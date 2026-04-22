@@ -4,6 +4,7 @@ A minimal Chrome extension thats a reading assistant. Highlight text to explain,
 
 Lumen tooltip appearing over selected text
 
+![Lumen](extension/public/lumen.gif)   
 ## Features
 
 - **Text selection toolbar**: highlight any text and a floating toolbar appears with Explain, Summarize, and Define actions
