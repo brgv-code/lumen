@@ -75,6 +75,9 @@ class Lumen {
       if (ch.lumen_settings_v2?.newValue) { this.settings = { ...DEFAULT_SETTINGS, ...ch.lumen_settings_v2.newValue }; this.applySettings(); }
     });
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applySettings());
+    const mo = new MutationObserver(() => this.adaptMarks());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     this.applySettings();
 
     chrome.runtime.onMessage.addListener((m, _s, reply) => {
@@ -124,16 +127,14 @@ class Lumen {
     this.adaptMarks();
   }
 
-  /** Light text means a dark page: switch that mark to a tint plus underline so it stays readable. */
+  /** Light text or a dark background means a dark page: that mark becomes a tint plus underline. */
   adaptMarks() {
     const style = this.settings.markStyle ?? "auto";
     document.querySelectorAll<HTMLElement>("mark.lumen-mark").forEach((m) => {
       m.classList.remove("lumen-dark", "lumen-ul");
       if (style === "underline") { m.classList.add("lumen-ul"); return; }
       if (style === "fill") return;
-      const c = getComputedStyle(m.parentElement ?? m).color.match(/\d+(\.\d+)?/g)?.map(Number) ?? [0, 0, 0];
-      const lum = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
-      if (lum > 0.6) m.classList.add("lumen-dark");
+      if (isDarkContext(m)) m.classList.add("lumen-dark");
     });
   }
 
@@ -491,4 +492,36 @@ class Lumen {
 
 function esc(s: string) {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+}
+
+/* ---------- colour helpers ---------- */
+// getComputedStyle can return rgb(), oklch(), lab(), color(srgb …) and more. A 1x1 canvas turns
+// any of them into real RGBA, so the check works on every site.
+let probe: CanvasRenderingContext2D | null = null;
+function toRgba(css: string): [number, number, number, number] | null {
+  try {
+    probe ??= Object.assign(document.createElement("canvas"), { width: 1, height: 1 }).getContext("2d", { willReadFrequently: true });
+    if (!probe) return null;
+    probe.clearRect(0, 0, 1, 1);
+    probe.fillStyle = "#000";
+    probe.fillStyle = css;
+    probe.fillRect(0, 0, 1, 1);
+    const d = probe.getImageData(0, 0, 1, 1).data;
+    const alphaFromCss = /transparent|rgba?\([^)]*,\s*0\s*\)|\/\s*0\s*\)/.test(css) ? 0 : d[3] / 255;
+    return [d[0], d[1], d[2], alphaFromCss];
+  } catch { return null; }
+}
+const lum = ([r, g, b]: number[]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+function isDarkContext(el: HTMLElement): boolean {
+  const text = toRgba(getComputedStyle(el.parentElement ?? el).color);
+  if (text && lum(text) > 0.62) return true;
+  // walk up to the first solid background
+  for (let n: HTMLElement | null = el.parentElement; n; n = n.parentElement) {
+    const bg = toRgba(getComputedStyle(n).backgroundColor);
+    if (bg && bg[3] > 0.5) return lum(bg) < 0.4;
+  }
+  const root = toRgba(getComputedStyle(document.documentElement).backgroundColor);
+  if (root && root[3] > 0.5) return lum(root) < 0.4;
+  return matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.style.colorScheme !== "light";
 }
