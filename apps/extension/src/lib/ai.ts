@@ -83,8 +83,15 @@ async function viaOpenAI(prompt: string, s: Settings, on: On) {
   await readSSE(res, (j) => j.choices?.[0]?.delta?.content, on);
 }
 
+const NO_PERMISSION = "Allow the Claude helper first: open Lumen settings and pick Claude (local CLI).";
+/** Native messaging is an optional permission, granted when Claude is picked in settings. */
+async function nativeAllowed(): Promise<boolean> {
+  try { return await chrome.permissions.contains({ permissions: ["nativeMessaging"] }); } catch { return false; }
+}
+
 /** Claude through the local Lumen helper, which runs `claude -p` (native messaging). */
-function viaClaude(prompt: string, s: Settings, on: On): Promise<void> {
+async function viaClaude(prompt: string, s: Settings, on: On): Promise<void> {
+  if (!(await nativeAllowed())) { on.error(NO_PERMISSION); return; }
   return new Promise((resolve) => {
     let port: chrome.runtime.Port;
     try {
@@ -123,6 +130,7 @@ export async function testProvider(s: Settings): Promise<{ ok: boolean; message:
       const r = await fetch(`${s.openaiBaseUrl.replace(/\/$/, "")}/models`, { headers: { authorization: `Bearer ${s.openaiKey}` } });
       return r.ok ? { ok: true, message: "API key works" } : { ok: false, message: `API answered ${r.status}` };
     }
+    if (!(await nativeAllowed())) return { ok: false, message: NO_PERMISSION };
     return await new Promise((resolve) => {
       try {
         const port = chrome.runtime.connectNative("dev.lumen.host");

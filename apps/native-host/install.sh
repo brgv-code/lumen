@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Registers the Lumen helper with Chrome (macOS and Linux).
-# Usage: ./install.sh [extension-id]   (defaults to the fixed id of the unpacked build)
+# Usage: ./install.sh [extension-id ...]
+# With no ids it allows both the unpacked build and the Chrome Web Store build.
 set -euo pipefail
-EXT_ID="${1:-ffjconacpmnbadoeegamifkellcddfja}"
+DEV_ID="ffjconacpmnbadoeegamifkellcddfja"   # unpacked build (fixed manifest key)
+STORE_ID=""                                 # Chrome Web Store build: fill in after the first upload
+if [[ $# -gt 0 ]]; then IDS=("$@"); else IDS=("$DEV_ID"); [[ -n "$STORE_ID" ]] && IDS+=("$STORE_ID"); fi
+ORIGINS=""
+for ID in "${IDS[@]}"; do ORIGINS+="${ORIGINS:+, }\"chrome-extension://$ID/\""; done
 DIR="$(cd "$(dirname "$0")" && pwd)"
 NODE="$(command -v node)"
 CLAUDE="$(command -v claude || true)"
@@ -29,7 +34,7 @@ for TARGET in "${TARGETS[@]}"; do
   "description": "Lumen helper: runs claude -p for the Lumen extension",
   "path": "$WRAPPER",
   "type": "stdio",
-  "allowed_origins": ["chrome-extension://$EXT_ID/"]
+  "allowed_origins": [$ORIGINS]
 }
 JSON
   echo "Registered for: $TARGET"

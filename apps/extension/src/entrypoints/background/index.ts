@@ -22,6 +22,7 @@ export default defineBackground(() => {
       if (msg?.type === "LUMEN_CONNECT" && typeof msg.token === "string" && msg.token.startsWith("lum_") && origin) {
         await saveSettings({ token: msg.token, apiBase: origin });
         buildMenus();
+        refreshMarkedIndex().catch(() => {});
         return reply({ ok: true });
       }
       reply({ ok: false });
@@ -51,8 +52,9 @@ export default defineBackground(() => {
     buildMenus();
     injectIntoOpenTabs();
     if (d.reason === "install") chrome.runtime.openOptionsPage();
+    refreshMarkedIndex().catch(() => {});
   });
-  chrome.runtime.onStartup.addListener(() => buildMenus());
+  chrome.runtime.onStartup.addListener(() => { buildMenus(); refreshMarkedIndex().catch(() => {}); });
   chrome.contextMenus.onClicked.addListener((info, tab) => onMenu(info, tab).catch(() => {}));
   chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
 
@@ -66,10 +68,12 @@ export default defineBackground(() => {
   chrome.alarms.create("lumen-reminders", { periodInMinutes: 240, delayInMinutes: 1 });
   chrome.alarms.create("lumen-menus", { periodInMinutes: 60 });
   chrome.alarms.create("lumen-follow", { periodInMinutes: 60, delayInMinutes: 2 });
+  chrome.alarms.create("lumen-index", { periodInMinutes: 30 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === "lumen-reminders") checkReminders().catch(() => {});
     if (a.name === "lumen-menus") buildMenus();
     if (a.name === "lumen-follow") checkNewPosts().catch(() => {});
+    if (a.name === "lumen-index") refreshMarkedIndex().catch(() => {});
   });
   chrome.notifications.onClicked.addListener(async (nid) => {
     if (nid.startsWith("lumen-post-")) {
@@ -233,6 +237,28 @@ async function chat(port: chrome.runtime.Port, req: { question: string; page?: u
   }
 }
 
+/* ---------------- which pages have highlights ----------------
+   Kept locally so restoring highlights on page load never sends the URL you are visiting to the
+   server: only pages already in your library are looked up. */
+const INDEX_KEY = "lumen_marked_urls";
+async function markedIndex(): Promise<Set<string> | null> {
+  const v = (await chrome.storage.local.get(INDEX_KEY))[INDEX_KEY] as { urls: string[]; at: number } | undefined;
+  return v ? new Set(v.urls) : null;
+}
+async function refreshMarkedIndex(): Promise<Set<string> | null> {
+  if (!(await connected())) { await chrome.storage.local.remove(INDEX_KEY); return null; }
+  try {
+    const r = await cloudApi.markedUrls();
+    await chrome.storage.local.set({ [INDEX_KEY]: { urls: r.urls, at: r.at } });
+    return new Set(r.urls);
+  } catch { return markedIndex(); }
+}
+async function addToMarkedIndex(url: string) {
+  const set = (await markedIndex()) ?? new Set<string>();
+  set.add(url);
+  await chrome.storage.local.set({ [INDEX_KEY]: { urls: [...set], at: Date.now() } });
+}
+
 /* ---------------- messages ---------------- */
 
 async function connected() {
@@ -302,6 +328,11 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "PAGE_STATE": {
       const url = pageKey(msg.url);
       if (!(await connected())) return { connected: false, item: null, highlights: await localHighlights(url) } satisfies PageState;
+      // automatic restore on page load: only ask about pages that are known to have highlights
+      if (msg.auto) {
+        const index = (await markedIndex()) ?? (await refreshMarkedIndex());
+        if (!index?.has(url)) return { connected: true, item: null, highlights: [] } satisfies PageState;
+      }
       try {
         const r = await cloudApi.lookup(url);
         return { connected: true, item: r.item, highlights: r.highlights } satisfies PageState;
@@ -338,6 +369,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       }
       const item = await ensureItem(url, msg.title, msg.html, msg.collectionId);
       const r = await cloudApi.addHighlight(item.id, { ...msg.quote, color: msg.color, note: msg.note });
+      addToMarkedIndex(pageKey(item.url ?? url)).catch(() => {});
       autoSend(tabId);
       return { ok: true, highlight: r.highlight };
     }
@@ -392,6 +424,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "SAVE_SETTINGS": {
       const settings = await saveSettings(msg.settings);
       if ("token" in msg.settings || "helper" in msg.settings) buildMenus();
+      if ("token" in msg.settings || "apiBase" in msg.settings) refreshMarkedIndex().catch(() => {});
       return { ok: true, settings };
     }
 

@@ -70,7 +70,7 @@ export interface PageState {
 
 export type Msg =
   | { type: "AI_REQUEST"; action: AIAction; text: string; question?: string; title?: string; context?: string }
-  | { type: "PAGE_STATE"; url: string }
+  | { type: "PAGE_STATE"; url: string; auto?: boolean }
   | { type: "SAVE_PAGE"; url: string; title: string; html: string }
   | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; quote: TextQuote; color: string; note?: string; collectionId?: string }
   | { type: "UPDATE_HIGHLIGHT"; id: string; url: string; color?: string; note?: string | null }

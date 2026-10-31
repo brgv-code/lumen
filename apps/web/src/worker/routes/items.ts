@@ -43,6 +43,13 @@ items.get("/", async (c) => {
   return c.json({ data: rows.map(toItem), nextCursor: next });
 });
 
+/** URLs of your pages that have highlights. The extension keeps this list locally so it only asks
+ *  about pages you have marked, instead of sending every page you visit to the server. */
+items.get("/urls", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT DISTINCT i.url FROM items i JOIN highlights h ON h.item_id = i.id WHERE i.user_id = ?").bind(c.get("user").id).all<{ url: string }>();
+  return c.json({ urls: results.map((r) => r.url), at: Date.now() });
+});
+
 items.get("/lookup", async (c) => {
   const u = c.get("user");
   const url = c.req.query("url");

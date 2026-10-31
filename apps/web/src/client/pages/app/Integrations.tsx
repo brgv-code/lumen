@@ -8,7 +8,7 @@ import { timeAgo } from "../../lib/hooks";
 import { useApp } from "./Layout";
 import { useSearchParams } from "react-router-dom";
 import { Segmented } from "../../components/ui";
-import { extension } from "../../lib/extension";
+import { extension, STORE_URL } from "../../lib/extension";
 import { ProChip } from "../../components/Pro";
 
 const KINDS = {
@@ -214,7 +214,9 @@ export function ExtensionPanel() {
              : <button className="key key--lamp key--sm" disabled={busy} onClick={connect}><Puzzle size={14} /> {busy ? "Connecting…" : "Connect this browser's extension"}</button>
       ) : (
         <ol className="small" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-          <li><a href="/downloads/lumen-extension.zip" download>Download the extension</a> and unzip it. Open <code className="mono">chrome://extensions</code> (or brave://extensions, arc://extensions), turn on Developer mode, choose Load unpacked and pick the unzipped folder.</li>
+          {STORE_URL
+            ? <li><a href={STORE_URL} target="_blank" rel="noreferrer">Add Lumen from the Chrome Web Store</a> (works in Chrome, Brave, Edge and Arc).</li>
+            : <li><a href="/downloads/lumen-extension.zip" download>Download the extension</a> and unzip it. Open <code className="mono">chrome://extensions</code> (or brave://extensions, arc://extensions), turn on Developer mode, choose Load unpacked and pick the unzipped folder.</li>}
           <li>Reload this page: a Connect button appears and links it in one click.</li>
           <li>Select text on any page: highlight, note, ask, copy. Pick the collection from the popup.</li>
         </ol>

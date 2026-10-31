@@ -135,7 +135,7 @@ class Lumen {
   }
 
   async load() {
-    const st = await send<{ highlights: Highlight[] }>({ type: "PAGE_STATE", url: location.href }).catch(() => null);
+    const st = await send<{ highlights: Highlight[] }>({ type: "PAGE_STATE", url: location.href, auto: true }).catch(() => null);
     if (!st) return;
     this.highlights = st.highlights;
     this.paint();

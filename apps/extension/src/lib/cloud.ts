@@ -24,6 +24,7 @@ export async function cloud<T>(method: string, path: string, body?: unknown): Pr
 
 export const cloudApi = {
   me: () => cloud<{ user: { name: string; isDemo: boolean } }>("GET", "/me"),
+  markedUrls: () => cloud<{ urls: string[]; at: number }>("GET", "/items/urls"),
   lookup: (url: string) => cloud<{ item: Item | null; highlights: Highlight[] }>("GET", `/items/lookup?url=${encodeURIComponent(url)}`),
   save: (d: { url: string; html?: string; title?: string; collectionId?: string; tags?: string[] }) => cloud<{ item: Item; created: boolean }>("POST", "/items", d),
   addHighlight: (itemId: string, d: Record<string, unknown>) => cloud<{ highlight: Highlight }>("POST", `/items/${itemId}/highlights`, d),

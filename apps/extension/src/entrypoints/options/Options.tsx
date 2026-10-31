@@ -171,7 +171,14 @@ export default function Options() {
             <h1 style={{ fontSize: 28 }}><span className="lead">Which</span> model answers</h1>
             <p className="muted" style={{ margin: 0 }}>Used by Explain, Expand, Summary and Define on the page. Asking your library in the side panel always goes through Lumen, because that is where your bank lives.</p>
             <div className="surface stack">
-              <div className="seg">{PROVIDERS.map((p) => <button key={p.id} aria-pressed={s.provider === p.id} onClick={() => set("provider", p.id)}>{p.label}</button>)}</div>
+              <div className="seg">{PROVIDERS.map((p) => <button key={p.id} aria-pressed={s.provider === p.id} onClick={async () => {
+                if (p.id === "claude") {
+                  // ask for native messaging only when someone actually wants the local Claude helper
+                  const ok = await chrome.permissions.request({ permissions: ["nativeMessaging"] }).catch(() => false);
+                  if (!ok) return;
+                }
+                set("provider", p.id);
+              }}>{p.label}</button>)}</div>
               <p className="small muted" style={{ margin: 0 }}>{PROVIDERS.find((p) => p.id === s.provider)?.hint}</p>
               {s.provider === "ollama" && (<>
                 <label>Ollama address<input value={s.ollamaBaseUrl} onChange={(e) => set("ollamaBaseUrl", e.target.value)} /></label>

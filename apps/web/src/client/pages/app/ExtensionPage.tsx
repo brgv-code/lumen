@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bell, Download, Heart, Highlighter, Keyboard, MousePointerClick, PanelRight, Puzzle, Sparkles, Settings as Gear } from "lucide-react";
-import { extension } from "../../lib/extension";
+import { extension, STORE_URL } from "../../lib/extension";
 import { PageHero } from "../../components/PageHero";
 import { ExtensionPanel } from "./Integrations";
 
@@ -30,12 +30,14 @@ export default function ExtensionPage() {
         mesh="mesh-sky" tiles={[["tile--sky", <Puzzle />], ["tile--lamp", <Highlighter />], ["tile--iris", <PanelRight />], ["tile--mint", <Heart />]]}
         actions={<>
           {ext && <button className="key key--ghost key--sm" onClick={() => extension.openOptions()}><Gear size={14} /> Extension settings</button>}
-          <a className="key key--lamp key--sm" href="/downloads/lumen-extension.zip" download><Download size={14} /> Download{latest ? ` v${latest}` : ""}</a>
+          {STORE_URL
+            ? <a className="key key--lamp key--sm" href={STORE_URL} target="_blank" rel="noreferrer"><Download size={14} /> {ext ? "Chrome Web Store" : "Add to Chrome"}</a>
+            : <a className="key key--lamp key--sm" href="/downloads/lumen-extension.zip" download><Download size={14} /> Download{latest ? ` v${latest}` : ""}</a>}
         </>} />
 
       {outdated && (
         <section className="card-flat row" style={{ padding: 14, background: "var(--lamp-tint)", flexWrap: "wrap" }}>
-          <span style={{ flex: 1, minWidth: 240 }} className="small"><b style={{ color: "var(--ink)" }}>Update available.</b> You have v{ext!.version}; v{latest} is out. If you installed from a zip, remove Lumen and load the new folder unpacked; if you load it from a folder, press reload on your extensions page.</span>
+          <span style={{ flex: 1, minWidth: 240 }} className="small"><b style={{ color: "var(--ink)" }}>Update available.</b> You have v{ext!.version}; v{latest} is out. {STORE_URL ? "Chrome updates store extensions on its own within a few hours; to update now, press Update on your extensions page with Developer mode on." : "If you installed from a zip, remove Lumen and load the new folder unpacked; if you load it from a folder, press reload on your extensions page."}</span>
         </section>
       )}
 
