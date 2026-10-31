@@ -109,7 +109,8 @@ Webhook payload:
 ## AI
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/api/v1/ai/run` | `{ action: explain\|summarize\|define\|simplify\|ask, text, question?, title?, context? }` | `text/event-stream`: `data: {"response":"…"}` … `data: [DONE]` |
+| POST | `/api/v1/ai/run` | `{ action: explain\|summarize\|define\|simplify\|expand\|ask, text, question?, title?, context? }` | `text/event-stream`: `data: {"response":"…"}` … `data: [DONE]` |
+| POST | `/api/v1/ai/chat` | `{ question, page?: { title, url, text }, selection?, history? }` | SSE: first `{"sources":[…]}` (numbered library matches), then `{"response":"…"}` chunks; answers cite sources as [n] |
 | POST | `/api/v1/ai/spark` | | `{ data: Idea[] }` from the last 30 highlights |
 | GET | `/api/v1/ideas` | | ideas not dismissed |
 | PATCH | `/api/v1/ideas/:id` | `{ status: new\|saved\|dismissed }` | keeping an idea awards glow |

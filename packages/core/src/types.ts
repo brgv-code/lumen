@@ -12,7 +12,7 @@ export type ItemKind = (typeof ITEM_KINDS)[number];
 export const DESTINATION_KINDS = ["obsidian", "notion", "markdown", "webhook"] as const;
 export type DestinationKind = (typeof DESTINATION_KINDS)[number];
 
-export const AI_ACTIONS = ["explain", "summarize", "define", "ask", "simplify"] as const;
+export const AI_ACTIONS = ["explain", "summarize", "define", "ask", "simplify", "expand"] as const;
 export type AIAction = (typeof AI_ACTIONS)[number];
 
 export type HighlightFormat = "house" | "callout" | "plain";

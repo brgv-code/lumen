@@ -151,3 +151,41 @@ export async function streamAI(
   }
   return full;
 }
+
+export interface ChatSource { n: number; kind: "highlight" | "item"; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null; excerpt?: string | null }
+
+/** Ask your library: streams the answer, calls onSources once. */
+export async function streamChat(
+  d: { question: string; history?: { role: string; content: string }[] },
+  on: { text: (full: string) => void; sources: (s: ChatSource[]) => void },
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch("/api/v1/ai/chat", { method: "POST", headers: { "content-type": "application/json", "x-lumen": "1" }, body: JSON.stringify(d), signal });
+  if (!res.ok || !res.body) {
+    let msg = "The assistant is unavailable right now.";
+    try { msg = (await res.json()).error?.message ?? msg; } catch { /* */ }
+    if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: msg }));
+    throw new ApiError(res.status, "ai", msg);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "", full = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") return full;
+      try {
+        const j = JSON.parse(data);
+        if (j.sources) on.sources(j.sources);
+        else if (j.response) { full += j.response; on.text(full); }
+      } catch { /* partial */ }
+    }
+  }
+  return full;
+}

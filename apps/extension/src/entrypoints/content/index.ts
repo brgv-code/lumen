@@ -3,6 +3,8 @@
 import { HIGHLIGHT_COLORS, citeForClipboard, type Highlight, type TextQuote } from "@lumen/core";
 import { anchorToRange, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { UI_CSS, MARK_CSS } from "./styles";
+import { ICON, LABEL, LAMP } from "./icons";
+import { DEFAULT_SETTINGS, type Settings } from "../../lib/types";
 
 const SWATCH: Record<string, string> = { sun: "#ffd34d", mint: "#3fd39a", iris: "#8a7bff", peach: "#ff8a6b", sky: "#5b9bff" };
 
@@ -27,6 +29,9 @@ function pageHtml(): string {
 }
 
 class Lumen {
+  settings: Settings = DEFAULT_SETTINGS;
+  helperEl!: HTMLElement;
+  helperMenu = false;
   host!: HTMLElement;
   root!: ShadowRoot;
   bar!: HTMLElement;
@@ -47,10 +52,11 @@ class Lumen {
     this.host.setAttribute("data-lumen-ui", "");
     this.host.style.cssText = "all: initial; position: absolute; top: 0; left: 0; z-index: 2147483646;";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${UI_CSS}</style><div class="bar" hidden></div><div class="card" hidden></div><div class="toast" hidden></div>`;
+    this.root.innerHTML = `<style>${UI_CSS}</style><div class="bar" hidden></div><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
     this.bar = this.root.querySelector(".bar")!;
     this.card = this.root.querySelector(".card")!;
     this.toastEl = this.root.querySelector(".toast")!;
+    this.helperEl = this.root.querySelector(".helper")!;
     document.documentElement.appendChild(this.host);
 
     document.addEventListener("mouseup", (e) => this.onSelect(e), true);
@@ -60,7 +66,19 @@ class Lumen {
     document.addEventListener("scroll", () => this.hideBar(), { passive: true, capture: true });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") { this.hideBar(); this.hideCard(); } });
 
+    send<{ settings: Settings }>({ type: "GET_SETTINGS" }).then((r) => { if (r?.settings) { this.settings = r.settings; this.renderHelper(); } }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch) => {
+      if (ch.lumen_settings_v2?.newValue) { this.settings = { ...DEFAULT_SETTINGS, ...ch.lumen_settings_v2.newValue }; this.renderHelper(); }
+    });
+
     chrome.runtime.onMessage.addListener((m, _s, reply) => {
+      if (m?.type === "GET_HTML") { reply(pageHtml()); return; }
+      if (m?.type === "SCROLL_TO") {
+        const el = document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`) as HTMLElement | null;
+        if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.animate([{ filter: "brightness(1)" }, { filter: "brightness(.8)" }, { filter: "brightness(1)" }], { duration: 700 }); }
+        reply({ ok: Boolean(el) });
+        return;
+      }
       if (m?.type === "GET_TEXT") {
         const sel = window.getSelection()?.toString().trim() ?? "";
         const main = (document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body;
@@ -77,6 +95,7 @@ class Lumen {
     if (!st) return;
     this.highlights = st.highlights;
     this.paint();
+    this.renderHelper();
     // late rendering pages: try again once content settles
     if (st.highlights.length) setTimeout(() => this.paint(), 2500);
   }
@@ -101,6 +120,8 @@ class Lumen {
       const quote = describeRange(document.body, range);
       if (!quote || quote.quote.trim().length < 2) return this.hideBar();
       this.pending = { quote, rect: range.getBoundingClientRect() };
+      const t = this.settings.toolbar;
+      if (!t.enabled || t.disabledSites.includes(location.hostname)) return;
       this.showBar();
     }, 10);
   }
@@ -108,19 +129,17 @@ class Lumen {
   showBar() {
     if (!this.pending) return;
     const { rect } = this.pending;
-    this.bar.innerHTML =
-      HIGHLIGHT_COLORS.map((c) => `<button class="sw" data-color="${c}" style="background:${SWATCH[c]}" title="Highlight"></button>`).join("") +
-      `<span class="sep"></span>
-       <button data-act="note">Note</button>
-       <button data-act="explain">Explain</button>
-       <button data-act="summarize">Summarize</button>
-       <button data-act="define">Define</button>
-       <button data-act="ask">Ask</button>
-       <button data-act="copy" title="Copy with a link back to this passage">Copy</button>`;
+    const t = this.settings.toolbar;
+    const acts = t.actions.length ? t.actions : DEFAULT_SETTINGS.toolbar.actions;
+    const btn = (a: string) => a === "highlight"
+      ? `<span class="hl-group"><button data-color="sun" class="act" title="Highlight">${ICON.highlight}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button><span class="flyout">${HIGHLIGHT_COLORS.map((c) => `<button class="sw" data-color="${c}" style="background:${SWATCH[c]}" title="Highlight ${c}"></button>`).join("")}</span></span>`
+      : `<button class="act" data-act="${a}" title="${LABEL[a]}">${ICON[a as keyof typeof ICON]}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button>`;
+    this.bar.className = `bar${t.labels ? " labels" : ""}`;
+    this.bar.innerHTML = acts.map(btn).join("") + `<span class="sep"></span><button class="act more" data-act="more" title="Toolbar settings">${ICON.more}</button>`;
     this.bar.hidden = false;
-    const w = this.bar.offsetWidth || 380;
+    const w = this.bar.offsetWidth || 260;
     const x = Math.min(Math.max(rect.left + rect.width / 2 - w / 2 + scrollX, scrollX + 8), scrollX + innerWidth - w - 8);
-    const y = rect.top + scrollY - 48 < scrollY + 4 ? rect.bottom + scrollY + 10 : rect.top + scrollY - 48;
+    const y = rect.top + scrollY - 46 < scrollY + 4 ? rect.bottom + scrollY + 10 : rect.top + scrollY - 46;
     this.bar.style.left = `${x}px`;
     this.bar.style.top = `${y}px`;
     this.bar.onmousedown = (ev) => ev.preventDefault(); // keep the page selection alive
@@ -128,30 +147,107 @@ class Lumen {
       const b = (ev.target as HTMLElement).closest("button");
       if (!b) return;
       if (b.dataset.color) return this.highlight(b.dataset.color);
-      const act = b.dataset.act!;
-      if (act === "note") return this.highlight("sun", true);
-      if (act === "copy") return this.copy();
-      if (act === "ask") return this.askBox(this.pending!.quote.quote);
-      this.ai(act as "explain" | "define" | "summarize", this.pending!.quote.quote);
+      const q = this.pending!.quote.quote;
+      switch (b.dataset.act) {
+        case "note": return this.highlight("sun", true);
+        case "copy": return this.copy();
+        case "save": return this.highlight("mint");
+        case "ask": return this.openPanel(`What does this mean: “${q.slice(0, 400)}”`, q);
+        case "more": return this.moreMenu();
+        default: return this.ai(b.dataset.act as "explain" | "define" | "summarize" | "expand", q);
+      }
+    };
+  }
+
+  moreMenu() {
+    this.hideBar();
+    const host = location.hostname;
+    this.card.hidden = false;
+    this.card.innerHTML = `
+      <div class="head"><span class="tile">${ICON.settings}</span><b>Toolbar</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
+      <div class="menu">
+        <button data-act="off-site">${ICON.eyeOff}<span>Turn off on ${host}</span></button>
+        <button data-act="settings">${ICON.settings}<span>Customise actions…</span></button>
+        <button data-act="panel">${ICON.panel}<span>Open the Lumen panel</span></button>
+      </div>`;
+    this.card.onclick = async (ev) => {
+      const b = (ev.target as HTMLElement).closest("button");
+      if (!b) return;
+      if (b.dataset.act === "close") return this.hideCard();
+      if (b.dataset.act === "off-site") { await send({ type: "SET_TOOLBAR_SITE", host, on: false }); this.hideCard(); return this.toast(`Toolbar off on ${host}. Turn it back on in settings.`); }
+      if (b.dataset.act === "settings") { send({ type: "OPEN_OPTIONS" }).catch(() => {}); return this.hideCard(); }
+      if (b.dataset.act === "panel") { this.hideCard(); return this.openPanel(); }
+    };
+  }
+
+  async openPanel(prompt?: string, fallbackText?: string) {
+    this.hideBar();
+    const r = await send<{ ok: boolean }>({ type: "OPEN_PANEL", prompt }).catch(() => ({ ok: false }));
+    if (!r?.ok && fallbackText) this.askBox(fallbackText);
+  }
+
+  /* ---------- the page helper ---------- */
+  helperOn() {
+    const h = this.settings.helper;
+    const host = location.hostname;
+    if (h.mode === "off") return false;
+    if (h.mode === "everywhere") return !h.hiddenOn.includes(host);
+    return h.sites.includes(host);
+  }
+
+  renderHelper() {
+    if (!this.helperEl) return;
+    const on = this.helperOn() && window.top === window;
+    this.host.classList.toggle("has-helper", on);
+    this.host.classList.toggle("helper-left", this.settings.helper.side === "left");
+    if (!on) { this.helperEl.hidden = true; return; }
+    const h = this.settings.helper;
+    const count = this.highlights.length;
+    this.helperEl.hidden = false;
+    this.helperEl.className = `helper ${h.side}`;
+    this.helperEl.innerHTML = `
+      ${this.helperMenu ? `<div class="hmenu">
+        <div class="hhead"><b>Hi, I'm ${esc(h.name)}</b><span class="muted">${count ? `${count} highlight${count === 1 ? "" : "s"} here` : "Select any text to start"}</span></div>
+        <button data-h="save">${ICON.save}<span>Save this page</span></button>
+        <button data-h="summary">${ICON.summarize}<span>Summarise this page</span></button>
+        <button data-h="ask">${ICON.ask}<span>Ask about this page</span></button>
+        <button data-h="panel">${ICON.panel}<span>Open the panel</span></button>
+        <div class="hsep"></div>
+        <button data-h="hide">${ICON.eyeOff}<span>Hide on ${location.hostname}</span></button>
+      </div>` : ""}
+      <button class="orb" data-h="toggle" title="${esc(h.name)}">${LAMP}${count ? `<span class="badge">${count}</span>` : ""}</button>
+      <span class="hname">${esc(h.name)}</span>`;
+    this.helperEl.onclick = async (ev) => {
+      const b = (ev.target as HTMLElement).closest("button");
+      if (!b) return;
+      const act = b.dataset.h;
+      if (act === "toggle") { this.helperMenu = !this.helperMenu; return this.renderHelper(); }
+      this.helperMenu = false; this.renderHelper();
+      if (act === "save") return this.savePage();
+      if (act === "summary") { const main = (document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body; return this.ai("summarize", (main.innerText || "").slice(0, 8000)); }
+      if (act === "ask") return this.openPanel("Summarise this page and connect it to what I have saved before.", document.title);
+      if (act === "panel") return this.openPanel();
+      if (act === "hide") { await send({ type: "SET_HELPER_SITE", host: location.hostname, on: false }); this.toast(`${h.name} hidden here. Bring it back from the popup or right click.`); }
     };
   }
 
   hideBar() { this.bar.hidden = true; }
   hideCard() { this.card.hidden = true; this.card.innerHTML = ""; }
 
-  async highlight(color: string, withNote = false) {
+  async highlight(color: string, withNote = false, collectionId?: string) {
     if (!this.pending) return;
     const quote = this.pending.quote;
     this.hideBar();
     window.getSelection()?.removeAllRanges();
     type AddResult = { ok: boolean; highlight?: Highlight; error?: string; local?: boolean };
     const r: AddResult = await send<AddResult>({
-      type: "ADD_HIGHLIGHT", url: location.href, title: document.title, html: pageHtml(), quote, color,
+      type: "ADD_HIGHLIGHT", url: location.href, title: document.title, html: pageHtml(), quote, color, collectionId,
     }).catch((e): AddResult => ({ ok: false, error: String(e) }));
     if (!r.ok || !r.highlight) return this.toast(r.error ?? "Could not save the highlight", "err");
     this.highlights.push(r.highlight);
     this.paint();
-    this.toast(r.local ? "Highlighted (saved in this browser)" : "Highlighted · +2 glow");
+    this.toast(r.local ? "Highlighted (saved in this browser)" : color === "mint" ? "Saved to your Lumen bank · +2 glow" : "Highlighted · +2 glow");
+    this.renderHelper();
     if (withNote) this.noteEditor(r.highlight);
   }
 
@@ -255,7 +351,7 @@ class Lumen {
     };
   }
 
-  async ai(action: "explain" | "define" | "summarize" | "ask", text: string, question?: string) {
+  async ai(action: "explain" | "define" | "summarize" | "expand" | "ask", text: string, question?: string) {
     this.hideBar();
     this.aiText = "";
     this.card.hidden = false;
@@ -263,11 +359,18 @@ class Lumen {
       <div class="head"><span class="tile iris">✦</span><b>${action === "ask" ? "Answer" : action[0].toUpperCase() + action.slice(1)}</b><span class="sp"></span><span class="chip" data-prov></span><button class="x" data-act="close">✕</button></div>
       <blockquote class="q">${esc((question ?? text).slice(0, 300))}</blockquote>
       <div class="answer streaming"></div>
-      <div class="row"><button class="key ghost" data-act="copy-answer">Copy answer</button></div>`;
+      <div class="row"><button class="key ghost" data-act="copy-answer">Copy answer</button><button class="key ghost" data-act="keep">Save to Lumen</button><button class="key ghost" data-act="more-panel">Ask more</button></div>`;
     this.card.onclick = async (ev) => {
       const b = (ev.target as HTMLElement).closest("button");
       if (b?.dataset.act === "close") this.hideCard();
       if (b?.dataset.act === "copy-answer") { await navigator.clipboard.writeText(this.aiText); this.toast("Answer copied"); }
+      if (b?.dataset.act === "more-panel") { this.hideCard(); this.openPanel(`Tell me more about: “${text.slice(0, 300)}”`); }
+      if (b?.dataset.act === "keep" && this.pending && this.aiText) {
+        await this.highlight("iris");
+        const h = this.highlights[this.highlights.length - 1];
+        if (h) await send({ type: "UPDATE_HIGHLIGHT", id: h.id, url: location.href, note: `${action[0].toUpperCase()}${action.slice(1)}: ${this.aiText.slice(0, 1500)}` });
+        this.toast("Saved the passage with this answer as its note");
+      }
     };
     const r = await send<{ provider: string }>({ type: "AI_REQUEST", action, text, question, title: document.title }).catch(() => null);
     const chip = this.card.querySelector("[data-prov]");
@@ -281,7 +384,14 @@ class Lumen {
     if (m.type === "AI_ERROR" && ans) { ans.classList.remove("streaming"); ans.classList.add("err"); ans.textContent = m.error ?? "Something went wrong"; }
     if (m.type === "TOAST") this.toast(m.text ?? "", m.tone === "err" ? "err" : "ok");
     if (m.type === "CMD") {
-      if (m.cmd === "save") this.savePage();
+      if (m.cmd === "save") this.savePage((m as { collectionId?: string }).collectionId);
+      if (m.cmd === "send-selection") {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) {
+          const quote = describeRange(document.body, sel.getRangeAt(0));
+          if (quote) { this.pending = { quote, rect: sel.getRangeAt(0).getBoundingClientRect() }; this.highlight("sun", false, (m as { collectionId?: string }).collectionId); }
+        }
+      }
       if (m.cmd === "highlight" || m.cmd === "explain") {
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed) {
@@ -295,8 +405,10 @@ class Lumen {
     }
   }
 
-  async savePage() {
-    const r = await send<{ ok: boolean; error?: string }>({ type: "SAVE_PAGE", url: location.href, title: document.title, html: pageHtml() });
+  async savePage(collectionId?: string) {
+    const r = collectionId
+      ? await send<{ ok: boolean; error?: string }>({ type: "SAVE_PAGE_TO", url: location.href, title: document.title, html: pageHtml(), collectionId })
+      : await send<{ ok: boolean; error?: string }>({ type: "SAVE_PAGE", url: location.href, title: document.title, html: pageHtml() });
     this.toast(r.ok ? "Saved to Lumen · +1 glow" : r.error ?? "Could not save", r.ok ? "ok" : "err");
   }
 

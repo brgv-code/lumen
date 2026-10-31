@@ -20,6 +20,7 @@ export default defineBackground(() => {
       }
       if (msg?.type === "LUMEN_CONNECT" && typeof msg.token === "string" && msg.token.startsWith("lum_") && origin) {
         await saveSettings({ token: msg.token, apiBase: origin });
+        buildMenus();
         return reply({ ok: true });
       }
       reply({ ok: false });
@@ -27,58 +28,183 @@ export default defineBackground(() => {
     return true;
   });
 
-  // The popup streams answers over a port (it has no tab to receive messages).
+  // Ports: margin answers for the popup, library chat for the side panel.
   chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== "lumen-ai") return;
-    port.onMessage.addListener(async (req: { action: "explain" | "summarize" | "define" | "ask"; text: string; question?: string; title?: string }) => {
-      const s = await getSettings();
-      port.postMessage({ provider: s.provider });
-      streamAnswer(req, s, {
-        chunk: (chunk) => { try { port.postMessage({ chunk }); } catch { /* closed */ } },
-        done: () => { try { port.postMessage({ done: true }); } catch { /* closed */ } },
-        error: (error) => { try { port.postMessage({ error }); } catch { /* closed */ } },
+    if (port.name === "lumen-ai") {
+      port.onMessage.addListener(async (req: { action: "explain" | "summarize" | "define" | "ask" | "expand"; text: string; question?: string; title?: string }) => {
+        const s = await getSettings();
+        port.postMessage({ provider: s.provider });
+        streamAnswer(req, s, {
+          chunk: (chunk) => safePost(port, { chunk }),
+          done: () => safePost(port, { done: true }),
+          error: (error) => safePost(port, { error }),
+        });
       });
-    });
+    }
+    if (port.name === "lumen-chat") {
+      port.onMessage.addListener((req: { question: string; page?: { title: string; url: string; text: string }; selection?: string; history?: { role: string; content: string }[] }) => chat(port, req));
+    }
   });
 
   chrome.runtime.onInstalled.addListener((d) => {
-    chrome.contextMenus.create({ id: "lumen-highlight", title: "Highlight with Lumen", contexts: ["selection"] });
-    chrome.contextMenus.create({ id: "lumen-explain", title: "Explain with Lumen", contexts: ["selection"] });
-    chrome.contextMenus.create({ id: "lumen-save", title: "Save page to Lumen", contexts: ["page"] });
+    buildMenus();
     if (d.reason === "install") chrome.runtime.openOptionsPage();
   });
+  chrome.runtime.onStartup.addListener(() => buildMenus());
+  chrome.contextMenus.onClicked.addListener((info, tab) => onMenu(info, tab).catch(() => {}));
+  chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
 
-  chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (!tab?.id) return;
-    const cmd = info.menuItemId === "lumen-highlight" ? "highlight" : info.menuItemId === "lumen-explain" ? "explain" : "save";
-    chrome.tabs.sendMessage(tab.id, { type: "CMD", cmd }).catch(() => {});
+  chrome.commands.onCommand.addListener(async (command) => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (command === "open-panel" && tab?.windowId !== undefined) { chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {}); return; }
+    if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "CMD", cmd: command === "save-page" ? "save" : "highlight" }).catch(() => {});
   });
 
   // Reminders: a gentle nudge for articles you started and left.
   chrome.alarms.create("lumen-reminders", { periodInMinutes: 240, delayInMinutes: 1 });
-  chrome.alarms.onAlarm.addListener((a) => { if (a.name === "lumen-reminders") checkReminders().catch(() => {}); });
+  chrome.alarms.create("lumen-menus", { periodInMinutes: 60 });
+  chrome.alarms.onAlarm.addListener((a) => {
+    if (a.name === "lumen-reminders") checkReminders().catch(() => {});
+    if (a.name === "lumen-menus") buildMenus();
+  });
   chrome.notifications.onClicked.addListener(async (nid) => {
     if (!nid.startsWith("lumen-remind-")) return;
     const s = await getSettings();
     chrome.tabs.create({ url: `${s.apiBase}/app/read/${nid.slice("lumen-remind-".length)}` });
     chrome.notifications.clear(nid);
   });
-
-  chrome.commands.onCommand.addListener(async (command) => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "CMD", cmd: command === "save-page" ? "save" : "highlight" }).catch(() => {});
-  });
 });
+
+function safePost(port: chrome.runtime.Port, m: object) {
+  try { port.postMessage(m); } catch { /* closed */ }
+}
+
+/* ---------------- right click menus ---------------- */
+
+let building = false;
+async function buildMenus() {
+  if (building) return;
+  building = true;
+  try {
+    await chrome.contextMenus.removeAll();
+    const s = await getSettings();
+    const add = (o: chrome.contextMenus.CreateProperties) => chrome.contextMenus.create(o, () => void chrome.runtime.lastError);
+    add({ id: "save-page", title: "Save page to Lumen", contexts: ["page"] });
+    add({ id: "save-link", title: "Save link to Lumen", contexts: ["link"] });
+    add({ id: "highlight", title: "Highlight with Lumen", contexts: ["selection"] });
+    add({ id: "explain", title: "Explain with Lumen", contexts: ["selection"] });
+    add({ id: "ask", title: "Ask Lumen about “%s”", contexts: ["selection"] });
+    let cols: { id: string; name: string; emoji: string }[] = [];
+    if (s.token) cols = (await cloudApi.collections().catch(() => ({ data: [] }))).data as typeof cols;
+    if (cols.length) {
+      add({ id: "send", title: "Send to Lumen", contexts: ["page", "selection", "link"] });
+      for (const c of cols.slice(0, 12)) add({ id: `send:${c.id}`, parentId: "send", title: `${c.emoji} ${c.name}`, contexts: ["page", "selection", "link"] });
+    }
+    add({ id: "sep", type: "separator", contexts: ["page"] });
+    add({ id: "panel", title: "Open the Lumen panel", contexts: ["page", "selection"] });
+    add({ id: "helper", title: `Show or hide ${s.helper.name} on this site`, contexts: ["page"] });
+  } finally {
+    building = false;
+  }
+}
+
+async function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab) {
+  if (!tab?.id) return;
+  const id = String(info.menuItemId);
+  const tabMsg = (m: object) => chrome.tabs.sendMessage(tab.id!, m).catch(() => {});
+  if (id === "panel" || id === "ask") {
+    await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+    if (id === "ask" && info.selectionText) setTimeout(() => chrome.runtime.sendMessage({ type: "PANEL_PROMPT", prompt: `What does this mean: “${info.selectionText}”` }).catch(() => {}), 500);
+    return;
+  }
+  if (id === "save-page") return tabMsg({ type: "CMD", cmd: "save" });
+  if (id === "highlight") return tabMsg({ type: "CMD", cmd: "highlight" });
+  if (id === "explain") return tabMsg({ type: "CMD", cmd: "explain" });
+  if (id === "save-link" && info.linkUrl) {
+    const r = await cloudApi.save({ url: info.linkUrl }).catch((e) => ({ error: String(e) }));
+    return tabMsg({ type: "TOAST", text: "error" in r ? "Could not save the link" : "Link saved to Lumen · +1 glow" });
+  }
+  if (id === "helper") {
+    const host = tab.url ? new URL(tab.url).hostname : "";
+    const s = await getSettings();
+    const shown = s.helper.mode === "everywhere" ? !s.helper.hiddenOn.includes(host) : s.helper.sites.includes(host);
+    await setHelperSite(host, !shown);
+    return tabMsg({ type: "TOAST", text: shown ? `${s.helper.name} hidden on ${host}` : `${s.helper.name} will keep you company on ${host}` });
+  }
+  if (id.startsWith("send:")) {
+    const collectionId = id.slice(5);
+    if (info.linkUrl && !info.selectionText) {
+      await cloudApi.save({ url: info.linkUrl, collectionId }).catch(() => {});
+      return tabMsg({ type: "TOAST", text: "Link sent to Lumen" });
+    }
+    return tabMsg({ type: "CMD", cmd: info.selectionText ? "send-selection" : "save", collectionId });
+  }
+}
+
+async function setHelperSite(host: string, on: boolean) {
+  const s = await getSettings();
+  const h = { ...s.helper };
+  if (h.mode === "everywhere") h.hiddenOn = on ? h.hiddenOn.filter((x) => x !== host) : [...new Set([...h.hiddenOn, host])];
+  else {
+    if (h.mode === "off" && on) h.mode = "chosen";
+    h.sites = on ? [...new Set([...h.sites, host])] : h.sites.filter((x) => x !== host);
+  }
+  await saveSettings({ helper: h });
+}
+
+/* ---------------- library chat (side panel) ---------------- */
+
+async function chat(port: chrome.runtime.Port, req: { question: string; page?: unknown; selection?: string; history?: unknown[] }) {
+  const s = await getSettings();
+  if (!s.token) return safePost(port, { error: "Connect Lumen in settings to ask your library." });
+  try {
+    const res = await fetch(`${s.apiBase}/api/v1/ai/chat`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${s.token}`, "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+      let m = `Lumen answered ${res.status}`;
+      try { m = (await res.json()).error?.message ?? m; } catch { /* */ }
+      return safePost(port, { error: m, upgrade: res.status === 402 });
+    }
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        const d = line.slice(5).trim();
+        if (d === "[DONE]") return safePost(port, { done: true });
+        try {
+          const j = JSON.parse(d);
+          if (j.sources) safePost(port, { sources: j.sources });
+          else if (j.response) safePost(port, { chunk: j.response });
+        } catch { /* partial */ }
+      }
+    }
+    safePost(port, { done: true });
+  } catch (e) {
+    safePost(port, { error: e instanceof Error ? e.message : "Could not reach Lumen" });
+  }
+}
+
+/* ---------------- messages ---------------- */
 
 async function connected() {
   return Boolean((await getSettings()).token);
 }
 
-async function ensureItem(url: string, title: string, html: string) {
+async function ensureItem(url: string, title: string, html: string, collectionId?: string) {
   const found = await cloudApi.lookup(url);
   if (found.item) return found.item;
   const s = await getSettings();
-  const r = await cloudApi.save({ url, title, html, collectionId: s.targetCollectionId || undefined });
+  const r = await cloudApi.save({ url, title, html, collectionId: collectionId ?? (s.targetCollectionId || undefined) });
   return r.item;
 }
 
@@ -107,6 +233,28 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       return { ok: true, provider: s.provider };
     }
 
+    case "OPEN_PANEL": {
+      const winId = sender.tab?.windowId;
+      try {
+        if (winId !== undefined) await chrome.sidePanel.open({ windowId: winId });
+        if (msg.prompt) setTimeout(() => chrome.runtime.sendMessage({ type: "PANEL_PROMPT", prompt: msg.prompt }).catch(() => {}), 500);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+
+    case "SET_HELPER_SITE":
+      await setHelperSite(msg.host, msg.on);
+      return { ok: true };
+
+    case "SET_TOOLBAR_SITE": {
+      const s = await getSettings();
+      const list = msg.on ? s.toolbar.disabledSites.filter((x) => x !== msg.host) : [...new Set([...s.toolbar.disabledSites, msg.host])];
+      await saveSettings({ toolbar: { ...s.toolbar, disabledSites: list } });
+      return { ok: true };
+    }
+
     case "PAGE_STATE": {
       const url = pageKey(msg.url);
       if (!(await connected())) return { connected: false, item: null, highlights: await localHighlights(url) } satisfies PageState;
@@ -124,6 +272,18 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       return { ok: true, item };
     }
 
+    case "SAVE_PAGE_TO": {
+      if (!(await connected())) return { ok: false, error: "Connect Lumen in settings to save pages." };
+      const url = pageKey(msg.url);
+      const found = await cloudApi.lookup(url);
+      if (found.item) {
+        const r = await cloud<{ item: unknown }>("PATCH", `/items/${found.item.id}`, { collectionId: msg.collectionId ?? null, ...(msg.tags?.length ? { tags: msg.tags } : {}) });
+        return { ok: true, item: r.item, existed: true };
+      }
+      const r = await cloud<{ item: unknown }>("POST", "/items", { url, title: msg.title, html: msg.html, collectionId: msg.collectionId, tags: msg.tags });
+      return { ok: true, item: r.item };
+    }
+
     case "ADD_HIGHLIGHT": {
       const url = pageKey(msg.url);
       if (!(await connected())) {
@@ -132,7 +292,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         await setLocalHighlights(url, [...(await localHighlights(url)), h]);
         return { ok: true, highlight: h, local: true };
       }
-      const item = await ensureItem(url, msg.title, msg.html);
+      const item = await ensureItem(url, msg.title, msg.html, msg.collectionId);
       const r = await cloudApi.addHighlight(item.id, { ...msg.quote, color: msg.color, note: msg.note });
       autoSend(tabId);
       return { ok: true, highlight: r.highlight };
@@ -163,13 +323,6 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "GET_COLLECTIONS":
       return { ok: true, collections: (await connected()) ? (await cloudApi.collections()).data : [] };
 
-    case "SET_TARGET":
-      await saveSettings({ targetCollectionId: msg.collectionId });
-      return { ok: true };
-
-    case "GET_SETTINGS":
-      return { ok: true, settings: await getSettings() };
-
     case "GET_DESTINATIONS":
       return { ok: true, destinations: (await connected()) ? (await cloudApi.destinations()).data : [] };
 
@@ -181,11 +334,22 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       }
       const r = await cloud<{ collection: { id: string } }>("POST", "/collections", { name: msg.name, emoji: msg.emoji, color: "sun", destinationId });
       await saveSettings({ targetCollectionId: r.collection.id });
+      buildMenus();
       return { ok: true, collection: r.collection };
     }
 
-    case "SAVE_SETTINGS":
-      return { ok: true, settings: await saveSettings(msg.settings) };
+    case "SET_TARGET":
+      await saveSettings({ targetCollectionId: msg.collectionId });
+      return { ok: true };
+
+    case "GET_SETTINGS":
+      return { ok: true, settings: await getSettings() };
+
+    case "SAVE_SETTINGS": {
+      const settings = await saveSettings(msg.settings);
+      if ("token" in msg.settings || "helper" in msg.settings) buildMenus();
+      return { ok: true, settings };
+    }
 
     case "TEST_CONNECTION":
       return testProvider(await getSettings());
@@ -199,8 +363,27 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         cloud<{ streak: number; glowToday: number; dailyGoal: number; level: { name: string } }>("GET", "/stats").catch(() => null),
         cloud<{ picks: { id: string; title: string; readingMinutes: number; status: string; progress: number }[] }>("GET", "/reads?period=daily").catch(() => null),
       ]);
-      return { ok: true, stats, picks: reads?.picks.slice(0, 3) ?? [] };
+      return { ok: true, stats, picks: reads?.picks.slice(0, 4) ?? [] };
     }
+
+    case "GET_RADAR": {
+      if (!(await connected())) return { ok: false };
+      try {
+        const r = await cloud<{ trends: { id: string; title: string; url: string; topic: string; score: number; source: string }[] }>("GET", "/radar");
+        return { ok: true, trends: r.trends.slice(0, 8) };
+      } catch (e) {
+        return { ok: false, pro: (e as { status?: number }).status === 402, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+
+    case "SAVE_URL": {
+      const r = await cloudApi.save({ url: msg.url, title: msg.title });
+      return { ok: true, item: r.item, created: r.created };
+    }
+
+    case "OPEN_OPTIONS":
+      await chrome.runtime.openOptionsPage();
+      return { ok: true };
 
     case "OPEN_DASHBOARD": {
       const s = await getSettings();

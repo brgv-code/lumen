@@ -14,7 +14,15 @@ export function readerPrompt(action: AIAction, text: string, opts: { question?: 
     summarize: "Summarize this in two or three sentences.",
     define: "Define the key term or concept in this passage, then give one short example.",
     simplify: "Rewrite this passage so a 12 year old understands it, keeping the meaning.",
+    expand: "Expand on this passage: the background it assumes, why it is true or contested, and one concrete example. Keep it under 150 words.",
     ask: `Answer this question about the passage: ${opts.question?.slice(0, 500) || "What is this about?"}`,
   }[action];
   return `${passage}\n\n${task}`;
 }
+
+export const LIBRARY_SYSTEM = `You are Lumen, the reader's own research assistant. You answer from two places:
+the page they are reading (if given) and their Lumen library: articles they saved, passages they highlighted and notes they wrote.
+Prefer their own highlights and notes when they are relevant, and cite them inline as [1], [2] using the numbers given.
+If the library does not cover the question, say so briefly and answer from general knowledge, marked as such.
+Never invent authors, people, quotes or titles: only name what appears in the page text or the numbered sources.
+Plain language, at most 180 words, short paragraphs or a short list, no preamble.`;

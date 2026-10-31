@@ -5,7 +5,7 @@ import { Home, Library, Highlighter, FolderHeart, Sparkles, Plug, Settings, Sear
 import { ConnectAgent } from "../../components/ConnectAgent";
 import { PaywallModal, ProChip } from "../../components/Pro";
 import { Tour, APP_TOUR, tourDone, markTour } from "../../components/Tour";
-import { Crown } from "lucide-react";
+import { Crown, MessageCircle } from "lucide-react";
 import { Logo, Modal, useToast } from "../../components/ui";
 import { api } from "../../lib/api";
 import "../../styles/app.css";
@@ -69,6 +69,7 @@ export default function Layout() {
             <NavLink to="/app/library" className="side__link" data-tour="nav-library"><span className="ico"><Library /></span> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
             <NavLink to="/app/highlights" className="side__link" data-tour="nav-highlights"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
             <NavLink to="/app/collections" className="side__link" data-tour="nav-collections"><span className="ico"><FolderHeart /></span> Collections</NavLink>
+            <NavLink to="/app/ask" className="side__link" data-tour="nav-ask"><span className="ico"><MessageCircle /></span> Ask</NavLink>
             <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
             <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
             <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>

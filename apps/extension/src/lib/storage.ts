@@ -6,8 +6,16 @@ const LOCAL = "lumen_local_highlights"; // offline mode: { [url]: Highlight[] }
 
 export async function getSettings(): Promise<Settings> {
   const r = await chrome.storage.local.get(SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...(r[SETTINGS] ?? {}) };
+  const saved = r[SETTINGS] ?? {};
+  return {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    toolbar: { ...DEFAULT_SETTINGS.toolbar, ...(saved.toolbar ?? {}) },
+    helper: { ...DEFAULT_SETTINGS.helper, ...(saved.helper ?? {}) },
+  };
 }
+
+export const SETTINGS_KEY = SETTINGS;
 
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
   const next = { ...(await getSettings()), ...patch };

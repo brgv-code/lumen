@@ -4,6 +4,8 @@ import type { AppEnv, SessionUser } from "../env";
 import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
 import { DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
+import { retrieve, sourcesBlock } from "../lib/retrieve";
+import { LIBRARY_SYSTEM } from "@lumen/core";
 import { safeJson, toIdea } from "../lib/map";
 import { glowStmt } from "../lib/glow";
 
@@ -37,6 +39,45 @@ ai.post("/run", async (c) => {
     fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment, or switch to a local model in the extension.");
   }
   return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+});
+
+/** Ask Lumen: chat grounded in the page (optional) and the reader's own library.
+ *  SSE: first event {"sources":[...]}, then {"response":"..."} chunks, then [DONE]. */
+ai.post("/chat", async (c) => {
+  const u = c.get("user");
+  const b = await body<{ question?: string; page?: { title?: string; url?: string; text?: string }; selection?: string; history?: { role: string; content: string }[] }>(c);
+  const question = str(b.question, 1500);
+  if (!question) fail(422, "bad_request", "Ask a question.");
+  await spend(c.env.DB, u);
+  const sources = await retrieve(c.env.DB, u.id, `${question} ${b.selection ?? ""} ${b.page?.title ?? ""}`);
+  const page = b.page?.text ? `The reader is on "${b.page.title ?? "a page"}" (${b.page.url ?? ""}). Page text (trimmed): """${b.page.text.slice(0, 5000)}"""` : "";
+  const sel = b.selection ? `They selected: """${b.selection.slice(0, 1500)}"""` : "";
+  const history = (b.history ?? []).slice(-6).filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+  let stream: ReadableStream;
+  try {
+    stream = (await c.env.AI.run((c.env.AI_MODEL || DEFAULT_MODEL) as Parameters<Ai["run"]>[0], {
+      messages: [
+        { role: "system", content: LIBRARY_SYSTEM },
+        ...history,
+        { role: "user", content: [page, sel, sourcesBlock(sources), `Question: ${question}`].filter(Boolean).join("\n\n") },
+      ],
+      stream: true,
+      max_tokens: 500,
+    } as never)) as unknown as ReadableStream;
+  } catch (e) {
+    console.error("chat failed", e);
+    fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment.");
+  }
+  const head = new TextEncoder().encode(`data: ${JSON.stringify({ sources })}\n\n`);
+  const out = new ReadableStream({
+    async start(ctrl) {
+      ctrl.enqueue(head);
+      const r = stream.getReader();
+      while (true) { const { done, value } = await r.read(); if (done) break; ctrl.enqueue(value); }
+      ctrl.close();
+    },
+  });
+  return new Response(out, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
 });
 
 /** Spark: turn recent highlights into writing ideas. */

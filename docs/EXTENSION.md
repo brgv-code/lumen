@@ -1,36 +1,40 @@
 # The extension
 
-Chrome (Manifest V3, built with WXT). Load `apps/extension/.output/chrome-mv3` unpacked until
-it is in the Chrome Web Store.
+Chrome, Brave, Edge and Arc (Manifest V3, built with WXT). Load `apps/extension/.output/chrome-mv3`
+unpacked until it is in the Chrome Web Store. The unpacked build has a fixed id
+(`ffjconacpmnbadoeegamifkellcddfja`) so the dashboard can connect it in one click.
 
-## On any page
-| Action | How |
-|---|---|
-| Highlight | Select text, pick a colour in the toolbar, or press **Alt+Shift+H** |
-| Note | Toolbar **Note**, or click an existing highlight |
-| Copy with citation | Toolbar **Copy**: quote, title and a link that scrolls back to the passage. Plain Ctrl+C always works too |
-| Explain, Define, Ask | Toolbar buttons; the answer streams into a card |
-| Save the page | **Alt+Shift+S**, the popup, or right click → Save page to Lumen |
-| Change or delete a highlight | Click it |
+## Design: one job per surface
+Reading should not mean leaving the page. Every surface does one thing, the way the best reading
+and AI extensions split their work (one card save popups, a selection action bar, a persistent side
+panel, an optional page button with per site control):
 
-Highlights are stored as a quote plus the text around it, so they reappear when you come back
-even if the layout changed. Without an account they stay in the browser (local mode).
-
-## Popup
-Shows the page's state, saves it, and sets the **target collection**: the project you are
-reading for. Highlights go into that collection and, if it has a destination, are sent there
-once each (automatically if auto send is on).
+| Surface | Job | Opens with |
+|---|---|---|
+| **Selection toolbar** | Act on a passage without leaving: highlight (hover for colours), note, explain, expand, summary, define, ask, save, copy with link | Selecting text; Alt+Shift+H highlights |
+| **Popup** | Save this page to the right collection, with tags | The toolbar icon; Alt+Shift+S |
+| **Side panel** | Ask: chat with this page and your whole Lumen library, answers cite your own highlights and notes. This page: save state, collection, highlights here. For you: today's reads and trending in your topics | "Ask & explore" in the popup, right click, Lumi, Alt+Shift+L |
+| **Lumi, the page helper** | A small lamp at the edge of chosen sites: save, summarise, ask, open the panel, hide here | Off, sites you choose (default) or everywhere |
+| **Right click** | Save page or link; Send to Lumen ▸ any collection; highlight, explain or ask about a selection; show or hide Lumi on this site | The context menu |
 
 ## Settings
-- **Account:** Lumen address and an access token from Integrations.
-- **Model:** Lumen (hosted), Ollama (local), OpenAI compatible, or Claude (local CLI).
+- **Selection toolbar:** on or off; which actions, in which order (live preview); words next to
+  icons; sites where it stays off (also from ⋯ on the toolbar).
+- **Page helper:** name it, never / sites I choose / everywhere, left or right, and the site lists.
+- **Account:** one click connect, or paste a token; auto send to the collection's note.
+- **Model:** Lumen (hosted), Ollama, OpenAI compatible, or Claude via your CLI. Asking your library
+  always goes through Lumen, because that is where your bank lives.
 - **Obsidian:** the Local REST API key, kept in the extension only.
-- **Reminders:** a daily nudge for articles you started and left (uses Chrome notifications).
+- **Reminders** and shortcuts.
+
+## Your knowledge bank stays in Lumen
+Sending highlights to Obsidian or Notion is a copy. Every page, highlight, note and answer you keep
+also stays in Lumen, which is what Ask searches. "Save to Lumen" on an answer card stores the
+passage with the answer as its note.
 
 ## Claude through your CLI
-The extension cannot start programs, so a small helper does it through Chrome native messaging:
 ```bash
-apps/native-host/install.sh <extension-id>
+apps/native-host/install.sh          # registers for Chrome, Brave, Arc and Edge
 ```
-The helper runs `claude -p --model <haiku|sonnet|opus>` and streams the answer back. The page
-text goes in on stdin, never through a shell.
+The helper runs `claude -p --model <haiku|sonnet|opus>` and streams the answer back; page text goes
+in on stdin, never through a shell.

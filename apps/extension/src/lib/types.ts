@@ -15,6 +15,26 @@ export interface Settings {
   obsidianKey: string;      // Local REST API key, stays in the extension
   autoSend: boolean;        // push new highlights to the target's Obsidian note right away
   reminders: boolean;       // daily nudge for articles left half read
+  toolbar: ToolbarSettings;
+  helper: HelperSettings;
+}
+
+export const TOOLBAR_ACTIONS = ["highlight", "note", "explain", "expand", "summarize", "define", "ask", "save", "copy"] as const;
+export type ToolbarAction = (typeof TOOLBAR_ACTIONS)[number];
+
+export interface ToolbarSettings {
+  enabled: boolean;
+  actions: ToolbarAction[];   // shown, in order
+  labels: boolean;            // icons only, or icons with words
+  disabledSites: string[];    // hostnames where the toolbar stays hidden
+}
+
+export interface HelperSettings {
+  mode: "off" | "chosen" | "everywhere";
+  sites: string[];            // hostnames for "chosen"
+  hiddenOn: string[];         // hostnames hidden in "everywhere"
+  name: string;               // what to call the helper
+  side: "right" | "left";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -30,6 +50,8 @@ export const DEFAULT_SETTINGS: Settings = {
   obsidianKey: "",
   autoSend: true,
   reminders: true,
+  toolbar: { enabled: true, actions: ["highlight", "note", "explain", "expand", "summarize", "save", "copy"], labels: false, disabledSites: [] },
+  helper: { mode: "chosen", sites: [], hiddenOn: [], name: "Lumi", side: "right" },
 };
 
 export interface PageState {
@@ -42,7 +64,7 @@ export type Msg =
   | { type: "AI_REQUEST"; action: AIAction; text: string; question?: string; title?: string }
   | { type: "PAGE_STATE"; url: string }
   | { type: "SAVE_PAGE"; url: string; title: string; html: string }
-  | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; quote: TextQuote; color: string; note?: string }
+  | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; quote: TextQuote; color: string; note?: string; collectionId?: string }
   | { type: "UPDATE_HIGHLIGHT"; id: string; url: string; color?: string; note?: string | null }
   | { type: "DELETE_HIGHLIGHT"; id: string; url: string }
   | { type: "GET_COLLECTIONS" }
@@ -54,6 +76,13 @@ export type Msg =
   | { type: "OPEN_DASHBOARD"; path?: string }
   | { type: "GET_HOME" }
   | { type: "GET_DESTINATIONS" }
-  | { type: "CREATE_COLLECTION"; name: string; emoji: string; destinationId?: string; obsidianNote?: string };
+  | { type: "CREATE_COLLECTION"; name: string; emoji: string; destinationId?: string; obsidianNote?: string }
+  | { type: "OPEN_PANEL"; prompt?: string }
+  | { type: "SET_HELPER_SITE"; host: string; on: boolean }
+  | { type: "SET_TOOLBAR_SITE"; host: string; on: boolean }
+  | { type: "SAVE_PAGE_TO"; url: string; title: string; html: string; collectionId?: string; tags?: string[] }
+  | { type: "GET_RADAR" }
+  | { type: "OPEN_OPTIONS" }
+  | { type: "SAVE_URL"; url: string; title?: string };
 
 export type { Collection, Highlight, Item };
