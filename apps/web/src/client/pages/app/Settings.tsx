@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { PageHero } from "../../components/PageHero";
-import { useNavigate } from "react-router-dom";
-import { Download, KeyRound, LogOut, Moon, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Crown, Download, KeyRound, LogOut, Moon, Trash2 } from "lucide-react";
 import { api, type Token } from "../../lib/api";
 import { getTheme, setTheme, timeAgo } from "../../lib/hooks";
 import { Segmented, useToast } from "../../components/ui";
 import { useApp } from "./Layout";
 
 export default function Settings() {
-  const { user, refresh } = useApp();
+  const { user, refresh, startTour } = useApp();
   const toast = useToast();
   const nav = useNavigate();
   const [name, setName] = useState(user.name);
@@ -46,6 +46,12 @@ export default function Settings() {
         <label className="field"><span>Daily glow goal: {goal}</span><input type="range" min={5} max={100} step={5} value={goal} onChange={(e) => setGoal(Number(e.target.value))} style={{ accentColor: "var(--lamp)" }} /></label>
         <div><button className="key key--sm">Save profile</button></div>
       </form>
+
+      <section className="panel stack">
+        <div className="row"><span className="tile tile--sm tile--lamp"><Crown /></span><h2>Plan</h2><span className="spacer" /><span className={`chip ${user.planStatus === "free" ? "" : "chip--lamp"}`}>{user.planStatus === "pro" ? "Pro" : user.planStatus === "trial" ? `Pro trial · ${user.trialDaysLeft}d left` : "Free"}</span></div>
+        <p className="small muted">{user.planStatus === "trial" ? `Every Pro feature is on until ${new Date(user.trialEndsAt).toLocaleDateString(undefined, { month: "long", day: "numeric" })}. Your library, highlights and Obsidian sync stay free after that.` : user.planStatus === "free" ? "Your library, highlights, notes and Obsidian sync are free forever." : "Thank you for supporting Lumen."}</p>
+        <div className="row" style={{ flexWrap: "wrap" }}><Link to="/app/upgrade" className="key key--lamp key--sm"><Crown size={14} /> {user.planStatus === "pro" ? "Manage plan" : "See Pro"}</Link><button className="key key--ghost key--sm" onClick={startTour}>Replay the tour</button></div>
+      </section>
 
       <section className="panel stack">
         <h2>Reading and privacy</h2>

@@ -7,6 +7,7 @@ import { Modal, useToast } from "../../components/ui";
 import { timeAgo } from "../../lib/hooks";
 import { useApp } from "./Layout";
 import { extension } from "../../lib/extension";
+import { ProChip } from "../../components/Pro";
 
 const KINDS = {
   obsidian: { label: "Obsidian", tile: "tile--iris", icon: <NotebookPen />, blurb: "Append to a note in your vault through the Local REST API plugin. Runs in your browser; the key never leaves it." },
@@ -21,7 +22,7 @@ const getKey = (id: string) => { try { return localStorage.getItem(keyFor(id)) ?
 
 export default function Integrations() {
   const toast = useToast();
-  const { openAgent } = useApp();
+  const { openAgent, user } = useApp();
   const [dests, setDests] = useState<Destination[] | null>(null);
   const [adding, setAdding] = useState<Kind | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -76,8 +77,8 @@ export default function Integrations() {
 
       <section className="grid-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
         {(Object.keys(KINDS) as Kind[]).map((k) => (
-          <button key={k} className="item-card" style={{ border: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => setAdding(k)}>
-            <div className="row"><span className={`tile ${KINDS[k].tile}`}>{KINDS[k].icon}</span><span className="spacer" /><span className="chip"><Plus size={12} /> Add</span></div>
+          <button key={k} className="item-card" style={{ border: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => ((k === "notion" || k === "webhook") && !user.pro ? window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: `${KINDS[k].label} destinations are part of Lumen Pro.` })) : setAdding(k))}>
+            <div className="row"><span className={`tile ${KINDS[k].tile}`}>{KINDS[k].icon}</span><span className="spacer" />{(k === "notion" || k === "webhook") && !user.pro && <ProChip />}<span className="chip"><Plus size={12} /> Add</span></div>
             <h3>{KINDS[k].label}</h3>
             <p className="excerpt" style={{ WebkitLineClamp: 3 }}>{KINDS[k].blurb}</p>
           </button>

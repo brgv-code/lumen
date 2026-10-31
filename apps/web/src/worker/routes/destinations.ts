@@ -10,6 +10,7 @@ import { DESTINATION_KINDS, formatHighlight, formatSourceBlock, textFragmentUrl,
 import type { AppEnv } from "../env";
 import { body, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
 import { safeJson, toDestination } from "../lib/map";
+import { requirePro } from "../lib/plan";
 
 export const destinations = new Hono<AppEnv>();
 
@@ -57,6 +58,7 @@ destinations.post("/", async (c) => {
   const b = await body<{ kind?: string; name?: string; config?: Record<string, unknown>; secret?: string }>(c);
   const kind = oneOf(b.kind, DESTINATION_KINDS);
   if (!kind) fail(422, "bad_kind", "kind must be obsidian, notion, markdown or webhook.");
+  if (kind === "notion" || kind === "webhook") requirePro(c, kind);
   const config = cleanConfig(kind, b.config ?? {});
   const did = id("dst_");
   await c.env.DB.prepare("INSERT INTO destinations (id, user_id, kind, name, config, secret, created_at) VALUES (?,?,?,?,?,?,?)")
@@ -121,6 +123,7 @@ destinations.post("/:id/push", async (c) => {
   const u = c.get("user");
   const d = await own(c.env.DB, u.id, c.req.param("id"));
   if (d.kind !== "notion" && d.kind !== "webhook") fail(422, "client_delivered", `${d.kind} is delivered by the extension or the browser. Use /pending and /ack.`);
+  requirePro(c, d.kind as "notion" | "webhook");
   if (u.is_demo === 1) fail(403, "demo", "Pushing to external services is off in the demo.");
   const pending = await pendingFor(c.env.DB, d.id);
   if (!pending.length) return c.json({ delivered: 0 });

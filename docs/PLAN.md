@@ -52,6 +52,14 @@ While researching a piece of writing that breaks three ways:
 | Insight | Analytics page |
 | Growth | Docs, comparisons, answers, legal and changelog pages with structured data; sitemap, robots, llms.txt, Open Graph image |
 
+### Shipped in 2.2
+| Area | Feature |
+|---|---|
+| Business | Freemium: free plan forever (library, highlights, notes, collections, extension, Obsidian and markdown, daily reads, reminders, export); 7 day Pro trial (Spark, Radar, agents, analytics, Notion and webhooks, 500 hosted answers a day); paywall and in app pricing; Stripe Checkout, portal and webhook ready |
+| Onboarding | Welcome card and a ten step spotlight tour, replayable from Settings or the `?` button |
+| Extension | Dark mode, custom collection picker, create a collection and a new Obsidian note from the popup, ask about the page in the popup, Summarize in the toolbar |
+| License | AGPL-3.0 |
+
 ### Next
 | Priority | Feature | Notes |
 |---|---|---|

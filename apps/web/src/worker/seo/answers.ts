@@ -39,7 +39,7 @@ export const ANSWERS: Answer[] = [
     short: "A read later app saves web articles as clean, readable copies in one inbox, so you can read them when you have time instead of keeping dozens of tabs open. Good ones add highlighting, notes, progress tracking and export to your notes app.",
     steps: ["Save: one click in the browser or share sheet.", "Read: a distraction free view with your progress remembered.", "Keep: highlights and notes that go to your notes app.", "Review: a plan or reminders so the list does not only grow."],
     body: ["Look for four things: a clean reader view, highlights with notes, export you control (markdown or JSON), and something that helps you finish, such as daily reads or reminders.", "Lumen adds two extras: choosing which note each project's highlights go to, and an MCP connection so an AI agent like Claude can search and summarise what you saved."],
-    faq: [["Are read later apps free?", "Many have free tiers. Lumen is free for personal reading; Readwise Reader is paid."]],
+    faq: [["Are read later apps free?", "Many have free tiers. Lumen has a free plan with a 7 day trial of Pro; Readwise Reader is paid."]],
     related: ["how-do-i-save-an-article-to-read-later", "how-to-build-a-reading-habit"],
     topic: "save",
   },

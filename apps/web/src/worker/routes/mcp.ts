@@ -5,6 +5,7 @@
 import { Hono } from "hono";
 import type { AppEnv, SelfFetch } from "../env";
 import { userForBearer } from "../lib/session";
+import { entitlement } from "../lib/plan";
 
 const SERVER = { name: "lumen", title: "Lumen reading library", version: "2.1.0" };
 const VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -261,6 +262,10 @@ export function mcpApp(fetchApp: (req: Request) => Promise<Response>) {
           case "tools/call": {
             const tool = TOOLS.find((t) => t.name === params.name);
             if (!tool) { out.push(rpcError(m.id, -32602, `Unknown tool: ${String(params.name)}`)); break; }
+            if (!entitlement(user).pro) {
+              out.push(rpcResult(m.id, { content: [{ type: "text", text: `Agent access is part of Lumen Pro and the 7 day trial has ended. Upgrade at ${origin}/app/upgrade to keep using Lumen from your agent.` }], isError: true }));
+              break;
+            }
             try {
               const data = await tool.run((params.arguments ?? {}) as Json, call);
               out.push(rpcResult(m.id, {

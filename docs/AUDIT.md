@@ -20,12 +20,22 @@ listed with a priority.
 | Security | Anyone could create unlimited demo sandboxes | 8 per address per hour, hashed address, purged daily |
 | Backend | Workers AI model retired under us | Model ids in one file, friendly `ai_unavailable` |
 
+## Fixed in 2.2
+| Lens | Finding | Fix |
+|---|---|---|
+| Product | Public pricing before anyone has felt the product | Pricing only inside the app; landing CTAs lead to sign in; 7 day Pro trial for everyone |
+| Product | First time readers were dropped into a full dashboard | Welcome card plus a spotlight tour of every area |
+| Design | Native selects ignored dark mode in the extension | Custom picker; popup, settings and in page card follow the system theme |
+| Product | No way to create a collection or note from the extension | New collection, optionally with a new Obsidian note, from the popup |
+| Product | Asking what something means was only in the page toolbar | Ask, Summarize, Explain and Define from the popup too; Summarize back in the toolbar |
+| Legal | No license (all rights reserved) on a repo the site calls open source | AGPL-3.0 |
+
 ## Remaining, by priority
 | P | Lens | Item | Notes |
 |---|---|---|---|
 | P0 | Backend | **OAuth apps and secrets** for Google and GitHub | Code is done; needs the consoles and `wrangler secret put` |
 | P0 | Security | **MCP OAuth** (authorization server metadata, dynamic client registration) | Needed for Claude Desktop custom connectors without `mcp-remote`; bearer keys work today |
-| P1 | Product | Billing (Stripe Checkout + webhook to `users.plan`) and plan limits | Pricing copy is ready |
+| P1 | Product | Stripe keys and a Pro price | Code is done (`/api/v1/billing/*`, `/billing/webhook`) |
 | P1 | Product | PDF viewer (pdf.js page in the extension, files in R2) | Most requested format |
 | P1 | Growth | Chrome Web Store listing | Needs screenshots (in the vault) and a privacy form |
 | P1 | Product | Import: Pocket CSV, Readwise, Omnivore, Instapaper | Feeds the alternative pages |

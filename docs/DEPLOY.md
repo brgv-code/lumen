@@ -72,3 +72,15 @@ The unpacked build has a fixed id (`ffjconacpmnbadoeegamifkellcddfja`, from the 
 `wxt.config.ts`), so the dashboard can talk to it: Integrations shows Installed or Connected and
 **Connect this browser's extension** stores a token in it with one click. The extension's
 settings page has **Connect with Lumen**, which opens that flow.
+
+## Billing (Stripe)
+Freemium: every account gets 7 days of Pro, then the free plan unless they upgrade. Rules live in
+`apps/web/src/worker/lib/plan.ts`. Without Stripe secrets the Upgrade page collects early access
+interest instead of taking payment.
+```bash
+npx wrangler secret put STRIPE_SECRET_KEY        # sk_live_… or sk_test_…
+npx wrangler secret put STRIPE_PRICE_ID          # the recurring Pro price
+npx wrangler secret put STRIPE_WEBHOOK_SECRET    # whsec_… for https://<host>/billing/webhook
+```
+Webhook events: `checkout.session.completed`, `customer.subscription.updated`,
+`customer.subscription.deleted`.

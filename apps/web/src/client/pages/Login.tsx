@@ -30,15 +30,17 @@ export default function Login() {
   const nav = useNavigate();
   const toast = useToast();
   const err = params.get("error");
+  const rawNext = params.get("next") ?? "/app";
+  const next = rawNext.startsWith("/app") ? rawNext : "/app";
 
   useEffect(() => {
     api.providers().then(setP).catch(() => setP({ google: false, github: false, demo: true }));
-    api.me().then(() => nav("/app", { replace: true })).catch(() => {});
+    api.me().then(() => nav(next, { replace: true })).catch(() => {});
   }, [nav]);
 
   const demo = async () => {
     setBusy(true);
-    try { await api.demo(); nav("/app"); } catch (e) { toast((e as Error).message, "err"); setBusy(false); }
+    try { await api.demo(); nav(next); } catch (e) { toast((e as Error).message, "err"); setBusy(false); }
   };
 
   return (
@@ -47,12 +49,12 @@ export default function Login() {
       <div className="surface gridlines pop" style={{ width: "min(440px, 100%)", padding: "40px 32px 32px", display: "grid", gap: 14, textAlign: "center" }}>
         <div style={{ justifySelf: "center", position: "relative" }} className="bob"><AppIcon size={64} /></div>
         <h1 className="h3" style={{ position: "relative", marginTop: 8 }}><span className="lead-in">Welcome to</span> <span className="payoff">Lumen.</span></h1>
-        <p className="muted" style={{ position: "relative", marginBottom: 10 }}>One account for the dashboard and the extension.</p>
+        <p className="muted" style={{ position: "relative", marginBottom: 10 }}>One account for the dashboard and the extension. Free plan forever, every Pro feature for your first 7 days.</p>
         {err && <div className="chip chip--peach" style={{ justifySelf: "center", height: "auto", padding: "6px 12px", whiteSpace: "normal", position: "relative" }}>{ERRORS[err] ?? "Sign in failed."}</div>}
 
         <a
           className="key key--ghost key--lg"
-          href={p?.google ? "/auth/google/start?next=/app" : undefined}
+          href={p?.google ? `/auth/google/start?next=${encodeURIComponent(next)}` : undefined}
           aria-disabled={!p?.google}
           onClick={(e) => { if (!p?.google) { e.preventDefault(); toast("Google SSO needs GOOGLE_CLIENT_ID and SECRET on this deployment.", "err"); } }}
           style={{ position: "relative", opacity: p && !p.google ? 0.6 : 1 }}
@@ -61,7 +63,7 @@ export default function Login() {
         </a>
         <a
           className="key key--lg"
-          href={p?.github ? "/auth/github/start?next=/app" : undefined}
+          href={p?.github ? `/auth/github/start?next=${encodeURIComponent(next)}` : undefined}
           aria-disabled={!p?.github}
           onClick={(e) => { if (!p?.github) { e.preventDefault(); toast("GitHub SSO needs GITHUB_CLIENT_ID and SECRET on this deployment.", "err"); } }}
           style={{ position: "relative", opacity: p && !p.github ? 0.6 : 1 }}

@@ -5,6 +5,7 @@ import type { AppEnv } from "../env";
 import { body, dayIn, fail, id, now, str } from "../lib/util";
 import { toHighlight, toItem } from "../lib/map";
 import { refreshRadar, topicsFor } from "../lib/radar";
+import { entitlement, requirePro } from "../lib/plan";
 
 export const discover = new Hono<AppEnv>();
 
@@ -16,6 +17,7 @@ const ITEM_COLS = `i.id, i.url, i.title, i.site_name, i.author, i.excerpt, i.cov
 /* ---------------- radar ---------------- */
 
 discover.get("/radar", async (c) => {
+  requirePro(c, "radar");
   const u = c.get("user");
   const refreshed = await refreshRadar(c.env.DB, u).catch(() => false);
   const topics = await topicsFor(c.env.DB, u.id);
@@ -31,11 +33,13 @@ discover.get("/radar", async (c) => {
 });
 
 discover.post("/radar/refresh", async (c) => {
+  requirePro(c, "radar");
   await refreshRadar(c.env.DB, c.get("user"), true);
   return c.json({ ok: true });
 });
 
 discover.post("/topics", async (c) => {
+  requirePro(c, "radar");
   const u = c.get("user");
   const b = await body<{ name?: string }>(c);
   const name = str(b.name, 40)?.toLowerCase();
@@ -89,7 +93,7 @@ discover.get("/reads", async (c) => {
   const { results: resurface } = await db.prepare(`SELECT h.*, i.title AS item_title, i.url AS item_url, i.site_name AS item_site FROM highlights h JOIN items i ON i.id = h.item_id
     WHERE h.user_id = ? AND h.created_at < ? ORDER BY (h.rowid * 7 + ?) % 97 LIMIT ?`).bind(u.id, now() - 2 * 864e5, seed, period === "daily" ? 2 : 5).all();
 
-  const { results: trending } = await db.prepare(`SELECT id, topic, url, title, source, score FROM trends WHERE user_id = ? AND dismissed = 0
+  const { results: trending } = !entitlement(u).pro ? { results: [] } : await db.prepare(`SELECT id, topic, url, title, source, score FROM trends WHERE user_id = ? AND dismissed = 0
     AND url NOT IN (SELECT url FROM items WHERE user_id = ?) ORDER BY score DESC LIMIT ?`).bind(u.id, u.id, period === "daily" ? 3 : 8).all();
 
   return c.json({ period, budgetMinutes: budget, minutes, picks: picks.map(toItem), resurface: resurface.map(toHighlight), trending, date: today });
@@ -150,6 +154,7 @@ discover.get("/similar", async (c) => {
 /* ---------------- analytics ---------------- */
 
 discover.get("/analytics", async (c) => {
+  requirePro(c, "analytics");
   const u = c.get("user");
   const db = c.env.DB;
   const since = now() - 84 * 864e5;
@@ -186,6 +191,7 @@ function safeTz(tz: string) { try { new Intl.DateTimeFormat("en", { timeZone: tz
 
 /* ---------------- save a trend into the library ---------------- */
 discover.post("/trends/:id/save", async (c) => {
+  requirePro(c, "radar");
   const u = c.get("user");
   const tr = await c.env.DB.prepare("SELECT url, title FROM trends WHERE user_id = ? AND id = ?").bind(u.id, c.req.param("id")).first<{ url: string; title: string }>();
   if (!tr) fail(404, "not_found", "No such story.");

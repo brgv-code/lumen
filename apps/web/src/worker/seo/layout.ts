@@ -41,14 +41,14 @@ export function footerHtml() {
   ];
   return `<footer class="s-wrap foot">
   <div class="foot__grid">
-    <div style="display:grid;gap:14px;align-content:start"><a class="s-logo" href="/">${ICON}lumen</a><p class="muted" style="max-width:260px">Built for people who think reading should feel light.</p>
+    <div style="display:grid;gap:14px;align-content:start"><a class="s-logo" href="/">${ICON}lumen</a><p class="muted" style="max-width:260px">Built for people who think reading should feel light.</p><a class="key key--lamp key--sm" href="/login" style="justify-self:start">Start free</a>
       <a href="${SITE.github}" aria-label="GitHub" style="color:var(--ink-2)">${svg('<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.1-1.3-.3-2.5-1-3.5.3-1.2.3-2.4 0-3.5 0 0-1 0-3 1.5a10.3 10.3 0 0 0-6 0C8 2 7 2 7 2c-.3 1.1-.3 2.3 0 3.5a5.4 5.4 0 0 0-1 3.5c0 3.5 3 5.5 6 5.5-.4.4-.7 1-.8 1.6-.2.6-.2 1.2-.2 1.9v4"/><path d="M9 18c-4.5 2-5-2-7-2"/>').replace("<svg", '<svg width="18" height="18"')}</a></div>
-    <div><h5>Product</h5><ul><li><a href="/#features">Features</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/login">Dashboard</a></li></ul></div>
+    <div><h5>Product</h5><ul><li><a href="/#features">Features</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/login">Dashboard</a></li></ul></div>
     <div><h5>Compare</h5><ul><li><a href="/compare/lumen-vs-readwise-reader">vs Readwise Reader</a></li><li><a href="/compare/lumen-vs-obsidian-web-clipper">vs Obsidian Web Clipper</a></li><li><a href="/compare/pocket-alternative">Pocket alternative</a></li><li><a href="/compare">All comparisons</a></li></ul></div>
     <div><h5>Developers</h5><ul><li><a href="/docs/api">API</a></li><li><a href="/docs/mcp">MCP for agents</a></li><li><a href="/docs/architecture">Architecture</a></li><li><a href="${SITE.github}">Source</a></li></ul></div>
     <div><h5>Resources</h5><ul><li><a href="/answers">Answers</a></li><li><a href="/docs">Docs</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li></ul></div>
   </div>
-  <p class="small muted" style="text-align:center;margin-top:40px;position:relative;z-index:2">© 2026 Lumen · Open source</p>
+  <p class="small muted" style="text-align:center;margin-top:40px;position:relative;z-index:2">© 2026 Lumen · Open source under AGPL-3.0</p>
   <div class="foot-stage" aria-hidden="true">
     ${floats.map(([x, y, r, d, inner, cls]) => `<div class="foot-float ${cls}" style="--x:${x};--y:${y};--r:${r};--d:${d}"><div>${inner}</div></div>`).join("")}
     <div class="wordmark">lumen</div>
@@ -104,8 +104,8 @@ ${o.extraHead ?? ""}
 <body>
 <nav class="s-nav"><div class="s-wrap s-nav__in">
   <a class="s-logo" href="/" aria-label="Lumen home">${ICON}lumen</a>
-  <div class="s-nav__links"><a href="/#features">Features</a><a href="/compare"${cur("compare")}>Compare</a><a href="/answers"${cur("answers")}>Answers</a><a href="/docs"${cur("docs")}>Docs</a><a href="/pricing">Pricing</a></div>
-  <div class="row"><a class="key key--quiet key--sm" href="/login">Log in</a><a class="key key--ghost key--sm" href="/login">Get Lumen</a></div>
+  <div class="s-nav__links"><a href="/#features">Features</a><a href="/compare"${cur("compare")}>Compare</a><a href="/answers"${cur("answers")}>Answers</a><a href="/docs"${cur("docs")}>Docs</a><a href="/changelog">Changelog</a></div>
+  <div class="row"><a class="key key--quiet key--sm" href="/login">Log in</a><a class="key key--lamp key--sm" href="/login">Start free</a></div>
 </div></nav>
 <main class="s-wrap">${o.body}</main>
 ${footerHtml()}
@@ -126,5 +126,5 @@ export function faqLd(faq: [string, string][]) {
 }
 
 export function ctaBand(title = "Turn the lamp on.", pay = "Start reading.") {
-  return `<section class="surface gridlines cta-band"><span style="position:relative">${ICON.replace('width="28" height="28"', 'width="56" height="56"')}</span><h2 class="h3" style="position:relative"><span class="lead-in">${esc(title)}</span> <span class="payoff">${esc(pay)}</span></h2><div class="row" style="position:relative;flex-wrap:wrap;justify-content:center"><a class="key key--lamp key--lg" href="/login">Start reading free</a><a class="key key--ghost key--lg" href="/login">Try the live demo</a></div></section>`;
+  return `<section class="surface gridlines cta-band"><span style="position:relative">${ICON.replace('width="28" height="28"', 'width="56" height="56"')}</span><h2 class="h3" style="position:relative"><span class="lead-in">${esc(title)}</span> <span class="payoff">${esc(pay)}</span></h2><div class="row" style="position:relative;flex-wrap:wrap;justify-content:center"><a class="key key--lamp key--lg" href="/login">Light your first lamp, free</a><a class="key key--ghost key--lg" href="/login">Explore the demo</a></div></section>`;
 }

@@ -60,6 +60,18 @@ textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px r
   background: #121215; color: #fff; font-size: 13.5px; font-weight: 500; box-shadow: 0 18px 34px -12px rgba(0,0,0,.5);
   animation: pop 300ms cubic-bezier(.34,1.56,.64,1) both; }
 .toast.err { background: #b42318; }
+@media (prefers-color-scheme: dark) {
+  .card { background: #18181b; color: #c9c9ce; box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 60px -20px rgba(0,0,0,.8); }
+  .head b, .q, textarea, input { color: #f4f4f5; }
+  .q, .note, .answer, textarea, input, .key.ghost, .chip { background: #222226; }
+  .q.lumen-sun { background: rgba(255,213,74,.22); } .q.lumen-mint { background: rgba(46,204,142,.2); } .q.lumen-iris { background: rgba(140,125,255,.24); }
+  .q.lumen-peach { background: rgba(255,130,100,.22); } .q.lumen-sky { background: rgba(80,150,255,.22); }
+  .answer { color: #c9c9ce; } .chip { color: #c9c9ce; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  .key.ghost { color: #f4f4f5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  .x:hover { background: #2a2a2f; color: #fff; }
+  textarea, input { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  .row .sw.on { box-shadow: 0 0 0 2px #18181b, 0 0 0 4px #f4f4f5; }
+}
 `;
 
 // In the page itself: only the marks, nothing else.

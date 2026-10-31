@@ -131,11 +131,11 @@ export default function Landing() {
             <a href="#agents">Agents</a>
             <a href="/compare">Compare</a>
             <a href="/docs">Docs</a>
-            <a href="#pricing">Pricing</a>
+            <a href="/changelog">Changelog</a>
           </div>
           <div className="row">
             <Link to="/login" className="key key--quiet key--sm">Log in</Link>
-            <Link to="/login" className="key key--ghost key--sm">Get Lumen</Link>
+            <Link to="/login" className="key key--lamp key--sm">Start free</Link>
           </div>
         </div>
       </nav>
@@ -155,10 +155,10 @@ export default function Landing() {
               Highlight, ask, and keep notes on anything you read, then send it to Obsidian, Notion or plain markdown. One calm place for everything you bookmark and read.
             </p>
             <div className="ctas">
-              <Link to="/login" className="key key--lamp key--lg">Start reading free <ArrowRight size={16} /></Link>
-              <button className="key key--ghost key--lg" onClick={tryDemo}>Try the live demo</button>
+              <Link to="/login" className="key key--lamp key--lg">Light your first lamp, free <ArrowRight size={16} /></Link>
+              <button className="key key--ghost key--lg" onClick={tryDemo}>Explore the demo</button>
             </div>
-            <p className="small muted" style={{ marginTop: 16 }}>Free forever for personal reading. No card.</p>
+            <p className="small muted" style={{ marginTop: 16 }}>Free plan forever · every Pro feature for your first 7 days · no card</p>
           </div>
 
           <div className="paper-stage reveal" style={{ ["--i" as string]: 2 }} aria-hidden="true">
@@ -205,7 +205,7 @@ export default function Landing() {
                 <span className="lead-in">One reading tool.</span> <span className="payoff">Every place you think.</span>
               </h2>
             </div>
-            <Link to="/login" className="key key--lg">Start free <ArrowRight size={16} /></Link>
+            <Link to="/login" className="key key--lg">Start free, 7 days of Pro <ArrowRight size={16} /></Link>
           </div>
 
           <div className="lp-tabs reveal">
@@ -376,20 +376,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* PRICING */}
-        <section className="lp-sec" id="pricing">
-          <div className="reveal" style={{ textAlign: "center" }}>
-            <span className="label-pill">Pricing</span>
-            <h2 className="h2" style={{ marginTop: 16 }}><span className="lead-in">Free to read.</span> <span className="payoff">Fair to grow.</span></h2>
-          </div>
-          <div className="price-grid">
-            <Price name="Reader" amount="€0" note="For personal reading" items={["Unlimited saves and highlights", "Obsidian, Markdown and webhooks", "100 AI answers a day", "Bring your own model, unlimited", "Full export, any time"]} cta="Start free" />
-            <Price hot name="Pro" amount="€6" note="per month, billed yearly" items={["Everything in Reader", "Notion sync and scheduled pushes", "1,000 AI answers a day", "PDF highlighting (coming soon)", "Agent access with higher limits"]} cta="Start free, upgrade later" />
-            <Price name="Team" amount="€12" note="per member, per month" items={["Shared collections", "Team reading digests", "SSO with Google Workspace", "Admin and audit log", "Priority support"]} cta="Coming soon" soon />
-          </div>
-          <p className="small muted" style={{ textAlign: "center", marginTop: 16 }}>Pricing shown is the plan for launch; billing is not live in this preview.</p>
-        </section>
-
         {/* FAQ */}
         <section className="lp-sec" id="faq">
           <div className="reveal"><h2 className="h2"><span className="lead-in">Questions,</span> <span className="payoff">answered.</span></h2></div>
@@ -404,9 +390,10 @@ export default function Landing() {
         <section className="lp-sec">
           <div className="surface gridlines reveal" style={{ padding: "64px 24px", textAlign: "center", display: "grid", justifyItems: "center", gap: 18 }}>
             <span className="bob" style={{ position: "relative" }}><AppIcon size={72} /></span>
-            <h2 className="h2" style={{ position: "relative" }}><span className="lead-in">Turn the lamp on.</span> <span className="payoff">Start reading.</span></h2>
+            <h2 className="h2" style={{ position: "relative" }}><span className="lead-in">Turn the lamp on.</span> <span className="payoff">It is free.</span></h2>
+            <p className="muted" style={{ position: "relative", maxWidth: 460 }}>Sign in with Google or GitHub and your library is ready in seconds. Every Pro feature is yours for the first 7 days.</p>
             <div className="row" style={{ position: "relative", flexWrap: "wrap", justifyContent: "center" }}>
-              <Link to="/login" className="key key--lamp key--lg">Create your library <ArrowRight size={16} /></Link>
+              <Link to="/login" className="key key--lamp key--lg">Light your first lamp <ArrowRight size={16} /></Link>
               <a className="key key--ghost key--lg" href="https://github.com/brgv-code/lumen" target="_blank" rel="noreferrer"><Puzzle size={16} /> Get the extension</a>
             </div>
           </div>
@@ -425,6 +412,7 @@ const QUOTES: [string, string][] = [
 ];
 
 const FAQ: [string, string][] = [
+  ["Is Lumen free?", "Yes. The free plan keeps saving, reading, highlighting, notes, collections, the extension and Obsidian or markdown sync, with no time limit. Every new account also gets all of Pro (Spark, Radar, agents, analytics, Notion) free for 7 days, no card needed."],
   ["Does highlighting stop me from copying text?", "No. Lumen never takes over your selection. Select text and a small toolbar appears next to it; your normal copy and paste keeps working, and Copy with citation is one click away."],
   ["Can I choose which note my highlights go to?", "Yes. Every collection points at a destination: a note in your Obsidian vault, a Notion page, a markdown file or a webhook. You pick the collection while you read, from the extension or the dashboard."],
   ["Will clipping the same page twice duplicate my highlights?", "Never. Lumen keeps a delivery ledger per destination and only ever appends highlights that destination has not received yet."],
@@ -434,17 +422,6 @@ const FAQ: [string, string][] = [
   ["Is my data mine?", "Yes. Export everything as JSON or markdown at any time, and delete your account from settings. Your Obsidian API key never leaves your browser."],
   ["Does it work on PDFs?", "PDF highlighting is in progress: PDFs open in Lumen's own viewer, because no extension can reach inside Chrome's built in PDF viewer."],
 ];
-
-function Price({ name, amount, note, items, cta, hot, soon }: { name: string; amount: string; note: string; items: string[]; cta: string; hot?: boolean; soon?: boolean }) {
-  return (
-    <div className={`surface price reveal ${hot ? "price--hot" : ""}`} style={soon ? { opacity: 0.85 } : undefined}>
-      <div className="row"><h3 style={{ fontSize: 18 }}>{name}</h3>{hot && <span className="chip chip--lamp" style={{ marginLeft: "auto" }}>Most loved</span>}{soon && <span className="chip" style={{ marginLeft: "auto" }}>Coming soon</span>}</div>
-      <div><span className="amount">{amount}</span> <span className="small">{note}</span></div>
-      <ul>{items.map((i) => <li key={i}><Check size={16} style={{ color: hot ? "var(--lamp-hi)" : "var(--mint)", flex: "none", marginTop: 2 }} />{i}</li>)}</ul>
-      {soon ? <span className="key key--ghost" style={{ marginTop: "auto", opacity: 0.6, cursor: "default" }}>{cta}</span> : <Link to="/login" className={`key ${hot ? "key--lamp" : "key--ghost"}`} style={{ marginTop: "auto" }}>{cta}</Link>}
-    </div>
-  );
-}
 
 function Orbit() {
   const nodes = [

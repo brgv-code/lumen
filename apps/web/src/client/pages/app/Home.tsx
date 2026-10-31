@@ -22,7 +22,7 @@ export default function Home() {
   const reads = useAsync(() => api.reads(period), [period]);
   const reminders = useAsync(() => api.reminders(), []);
   const similar = useAsync(() => api.similar(), []);
-  const radar = useAsync(() => api.radar(), []);
+  const radar = useAsync(() => (user.pro ? api.radar() : Promise.resolve(null)), [user.pro]);
   const hls = useAsync(() => api.highlights({}), []);
   const first = user.name.replace(/\s*\(demo\)$/, "").split(" ")[0];
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
@@ -41,7 +41,7 @@ export default function Home() {
 
   return (
     <div className="page">
-      <PageHero
+      <div data-tour="hero"><PageHero
         pill={<><Flame size={13} style={{ color: "var(--lamp)" }} /> {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</>}
         lead={`${greeting()}, ${first}.`}
         pay={goal >= 1 ? "Your lamp is glowing." : stats && stats.streak > 0 ? "Keep the lamp lit." : "Light the lamp today."}
@@ -52,7 +52,7 @@ export default function Home() {
       >
         <div className="eyebrow">Today</div>
         <div className="row" style={{ marginTop: 6 }}><Ring value={goal} /><div><div style={{ color: "var(--ink)", fontWeight: 600, fontSize: 22, letterSpacing: "-0.03em" }}>{stats?.glowToday ?? 0}<span className="muted" style={{ fontSize: 14 }}>/{stats?.dailyGoal ?? 20}</span></div><div className="small muted">glow</div></div></div>
-      </PageHero>
+      </PageHero></div>
 
       {isNew && (
         <section className="panel gridlines">
@@ -96,7 +96,7 @@ export default function Home() {
         </Link>
       </div>
 
-      <section className="panel">
+      <section className="panel" data-tour="reads">
         <div className="row" style={{ marginBottom: 14, flexWrap: "wrap" }}>
           <h2>{period === "daily" ? "Today's reads" : "This week's reads"}</h2>
           {reads.data && <span className="chip chip--lamp"><Clock size={12} /> about {reads.data.minutes} of {reads.data.budgetMinutes} min</span>}
@@ -194,6 +194,13 @@ export default function Home() {
         </section>
         <section className="panel">
           <div className="row" style={{ marginBottom: 14 }}><span className="tile tile--sm tile--sky"><Radar /></span><h2>On your radar</h2><span className="spacer" /><Link to="/app/radar" className="key key--quiet key--sm">Open <ArrowRight size={14} /></Link></div>
+          {!user.pro ? (
+            <div className="card-flat" style={{ padding: 14, display: "grid", gap: 8, background: "var(--lamp-tint)" }}>
+              <b style={{ color: "var(--ink)" }}>Radar is part of Pro</b>
+              <span className="small muted">Trending stories in your topics, refreshed every six hours.</span>
+              <Link to="/app/upgrade" className="key key--lamp key--sm" style={{ justifySelf: "start" }}>See Pro</Link>
+            </div>
+          ) : (<>
           <div className="row" style={{ flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
             {(radar.data?.topics ?? []).filter((t) => !t.muted).slice(0, 8).map((t) => <span key={t.name} className="chip chip--sky">#{t.name}</span>)}
           </div>
@@ -206,6 +213,7 @@ export default function Home() {
             ))}
             {radar.loading && <div className="skeleton" style={{ height: 70 }} />}
           </div>
+          </>)}
           <div className="card-flat row" style={{ padding: 14, marginTop: 14, background: "var(--iris-tint)" }}>
             <span className="tile tile--sm tile--iris"><Bot /></span>
             <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>Let your agent watch this for you</div><div className="small muted">Claude can review your week and suggest what to write.</div></div>

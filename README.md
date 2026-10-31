@@ -6,7 +6,10 @@ Lumen is a reading companion for the web. Save what you want to read, highlight 
 colours, leave margin notes, ask a model about any passage, and send what matters to the notes
 app you already use: Obsidian, Notion, a markdown file or a webhook.
 
-**Live preview:** https://lumen.brgv95.workers.dev (press "Try the live demo" for a sandbox account)
+**Live preview:** https://lumen.brgv95.workers.dev (press "Explore the demo" for a sandbox account)
+
+Free plan forever for reading, highlighting and syncing; every new account gets 7 days of Pro
+(Spark, Radar, agents over MCP, analytics, Notion and webhooks).
 
 ## Why
 
@@ -63,3 +66,10 @@ Cloudflare Workers + D1 + Workers AI · Hono · React 18 + Vite · WXT (Manifest
 ## Version 1
 The original Lumen was a small extension for explaining selected text with Ollama. Its demo is
 kept at [docs/media/lumen-v1-demo.gif](docs/media/lumen-v1-demo.gif).
+
+## License
+Copyright (C) 2026 Bhargav Venkatesh Babu.
+
+Lumen is free software under the [GNU Affero General Public License v3.0](LICENSE). You may use,
+study, modify and share it; if you run a modified version as a service for others, you must
+offer them its source code under the same license. For other licensing, open an issue.

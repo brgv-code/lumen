@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { AI_ACTIONS } from "@lumen/core";
-import type { AppEnv } from "../env";
+import type { AppEnv, SessionUser } from "../env";
+import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
 import { DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
 import { safeJson, toIdea } from "../lib/map";
@@ -8,14 +9,12 @@ import { glowStmt } from "../lib/glow";
 
 export const ai = new Hono<AppEnv>();
 
-const LIMITS = { demo: 40, free: 100, pro: 1000 } as const;
-
-async function spend(db: D1Database, user: { id: string; is_demo: number; plan: string; timezone: string }) {
+async function spend(db: D1Database, user: SessionUser) {
   const day = dayIn(user.timezone);
   const row = await db.prepare(`INSERT INTO ai_usage (user_id, day, count) VALUES (?,?,1)
     ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 RETURNING count`).bind(user.id, day).first<{ count: number }>();
-  const cap = user.is_demo === 1 ? LIMITS.demo : user.plan === "pro" ? LIMITS.pro : LIMITS.free;
-  if ((row?.count ?? 0) > cap) fail(429, "ai_quota", `Daily AI limit of ${cap} reached. Switch the provider to Ollama or Claude on your machine for unlimited use.`);
+  const cap = aiDailyCap(user);
+  if ((row?.count ?? 0) > cap) fail(entitlement(user).pro ? 429 : 402, entitlement(user).pro ? "ai_quota" : "upgrade_required", `Daily limit of ${cap} hosted answers reached. Pro raises it to 500, or use Ollama or Claude on your machine for unlimited answers.`);
 }
 
 /** Streams Server Sent Events: data: {"response":"..."} ... data: [DONE] */
@@ -42,6 +41,7 @@ ai.post("/run", async (c) => {
 
 /** Spark: turn recent highlights into writing ideas. */
 ai.post("/spark", async (c) => {
+  requirePro(c, "spark");
   const u = c.get("user");
   const db = c.env.DB;
   const { results } = await db.prepare(`SELECT h.quote, h.note, i.id AS item_id, i.title FROM highlights h JOIN items i ON i.id = h.item_id

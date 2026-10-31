@@ -508,3 +508,18 @@
 /* panels get a soft lift on hover like landing cards */
 .panel { transition: box-shadow 240ms var(--ease-out); }
 .panel h2 { display: flex; align-items: center; gap: 8px; }
+.pro-lock { min-height: 420px; display: grid; place-items: center; padding: 24px; }
+.trial-card { padding: 12px 14px; border-radius: 16px; background: var(--lamp-tint); display: grid; gap: 6px; }
+
+/* guided tour */
+.tour { position: fixed; inset: 0; z-index: 120; }
+.tour__spot { position: fixed; border-radius: 16px; box-shadow: 0 0 0 9999px rgba(16, 14, 12, 0.55), 0 0 0 3px var(--lamp), 0 0 30px 6px rgba(255, 138, 31, 0.45); transition: all 380ms var(--ease-out); pointer-events: none; }
+.tour__card { position: fixed; background: var(--surface); border-radius: 20px; padding: 16px 18px; box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.55); transition: left 380ms var(--ease-out), top 380ms var(--ease-out); animation: pop 360ms var(--ease-spring) both; }
+.tour__dots { display: flex; gap: 5px; }
+.tour__dots span { width: 6px; height: 6px; border-radius: 99px; background: var(--well); transition: all 240ms ease; }
+.tour__dots span.on { width: 18px; background: var(--lamp); }
+.tour-welcome { width: min(520px, 100%); }
+.tour-welcome__art { height: 170px; border-radius: 20px; position: relative; }
+.tour-who { display: grid; gap: 8px; margin-top: 14px; }
+.tour-who div { background: var(--raised); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; box-shadow: var(--shadow-pill); }
+.tour-who b { color: var(--ink); font-weight: 600; margin-right: 4px; }

@@ -57,9 +57,9 @@ export default function Options() {
           <label>Model<input value={s.model} onChange={(e) => set("model", e.target.value)} placeholder="gpt-4o-mini" /></label>
         </>)}
         {s.provider === "claude" && (
-          <label>Claude model<select value={s.claudeModel} onChange={(e) => set("claudeModel", e.target.value)}>
-            <option value="haiku">Haiku (fastest)</option><option value="sonnet">Sonnet</option><option value="opus">Opus (deepest)</option>
-          </select></label>
+          <div className="stack" style={{ gap: 6 }}><span style={{ fontSize: 13, fontWeight: 500 }}>Claude model</span>
+            <div className="seg">{[["haiku", "Haiku · fastest"], ["sonnet", "Sonnet"], ["opus", "Opus · deepest"]].map(([v, l]) => <button key={v} aria-pressed={s.claudeModel === v} onClick={() => set("claudeModel", v)}>{l}</button>)}</div>
+          </div>
         )}
       </section>
 

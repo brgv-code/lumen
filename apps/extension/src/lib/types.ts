@@ -52,6 +52,8 @@ export type Msg =
   | { type: "TEST_CONNECTION" }
   | { type: "SYNC_TARGET" }
   | { type: "OPEN_DASHBOARD"; path?: string }
-  | { type: "GET_HOME" };
+  | { type: "GET_HOME" }
+  | { type: "GET_DESTINATIONS" }
+  | { type: "CREATE_COLLECTION"; name: string; emoji: string; destinationId?: string; obsidianNote?: string };
 
 export type { Collection, Highlight, Item };

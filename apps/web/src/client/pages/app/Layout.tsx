@@ -3,6 +3,9 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { Collection, Stats, User } from "@lumen/core";
 import { Home, Library, Highlighter, FolderHeart, Sparkles, Plug, Settings, Search, Plus, Flame, LogOut, Puzzle, Radar, BarChart3, Bot } from "lucide-react";
 import { ConnectAgent } from "../../components/ConnectAgent";
+import { PaywallModal, ProChip } from "../../components/Pro";
+import { Tour, APP_TOUR, tourDone, markTour } from "../../components/Tour";
+import { Crown } from "lucide-react";
 import { Logo, Modal, useToast } from "../../components/ui";
 import { api } from "../../lib/api";
 import "../../styles/app.css";
@@ -14,6 +17,8 @@ interface Ctx {
   refresh: () => void;
   openSave: () => void;
   openAgent: () => void;
+  setUser: (u: User) => void;
+  startTour: () => void;
 }
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
@@ -24,6 +29,8 @@ export default function Layout() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [saveOpen, setSaveOpen] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
+  const [paywall, setPaywall] = useState<string | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
   const nav = useNavigate();
   const toast = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -34,14 +41,16 @@ export default function Layout() {
   };
 
   useEffect(() => {
-    api.me().then((r) => setUser(r.user)).catch(() => nav("/login", { replace: true }));
+    api.me().then((r) => { setUser(r.user); if (!tourDone(r.user.id)) setTimeout(() => setTourOpen(true), 700); }).catch(() => nav("/login", { replace: true }));
+    const onPay = (e: Event) => setPaywall((e as CustomEvent<string>).detail || "This is part of Lumen Pro.");
+    window.addEventListener("lumen:paywall", onPay);
     refresh();
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); searchRef.current?.focus(); }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && !(e.target as HTMLElement).closest("input,textarea")) { e.preventDefault(); setSaveOpen(true); }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("lumen:paywall", onPay); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -51,18 +60,18 @@ export default function Layout() {
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
 
   return (
-    <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true) }}>
+    <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true), setUser, startTour: () => setTourOpen(true) }}>
       <div className="shell">
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
           <nav className="side__nav">
             <NavLink end to="/app" className="side__link"><span className="ico"><Home /></span> Home</NavLink>
-            <NavLink to="/app/library" className="side__link"><span className="ico"><Library /></span> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
-            <NavLink to="/app/highlights" className="side__link"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
-            <NavLink to="/app/collections" className="side__link"><span className="ico"><FolderHeart /></span> Collections</NavLink>
-            <NavLink to="/app/radar" className="side__link"><span className="ico"><Radar /></span> Radar</NavLink>
-            <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark</NavLink>
-            <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics</NavLink>
+            <NavLink to="/app/library" className="side__link" data-tour="nav-library"><span className="ico"><Library /></span> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
+            <NavLink to="/app/highlights" className="side__link" data-tour="nav-highlights"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
+            <NavLink to="/app/collections" className="side__link" data-tour="nav-collections"><span className="ico"><FolderHeart /></span> Collections</NavLink>
+            <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+            <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+            <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
             <div className="side__section">Connect</div>
             <NavLink to="/app/integrations" className="side__link"><span className="ico"><Plug /></span> Integrations</NavLink>
             <NavLink to="/app/settings" className="side__link"><span className="ico"><Settings /></span> Settings</NavLink>
@@ -80,6 +89,13 @@ export default function Layout() {
             </nav>
           )}
           <div className="side__foot">
+            <NavLink to="/app/upgrade" className="trial-card" data-tour="trial" style={{ textDecoration: "none" }}>
+              <div className="row" style={{ gap: 8 }}>
+                <span className="tile tile--xs tile--lamp"><Crown /></span>
+                <b style={{ color: "var(--ink)", fontSize: 13.5 }}>{user.planStatus === "pro" ? "Lumen Pro" : user.planStatus === "trial" ? `Pro trial · ${user.trialDaysLeft}d left` : "Free plan"}</b>
+              </div>
+              <span className="small muted">{user.planStatus === "pro" ? "Thank you for keeping the lamp lit." : user.planStatus === "trial" ? "Every feature unlocked. See what stays free." : "Unlock Spark, Radar, agents and analytics."}</span>
+            </NavLink>
             {stats && (
               <div className="glowcard">
                 <div className="row">
@@ -114,9 +130,10 @@ export default function Layout() {
             <span className="kbd" style={{ marginLeft: -4 }}>⌘K</span>
             <span className="spacer" />
             {user.isDemo && <span className="chip chip--iris hide-sm">Demo sandbox</span>}
-            <a className="key key--ghost key--sm hide-sm" href="/docs/extension" target="_blank" rel="noreferrer"><Puzzle size={15} /> Extension</a>
-            <button className="key key--iris key--sm" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
-            <button className="key key--sm" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
+            <button className="icon-btn hide-sm" title="Take the tour" aria-label="Take the tour" onClick={() => setTourOpen(true)}>?</button>
+            <a className="key key--ghost key--sm hide-sm" data-tour="extension" href="/app/integrations"><Puzzle size={15} /> Extension</a>
+            <button className="key key--iris key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
+            <button className="key key--sm" data-tour="save" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
           </div>
           <Outlet />
         </div>
@@ -129,7 +146,9 @@ export default function Layout() {
           <NavLink to="/app/settings"><Settings size={19} />More</NavLink>
         </nav>
       </div>
-      <ConnectAgent open={agentOpen} onClose={() => setAgentOpen(false)} />
+      <ConnectAgent open={agentOpen} pro={user.pro} onClose={() => setAgentOpen(false)} />
+      <PaywallModal message={paywall} onClose={() => setPaywall(null)} />
+      <Tour open={tourOpen} steps={APP_TOUR} name={user.name.replace(/\s*\((demo|test)\)$/, "").split(" ")[0]} onClose={() => { setTourOpen(false); markTour(user.id); }} />
       <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast(<>Saved. <span className="muted">+1 glow</span></>, "glow"); nav(`/app/read/${id}`); }} />
     </AppCtx.Provider>
   );

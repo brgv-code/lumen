@@ -27,6 +27,20 @@ export default defineBackground(() => {
     return true;
   });
 
+  // The popup streams answers over a port (it has no tab to receive messages).
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== "lumen-ai") return;
+    port.onMessage.addListener(async (req: { action: "explain" | "summarize" | "define" | "ask"; text: string; question?: string; title?: string }) => {
+      const s = await getSettings();
+      port.postMessage({ provider: s.provider });
+      streamAnswer(req, s, {
+        chunk: (chunk) => { try { port.postMessage({ chunk }); } catch { /* closed */ } },
+        done: () => { try { port.postMessage({ done: true }); } catch { /* closed */ } },
+        error: (error) => { try { port.postMessage({ error }); } catch { /* closed */ } },
+      });
+    });
+  });
+
   chrome.runtime.onInstalled.addListener((d) => {
     chrome.contextMenus.create({ id: "lumen-highlight", title: "Highlight with Lumen", contexts: ["selection"] });
     chrome.contextMenus.create({ id: "lumen-explain", title: "Explain with Lumen", contexts: ["selection"] });
@@ -155,6 +169,20 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
 
     case "GET_SETTINGS":
       return { ok: true, settings: await getSettings() };
+
+    case "GET_DESTINATIONS":
+      return { ok: true, destinations: (await connected()) ? (await cloudApi.destinations()).data : [] };
+
+    case "CREATE_COLLECTION": {
+      let destinationId = msg.destinationId || undefined;
+      if (msg.obsidianNote) {
+        const d = await cloud<{ destination: { id: string } }>("POST", "/destinations", { kind: "obsidian", name: msg.obsidianNote.split("/").pop()?.replace(/\.md$/, "") || "Obsidian note", config: { notePath: msg.obsidianNote.endsWith(".md") ? msg.obsidianNote : `${msg.obsidianNote}.md`, format: "house" } });
+        destinationId = d.destination.id;
+      }
+      const r = await cloud<{ collection: { id: string } }>("POST", "/collections", { name: msg.name, emoji: msg.emoji, color: "sun", destinationId });
+      await saveSettings({ targetCollectionId: r.collection.id });
+      return { ok: true, collection: r.collection };
+    }
 
     case "SAVE_SETTINGS":
       return { ok: true, settings: await saveSettings(msg.settings) };

@@ -68,7 +68,7 @@ seo.get("/compare/:slug", (c) => {
   ${qaTabs("Questions", x.faq)}
 </div>
 <aside class="s-side">
-  <div class="side-card"><span class="tile tile--lamp">${GLYPH.highlighter}</span><b style="color:var(--ink)">Try Lumen free</b><p class="small muted">A demo account with sample reading, no sign up.</p><a class="key key--lamp key--sm" href="/login">Open the demo</a></div>
+  <div class="side-card"><span class="tile tile--lamp">${GLYPH.highlighter}</span><b style="color:var(--ink)">Light your first lamp</b><p class="small muted">Free plan forever, every Pro feature for your first 7 days. No card.</p><a class="key key--lamp key--sm" href="/login">Start free</a></div>
   <div class="side-card"><span class="eyebrow">More comparisons</span><ul>${others}</ul></div>
   <div class="side-card"><span class="eyebrow">Related answers</span><ul>${ANSWERS.slice(0, 4).map((a) => `<li><a href="/answers/${a.slug}">${esc(a.question)}</a></li>`).join("")}</ul></div>
 </aside></div>${ctaBand()}`,
@@ -130,7 +130,7 @@ seo.get("/answers/:slug", (c) => {
   <p class="updated">Updated ${UPDATED}.</p>
 </div>
 <aside class="s-side">
-  <div class="side-card"><span class="tile tile--lamp">${GLYPH.highlighter}</span><b style="color:var(--ink)">Lumen does this for free</b><p class="small muted">Save, highlight, send to your notes, ask a model.</p><a class="key key--lamp key--sm" href="/login">Try the demo</a></div>
+  <div class="side-card"><span class="tile tile--lamp">${GLYPH.highlighter}</span><b style="color:var(--ink)">Lumen does this for free</b><p class="small muted">Save, highlight, send to your notes, ask a model. Pro free for 7 days.</p><a class="key key--lamp key--sm" href="/login">Start free</a></div>
   ${related.length ? `<div class="side-card"><span class="eyebrow">Read next</span><ul>${related.map((r) => `<li><a href="/answers/${r.slug}">${esc(r.question)}</a></li>`).join("")}</ul></div>` : ""}
   ${cmp.length ? `<div class="side-card"><span class="eyebrow">Comparisons</span><ul>${cmp.map((k) => `<li><a href="/compare/${k.slug}">${esc(k.kind === "alternative" ? `${k.name} alternative` : `Lumen vs ${k.name}`)}</a></li>`).join("")}</ul></div>` : ""}
 </aside></div>${ctaBand()}`,
@@ -138,30 +138,9 @@ seo.get("/answers/:slug", (c) => {
 });
 
 
-/* ---------------- pricing ---------------- */
+/* ---------------- pricing (in the app only) ---------------- */
 
-const PLANS = [
-  { name: "Reader", price: "€0", note: "free forever for personal reading", hot: false, soon: false, items: ["Unlimited saves, highlights and notes", "Obsidian, Markdown and webhook destinations", "100 AI answers a day; your own model unlimited", "Connect your agent (MCP)", "Daily reads, reminders, radar, analytics", "Full export any time"] },
-  { name: "Pro", price: "€6", note: "per month, billed yearly (planned)", hot: true, soon: false, items: ["Everything in Reader", "Notion sync and scheduled pushes", "1,000 AI answers a day", "Higher agent limits", "PDF highlighting (coming soon)", "Priority on new formats"] },
-  { name: "Team", price: "€12", note: "per member, per month", hot: false, soon: true, items: ["Shared collections", "Team reading digests", "SSO with Google Workspace", "Admin and audit log"] },
-];
-const PRICING_FAQ: [string, string][] = [
-  ["Is Lumen free?", "Yes. The Reader plan is free for personal reading, with no card and no trial clock. During the public preview every feature is free."],
-  ["When does Pro start?", "Paid plans start after the preview. Everything you save stays yours and exportable whatever plan you are on."],
-  ["Can I use my own AI model for free?", "Yes. Ollama on your machine, any OpenAI compatible key, or Claude through your own CLI are unlimited on every plan."],
-  ["Can I self host?", "Yes. Lumen is open source and runs on Cloudflare Workers and D1; see the deploy guide."],
-];
-
-seo.get("/pricing", () => {
-  const trail: [string, string][] = [["Home", "/"], ["Pricing", "/pricing"]];
-  const cards = PLANS.map((p) => `<div class="price-card${p.hot ? " price-card--hot" : ""}"><div class="row"><h3>${p.name}</h3>${p.hot ? '<span class="chip chip--lamp" style="margin-left:auto">Most loved</span>' : ""}${p.soon ? '<span class="chip" style="margin-left:auto">Coming soon</span>' : ""}</div><div><span class="amount">${p.price}</span> <span class="small">${esc(p.note)}</span></div><ul>${p.items.map((i) => `<li><span class="tick">✓</span>${esc(i)}</li>`).join("")}</ul>${p.soon ? '<span class="key key--ghost" style="opacity:.6">Coming soon</span>' : `<a class="key ${p.hot ? "key--lamp" : "key--ghost"}" href="/login">${p.hot ? "Start free, upgrade later" : "Start free"}</a>`}</div>`).join("");
-  return html(page({
-    path: "/pricing", title: "Pricing: free for personal reading | Lumen",
-    description: "Lumen is free for personal reading: unlimited highlights, Obsidian and markdown sync, agent access over MCP, and 100 AI answers a day. Pro and Team plans are planned.",
-    jsonLd: [crumbsLd(trail), faqLd(PRICING_FAQ), { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Lumen", applicationCategory: "ProductivityApplication", operatingSystem: "Web, Chrome", offers: [{ "@type": "Offer", name: "Reader", price: "0", priceCurrency: "EUR" }] }],
-    body: `${crumbs(trail)}<section class="surface s-hero" style="text-align:center"><span class="label-pill">Pricing</span><h1 style="margin-left:auto;margin-right:auto"><span class="lead-in">Free to read.</span> <span class="payoff">Fair to grow.</span></h1><p class="dek" style="margin-left:auto;margin-right:auto">Every feature is free during the public preview. Bring your own model and it stays unlimited forever.</p></section><div class="price-grid-s">${cards}</div>${qaTabs("Pricing questions", PRICING_FAQ)}${ctaBand()}`,
-  }));
-});
+seo.get("/pricing", (c) => c.redirect("/login?next=/app/upgrade", 302));
 
 /* ---------------- docs ---------------- */
 
@@ -226,11 +205,12 @@ const LEGAL: Record<string, { title: string; body: string }> = {
   },
   terms: {
     title: "Terms",
-    body: `<h1>Terms</h1><p>Lumen is in public preview, provided as is. Use it for your own reading. Do not use it to store content you have no right to keep, to scrape at scale, or to abuse the demo or the AI quota.</p><h2>Your content</h2><p>You own what you save and write. You give Lumen permission to store and process it to provide the service, and nothing more.</p><h2>Availability</h2><p>Features may change during the preview. You can export your data at any time; if the service ever shuts down you will get at least 60 days to export.</p><h2>Open source</h2><p>The code is on <a href="${SITE.github}">GitHub</a>; you can run your own copy.</p><p class="updated">Updated ${UPDATED}.</p>`,
+    body: `<h1>Terms</h1><p>Lumen is in public preview, provided as is. Use it for your own reading. Do not use it to store content you have no right to keep, to scrape at scale, or to abuse the demo or the AI quota.</p><h2>Your content</h2><p>You own what you save and write. You give Lumen permission to store and process it to provide the service, and nothing more.</p><h2>Availability</h2><p>Features may change during the preview. You can export your data at any time; if the service ever shuts down you will get at least 60 days to export.</p><h2>Open source</h2><p>The code is on <a href="${SITE.github}">GitHub</a> under the AGPL-3.0: you can run your own copy, and if you modify it and offer it to others, including as a hosted service, you must publish your changes under the same license.</p><p class="updated">Updated ${UPDATED}.</p>`,
   },
   changelog: {
     title: "Changelog",
     body: `<h1>Changelog</h1>
+<h2>2.2 · ${UPDATED}</h2><ul><li>Freemium: the free plan keeps reading, highlighting and syncing; every new account gets 7 days of Pro.</li><li>A guided tour for first time readers.</li><li>Extension: dark mode, create collections and notes from the popup, ask about the page, Summarize is back in the toolbar.</li><li>Licensed AGPL-3.0.</li></ul>
 <h2>2.1 · ${UPDATED}</h2><ul><li><b>Connect your agent:</b> Lumen is now an MCP server. Claude Code, Claude Desktop, Cursor and other clients can search your library, read with your highlights, save links and suggest content.</li><li><b>Radar:</b> trending stories this week in the topics you read about (Hacker News, dev.to).</li><li><b>Daily and weekly reads:</b> a plan that fits your time, plus highlights worth revisiting.</li><li><b>Reminders</b> for articles you started, with snooze, in the dashboard and the extension.</li><li><b>Readers like you:</b> anonymous, aggregate suggestions from people whose libraries overlap with yours.</li><li><b>Analytics:</b> 12 week heatmap, minutes and words read, topics, sources, highlight colours, reading hours.</li><li>Docs, comparisons and answers pages; sitemap, robots and llms.txt.</li></ul>
 <h2>2.0 · ${UPDATED}</h2><ul><li>Lumen becomes a web app: library, reader, highlights with notes, collections, Spark ideas, integrations, glow streak.</li><li>Destinations with a delivery ledger: Obsidian, Notion, markdown, webhooks, each highlight sent once.</li><li>Extension rebuilt: toolbar that never blocks copy, persistent highlights, target collection, four model providers including Claude.</li></ul>
 <h2>1.0 · April 2026</h2><ul><li>Chrome extension: explain, summarise or define a selection with Ollama.</li></ul>`,
@@ -244,7 +224,7 @@ for (const key of Object.keys(LEGAL)) {
 /* ---------------- machine readable ---------------- */
 
 const urls = () => [
-  "/", "/pricing", "/compare", "/answers", "/docs", "/changelog", "/privacy", "/terms",
+  "/", "/compare", "/answers", "/docs", "/changelog", "/privacy", "/terms",
   ...COMPARES.map((c) => `/compare/${c.slug}`),
   ...ANSWERS.map((a) => `/answers/${a.slug}`),
   ...DOCS.filter((d) => d.slug).map((d) => `/docs/${d.slug}`),
@@ -261,7 +241,7 @@ seo.get("/robots.txt", () => new Response(
 ));
 
 seo.get("/llms.txt", () => new Response(
-  `# Lumen\n\n> ${SITE.description}\n\nLumen is free for personal reading and open source (${SITE.github}). Key ideas: highlighting never blocks copy and paste; each collection sends new highlights once to a chosen note (Obsidian, Notion, markdown, webhook); bring your own model (hosted, Ollama, OpenAI compatible, Claude via CLI); agents connect through MCP at ${SITE.url}/mcp.\n\n## Product\n- [Pricing](${SITE.url}/pricing): free for personal reading; Pro and Team planned\n- [Changelog](${SITE.url}/changelog)\n\n## Docs\n${DOCS.map((d) => `- [${d.title}](${SITE.url}/docs${d.slug ? "/" + d.slug : ""}): ${d.blurb}`).join("\n")}\n\n## Comparisons\n${COMPARES.map((c) => `- [${c.title}](${SITE.url}/compare/${c.slug}): ${c.answer}`).join("\n")}\n\n## Answers\n${ANSWERS.map((a) => `- [${a.question}](${SITE.url}/answers/${a.slug}): ${a.short}`).join("\n")}\n`,
+  `# Lumen\n\n> ${SITE.description}\n\nLumen is free for personal reading and open source (${SITE.github}). Key ideas: highlighting never blocks copy and paste; each collection sends new highlights once to a chosen note (Obsidian, Notion, markdown, webhook); bring your own model (hosted, Ollama, OpenAI compatible, Claude via CLI); agents connect through MCP at ${SITE.url}/mcp.\n\n## Product\n- Free plan for reading, highlighting and syncing; every new account gets 7 days of Pro (Spark, Radar, agents, analytics, Notion)\n- [Changelog](${SITE.url}/changelog)\n\n## Docs\n${DOCS.map((d) => `- [${d.title}](${SITE.url}/docs${d.slug ? "/" + d.slug : ""}): ${d.blurb}`).join("\n")}\n\n## Comparisons\n${COMPARES.map((c) => `- [${c.title}](${SITE.url}/compare/${c.slug}): ${c.answer}`).join("\n")}\n\n## Answers\n${ANSWERS.map((a) => `- [${a.question}](${SITE.url}/answers/${a.slug}): ${a.short}`).join("\n")}\n`,
   { headers: { "content-type": "text/plain; charset=utf-8" } },
 ));
 

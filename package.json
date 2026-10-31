@@ -1,7 +1,10 @@
 {
   "name": "lumen-monorepo",
   "private": true,
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev:web": "npm run dev -w @lumen/web",
     "dev:ext": "npm run dev -w @lumen/extension",
@@ -9,5 +12,8 @@
     "test": "npm test -w @lumen/core",
     "typecheck": "npm run typecheck -w @lumen/core && npm run typecheck -w @lumen/web"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "AGPL-3.0-only"
 }

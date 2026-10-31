@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
+import { Picker } from "./Picker";
+import { Ask } from "./Ask";
 
 type Home = { ok: boolean; stats: { streak: number; glowToday: number; dailyGoal: number; level: { name: string } } | null; picks: { id: string; title: string; readingMinutes: number; status: string; progress: number }[] };
 const SWATCH: Record<string, string> = { sun: "#ffe58a", mint: "#bdefd5", iris: "#dcd6ff", peach: "#ffd5c6", sky: "#cfe2ff" };
@@ -99,10 +101,9 @@ export default function Popup() {
       {connected ? (
         <div className="surface stack" style={{ gap: 8, padding: 12 }}>
           <div className="eyebrow">Sending highlights to</div>
-          <select value={s.targetCollectionId} onChange={async (e) => { await send({ type: "SET_TARGET", collectionId: e.target.value }); setS({ ...s, targetCollectionId: e.target.value }); setStatus(""); }}>
-            <option value="">No collection (library only)</option>
-            {cols.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-          </select>
+          <Picker cols={cols} value={s.targetCollectionId}
+            onChange={async (id) => { await send({ type: "SET_TARGET", collectionId: id }); setS({ ...s, targetCollectionId: id }); setStatus(""); }}
+            onCreated={(c) => { setCols((l) => [c, ...l]); setS({ ...s, targetCollectionId: c.id }); setStatus(`Created ${c.name}`); }} />
           <div className="small muted">{target ? (target.destinationId ? "New highlights flow to its note, once each." : "This collection has no destination yet.") : "Pick the piece you are working on."}</div>
           {target?.destinationId && <button className="key ghost" onClick={sync}>Send new highlights now</button>}
         </div>
@@ -113,6 +114,8 @@ export default function Popup() {
           <button className="key lamp" onClick={() => chrome.runtime.openOptionsPage()}>Connect Lumen</button>
         </div>
       )}
+
+      {onPage && <Ask tabId={tab?.id} />}
 
       {connected && home && home.picks.length > 0 && (
         <div className="stack" style={{ gap: 6 }}>
@@ -132,6 +135,7 @@ export default function Popup() {
       <div className="row small muted">
         <span>{status || "Select text on any page to start."}</span>
         <span className="sp" />
+        <span className="mono" style={{ fontSize: 11 }}>v{chrome.runtime.getManifest().version}</span>
         <a href="#" onClick={(e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); }} style={{ color: "var(--ink-2)" }}>Settings</a>
       </div>
     </div>

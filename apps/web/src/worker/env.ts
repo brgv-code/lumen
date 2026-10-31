@@ -13,6 +13,9 @@ export interface Env {
   GOOGLE_SITE_VERIFICATION?: string;
   /** Secret for the persistent test account login link. */
   DEV_LOGIN_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_PRICE_ID?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 export interface SessionUser {
@@ -26,6 +29,9 @@ export interface SessionUser {
   timezone: string;
   ai_provider: string;
   share_signals: number;
+  trial_ends_at?: number | null;
+  stripe_customer_id?: string | null;
+  pro_interest_at?: number | null;
   reminders: number;
   created_at: number;
 }

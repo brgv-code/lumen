@@ -6,7 +6,7 @@ import { Modal, Segmented, useToast } from "./ui";
 
 type Client = "claude-code" | "claude-desktop" | "cursor" | "other";
 
-export function ConnectAgent({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ConnectAgent({ open, onClose, pro = true }: { open: boolean; onClose: () => void; pro?: boolean }) {
   const toast = useToast();
   const [client, setClient] = useState<Client>("claude-code");
   const [key, setKey] = useState<string | null>(null);
@@ -37,6 +37,12 @@ export function ConnectAgent({ open, onClose }: { open: boolean; onClose: () => 
             Give Claude, Cursor or any MCP agent your library: it can search what you saved, read with your highlights, watch trending topics, save links and suggest what to write next.
           </p>
         </div>
+        {!pro && (
+          <div className="card-flat row" style={{ padding: 12, background: "var(--lamp-tint)" }}>
+            <span className="small" style={{ flex: 1 }}>Agent access is part of Lumen Pro. You can connect now; tools answer again once you upgrade.</span>
+            <a className="key key--lamp key--sm" href="/app/upgrade">See Pro</a>
+          </div>
+        )}
         <Segmented label="Client" size="sm" value={client} onChange={setClient} options={[
           { value: "claude-code", label: "Claude Code" }, { value: "claude-desktop", label: "Claude Desktop" }, { value: "cursor", label: "Cursor" }, { value: "other", label: "Other" },
         ]} />

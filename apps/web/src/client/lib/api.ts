@@ -31,6 +31,7 @@ async function req<T>(method: string, path: string, data?: unknown): Promise<T> 
     let code = "http_" + res.status, message = res.statusText || "Request failed";
     try { const j = await res.json(); code = j.error?.code ?? code; message = j.error?.message ?? message; } catch { /* not json */ }
     if (res.status === 401 && !location.pathname.startsWith("/login") && location.pathname.startsWith("/app")) location.href = "/login";
+    if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: message }));
     throw new ApiError(res.status, code, message);
   }
   return res.json() as Promise<T>;
@@ -102,6 +103,11 @@ export const api = {
   dismissTrend: (id: string) => req<{ ok: true }>("POST", `/api/v1/trends/${id}/dismiss`, {}),
   similar: () => req<{ data: Similar[]; optedOut: boolean }>("GET", "/api/v1/similar"),
   analytics: () => req<Analytics>("GET", "/api/v1/analytics"),
+  billing: () => req<{ configured: boolean; user: User }>("GET", "/api/v1/billing"),
+  checkout: () => req<{ url: string }>("POST", "/api/v1/billing/checkout", {}),
+  portal: () => req<{ url: string }>("POST", "/api/v1/billing/portal", {}),
+  billingInterest: () => req<{ ok: true }>("POST", "/api/v1/billing/interest", {}),
+  previewTrial: (action: "end" | "restart") => req<{ user: User }>("POST", "/api/v1/billing/preview", { action }),
   deleteToken: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/tokens/${id}`),
 };
 
@@ -120,6 +126,7 @@ export async function streamAI(
   if (!res.ok || !res.body) {
     let msg = "The assistant is unavailable right now.";
     try { msg = (await res.json()).error?.message ?? msg; } catch { /* */ }
+    if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: msg }));
     throw new ApiError(res.status, "ai", msg);
   }
   const reader = res.body.getReader();

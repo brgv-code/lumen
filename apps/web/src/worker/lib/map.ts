@@ -1,20 +1,29 @@
 import type { Item, Highlight, Collection, Destination, Idea, User } from "@lumen/core";
 import type { SessionUser } from "../env";
+import { entitlement } from "./plan";
 
 type Row = Record<string, any>;
 
-export const toUser = (u: SessionUser): User => ({
+export const toUser = (u: SessionUser): User => {
+  const e = entitlement(u);
+  return {
   id: u.id,
   email: u.email,
   name: u.name,
   avatarUrl: u.avatar_url,
   isDemo: u.is_demo === 1,
   plan: u.plan === "pro" ? "pro" : "free",
+  planStatus: e.status,
+  pro: e.pro,
+  trialEndsAt: e.trialEndsAt,
+  trialDaysLeft: e.trialDaysLeft,
+  billingInterest: Boolean(u.pro_interest_at),
   dailyGoal: u.daily_goal,
   shareSignals: Boolean(u.share_signals),
   reminders: Boolean(u.reminders),
   createdAt: u.created_at,
-});
+  };
+};
 
 export const toItem = (r: Row): Item => ({
   id: r.id,

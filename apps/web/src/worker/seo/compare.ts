@@ -28,9 +28,9 @@ export const COMPARES: Compare[] = [
     description: "Lumen vs Readwise Reader compared: pricing, highlighting, Obsidian and Notion export, AI models, and which one fits research reading.",
     lead: "Lumen vs Readwise Reader:",
     pay: "pick by where your notes live.",
-    answer: "Readwise Reader is a polished, paid reading app with spaced repetition of highlights and many sources (RSS, newsletters, EPUB). Lumen is free for personal reading, sends each highlight once to a note you choose (Obsidian, Notion, markdown, webhook), lets you pick the AI model, and plugs into agents through MCP.",
+    answer: "Readwise Reader is a polished, paid reading app with spaced repetition of highlights and many sources (RSS, newsletters, EPUB). Lumen has a free plan, sends each highlight once to a note you choose (Obsidian, Notion, markdown, webhook), lets you pick the AI model, and plugs into agents through MCP.",
     rows: [
-      ["Price", "Free for personal reading; Pro planned", "Included in Full Readwise, about $9.99 a month billed yearly (check their site)"],
+      ["Price", "Free plan; every Pro feature free for 7 days", "Included in Full Readwise, about $9.99 a month billed yearly (check their site)"],
       ["Highlight web pages", "Yes, toolbar on selection; copy keeps working", "Yes"],
       ["Choose the target note per project", "Yes, every collection points at one note", "Exports one document per source"],
       ["Duplicate safe re-clipping", "Yes, a delivery ledger per destination", "Sync based"],
@@ -46,7 +46,7 @@ export const COMPARES: Compare[] = [
     chooseLumen: ["You write from your reading and want highlights in the exact note you are drafting.", "You use Obsidian and care about clean markdown in your own syntax.", "You want to choose the model, run it locally, or let Claude work with your library."],
     switchSteps: ["Export your highlights from Readwise as markdown.", "Create a collection in Lumen for each project and point it at a note.", "Install the Lumen extension and keep reading; new highlights flow to the right note."],
     faq: [
-      ["Is Lumen a free Readwise alternative?", "Yes for web reading and highlighting: personal use is free, and you can bring your own model. Readwise still covers more formats such as EPUB and RSS."],
+      ["Is Lumen a free Readwise alternative?", "For web reading and highlighting, yes: the free plan covers saving, highlighting, notes and Obsidian sync, and every Pro feature is free for your first 7 days. Readwise still covers more formats such as EPUB and RSS."],
       ["Can Lumen send highlights to Obsidian like Readwise does?", "Yes. Lumen appends new highlights to a note you choose through the Obsidian Local REST API plugin, and never writes the same highlight twice."],
       ["Does Lumen have spaced repetition?", "A light version: daily reads resurface older highlights next to what you are reading now."],
     ],
@@ -61,7 +61,7 @@ export const COMPARES: Compare[] = [
     pay: "private research or social learning.",
     answer: "Glasp is a free social web highlighter: highlights are shared on a public profile by default and exported as files or copied into notes apps. Lumen is private by default, sends highlights to a chosen note automatically and only once, and adds a reader view, reading plans, analytics and MCP access for agents.",
     rows: [
-      ["Price", "Free for personal reading", "Free tier and paid plans (check their site)"],
+      ["Price", "Free plan; Pro free for 7 days", "Free tier and paid plans (check their site)"],
       ["Default visibility", "Private", "Social profile, public by default"],
       ["Send to a chosen note automatically", "Yes, per collection", "Export or copy"],
       ["Duplicate safe", "Yes, delivery ledger", "Manual"],
@@ -88,7 +88,7 @@ export const COMPARES: Compare[] = [
     pay: "keep the clipper, fix the gaps.",
     answer: "Obsidian Web Clipper is excellent for clipping whole pages into a vault with templates. Its highlighter is a mode that takes over selection, every clip follows the template's fixed destination, and clipping the same page again appends all highlights again. Lumen keeps copy working, lets you pick the target note while reading, appends only new highlights, and works with Notion and markdown too.",
     rows: [
-      ["Price", "Free for personal reading", "Free, open source"],
+      ["Price", "Free plan; Pro free for 7 days", "Free, open source"],
       ["Copy text while highlighting", "Yes, a toolbar instead of a mode", "Turn highlighter mode off first"],
       ["Choose the note while reading", "Yes, from the extension popup", "Fixed per template"],
       ["Append only new highlights", "Yes, ledger per destination", "Re-clipping duplicates (open request)"],
@@ -116,7 +116,7 @@ export const COMPARES: Compare[] = [
     pay: "annotate together or write alone.",
     answer: "Hypothesis is an open, standards based annotation layer for the web and PDFs, strong for classrooms and group discussion. Lumen is a personal reading tool: private highlights and notes that flow into your own notes app, plus a library, reader view, reading plans and agent access.",
     rows: [
-      ["Price", "Free for personal reading", "Free, open source"],
+      ["Price", "Free plan; Pro free for 7 days", "Free, open source"],
       ["Group annotation", "Not yet", "Yes, its strength"],
       ["Send to Obsidian, Notion, markdown", "Yes, automatically, once each", "Through the API or community plugins"],
       ["Library and reader view", "Yes", "No"],
@@ -150,7 +150,7 @@ export const COMPARES: Compare[] = [
     faq: [
       ["When did Pocket shut down?", "Mozilla shut Pocket down on July 8, 2025. Export stayed open for a few months and closed in November 2025."],
       ["Can I import my Pocket export into Lumen?", "Bulk import is on the roadmap; today you can save links one by one or through the API."],
-      ["Is Lumen free?", "Yes for personal reading."],
+      ["Is Lumen free?", "Yes. The free plan covers saving, reading, highlighting and syncing; Pro features are free for the first 7 days."],
     ],
   },
   {

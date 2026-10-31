@@ -60,7 +60,15 @@ class Lumen {
     document.addEventListener("scroll", () => this.hideBar(), { passive: true, capture: true });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") { this.hideBar(); this.hideCard(); } });
 
-    chrome.runtime.onMessage.addListener((m) => this.onMessage(m));
+    chrome.runtime.onMessage.addListener((m, _s, reply) => {
+      if (m?.type === "GET_TEXT") {
+        const sel = window.getSelection()?.toString().trim() ?? "";
+        const main = (document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body;
+        reply({ selection: sel.slice(0, 6000), text: (main.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000), title: document.title });
+        return;
+      }
+      this.onMessage(m);
+    });
     this.load();
   }
 
@@ -105,6 +113,7 @@ class Lumen {
       `<span class="sep"></span>
        <button data-act="note">Note</button>
        <button data-act="explain">Explain</button>
+       <button data-act="summarize">Summarize</button>
        <button data-act="define">Define</button>
        <button data-act="ask">Ask</button>
        <button data-act="copy" title="Copy with a link back to this passage">Copy</button>`;
@@ -123,7 +132,7 @@ class Lumen {
       if (act === "note") return this.highlight("sun", true);
       if (act === "copy") return this.copy();
       if (act === "ask") return this.askBox(this.pending!.quote.quote);
-      this.ai(act as "explain" | "define", this.pending!.quote.quote);
+      this.ai(act as "explain" | "define" | "summarize", this.pending!.quote.quote);
     };
   }
 
@@ -246,7 +255,7 @@ class Lumen {
     };
   }
 
-  async ai(action: "explain" | "define" | "ask", text: string, question?: string) {
+  async ai(action: "explain" | "define" | "summarize" | "ask", text: string, question?: string) {
     this.hideBar();
     this.aiText = "";
     this.card.hidden = false;

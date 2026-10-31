@@ -24,6 +24,11 @@ export interface User {
   avatarUrl: string | null;
   isDemo: boolean;
   plan: "free" | "pro";
+  planStatus: "trial" | "pro" | "free";
+  pro: boolean;
+  trialEndsAt: number;
+  trialDaysLeft: number;
+  billingInterest: boolean;
   dailyGoal: number;
   shareSignals: boolean;
   reminders: boolean;

@@ -11,6 +11,7 @@ import { ai, ideas } from "./routes/ai";
 import { me } from "./routes/me";
 import { discover } from "./routes/discover";
 import { mcpApp } from "./routes/mcp";
+import { billing, stripeWebhook } from "./routes/billing";
 import { seo, notFound } from "./seo/routes";
 import { requireUser } from "./lib/session";
 import { purgeDemos } from "./lib/seed";
@@ -31,6 +32,7 @@ app.onError((err, c) => {
 app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", time: new Date().toISOString() }));
 
 app.route("/auth", auth);
+app.post("/billing/webhook", (c) => stripeWebhook(c.req.raw, c.env));
 app.route("/mcp", mcpApp(internal));
 
 // The extension calls the API with a Bearer token from its own origin.
@@ -58,6 +60,7 @@ app.route("/api/v1/collections", collections);
 app.route("/api/v1/destinations", destinations);
 app.route("/api/v1/ai", ai);
 app.route("/api/v1/ideas", ideas);
+app.route("/api/v1/billing", billing);
 
 app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 

@@ -19,6 +19,8 @@ const Settings = lazy(() => import("./pages/app/Settings"));
 const Radar = lazy(() => import("./pages/app/Radar"));
 const Analytics = lazy(() => import("./pages/app/Analytics"));
 import NotFound from "./pages/NotFound";
+const Upgrade = lazy(() => import("./pages/app/Upgrade"));
+import { ProGate } from "./pages/app/ProGate";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -35,11 +37,12 @@ createRoot(document.getElementById("root")!).render(
               <Route path="highlights" element={<Highlights />} />
               <Route path="collections" element={<Collections />} />
               <Route path="collections/:id" element={<LibraryPage />} />
-              <Route path="spark" element={<Spark />} />
+              <Route path="spark" element={<ProGate feature="spark"><Spark /></ProGate>} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="radar" element={<Radar />} />
-              <Route path="analytics" element={<Analytics />} />
+              <Route path="radar" element={<ProGate feature="radar"><Radar /></ProGate>} />
+              <Route path="analytics" element={<ProGate feature="analytics"><Analytics /></ProGate>} />
+              <Route path="upgrade" element={<Upgrade />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -20,14 +20,15 @@ export function SiteFooter() {
         <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
           <Logo />
           <p className="muted" style={{ maxWidth: 260 }}>Built for people who think reading should feel light.</p>
+          <a className="key key--lamp key--sm" href="/login" style={{ justifySelf: "start" }}>Start free</a>
           <div className="row" style={{ gap: 14, color: "var(--ink-2)" }}><a href="https://github.com/brgv-code/lumen" aria-label="GitHub"><Github size={17} /></a></div>
         </div>
-        <div><h5>Product</h5><ul><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/login">Dashboard</a></li></ul></div>
+        <div><h5>Product</h5><ul><li><a href="#features">Features</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/login">Dashboard</a></li></ul></div>
         <div><h5>Compare</h5><ul><li><a href="/compare/lumen-vs-readwise-reader">vs Readwise Reader</a></li><li><a href="/compare/lumen-vs-obsidian-web-clipper">vs Obsidian Web Clipper</a></li><li><a href="/compare/pocket-alternative">Pocket alternative</a></li><li><a href="/compare">All comparisons</a></li></ul></div>
         <div><h5>Developers</h5><ul><li><a href="/docs/api">API</a></li><li><a href="/docs/mcp">MCP for agents</a></li><li><a href="/docs/architecture">Architecture</a></li><li><a href="https://github.com/brgv-code/lumen">Source</a></li></ul></div>
         <div><h5>Resources</h5><ul><li><a href="/answers">Answers</a></li><li><a href="/docs">Docs</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li></ul></div>
       </div>
-      <p className="small muted" style={{ textAlign: "center", marginTop: 40, position: "relative", zIndex: 2 }}>© 2026 Lumen · Open source</p>
+      <p className="small muted" style={{ textAlign: "center", marginTop: 40, position: "relative", zIndex: 2 }}>© 2026 Lumen · Open source under AGPL-3.0</p>
       <div className="foot-stage" aria-hidden="true">
         {FLOATS.map((f, k) => (
           <div key={k} className={`foot-float ${f.sm ? "hide-sm" : ""}`} style={{ ["--x" as string]: f.x, ["--y" as string]: f.y, ["--r" as string]: f.r, ["--d" as string]: f.d }}><div>{f.el}</div></div>

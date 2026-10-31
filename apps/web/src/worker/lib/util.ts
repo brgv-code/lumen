@@ -29,7 +29,7 @@ export function dayIn(tz: string, at = new Date()): string {
   }
 }
 
-export function fail(status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 501 | 502, code: string, message: string): never {
+export function fail(status: 400 | 401 | 402 | 403 | 404 | 409 | 422 | 429 | 500 | 501 | 502, code: string, message: string): never {
   throw new HTTPException(status, { res: Response.json({ error: { code, message } }, { status }) });
 }
 
