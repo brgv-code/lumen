@@ -29,7 +29,7 @@ export default function Ask() {
   };
 
   return (
-    <div className="page" style={{ maxWidth: 900 }}>
+    <div className="page page--narrow">
       <PageHero pill={<><MessageCircle size={13} /> Ask</>} lead="Ask everything" pay="you have read."
         sub="Answers come from your own saved articles, highlights and notes, with numbered sources you can open."
         mesh="mesh-iris" tiles={[["tile--iris", <Sparkles />], ["tile--lamp", <Highlighter />], ["tile--mint", <BookOpen />], ["tile--sky", <Library />]]} />

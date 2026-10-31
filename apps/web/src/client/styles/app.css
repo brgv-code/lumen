@@ -523,3 +523,5 @@
 .tour-who { display: grid; gap: 8px; margin-top: 14px; }
 .tour-who div { background: var(--raised); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; box-shadow: var(--shadow-pill); }
 .tour-who b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+/* narrow pages (settings, ask) sit centred in the main column */
+.page--narrow { max-width: 880px; width: 100%; margin-inline: auto; }

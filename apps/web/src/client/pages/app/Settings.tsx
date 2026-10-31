@@ -27,7 +27,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="page" style={{ maxWidth: 820 }}>
+    <div className="page page--narrow">
       <PageHero
         pill="Settings"
         lead="Make it"
