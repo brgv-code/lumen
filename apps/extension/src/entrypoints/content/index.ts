@@ -5,6 +5,7 @@ import { anchorToRange, describeRange, unwrapMarks, wrapRange } from "@lumen/cor
 import { UI_CSS, MARK_CSS } from "./styles";
 import { ICON, LABEL, LAMP } from "./icons";
 import { DEFAULT_SETTINGS, type Settings } from "../../lib/types";
+import { resolveTheme } from "../../lib/theme";
 
 const SWATCH: Record<string, string> = { sun: "#ffd34d", mint: "#3fd39a", iris: "#8a7bff", peach: "#ff8a6b", sky: "#5b9bff" };
 
@@ -34,6 +35,7 @@ class Lumen {
   settings: Settings = DEFAULT_SETTINGS;
   helperEl!: HTMLElement;
   helperMenu = false;
+  panelEl: HTMLElement | null = null;
   host!: HTMLElement;
   root!: ShadowRoot;
   bar!: HTMLElement;
@@ -66,15 +68,20 @@ class Lumen {
     document.addEventListener("mousedown", (e) => { if (!e.composedPath().includes(this.host)) this.hideBar(); }, true);
     document.addEventListener("click", (e) => this.onMarkClick(e), true);
     document.addEventListener("scroll", () => this.hideBar(), { passive: true, capture: true });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { this.hideBar(); this.hideCard(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { this.hideBar(); this.hideCard(); this.hidePanel(); } });
 
-    send<{ settings: Settings }>({ type: "GET_SETTINGS" }).then((r) => { if (r?.settings) { this.settings = r.settings; this.renderHelper(); } }).catch(() => {});
+    send<{ settings: Settings }>({ type: "GET_SETTINGS" }).then((r) => { if (r?.settings) { this.settings = r.settings; this.applySettings(); } }).catch(() => {});
     chrome.storage.onChanged.addListener((ch) => {
-      if (ch.lumen_settings_v2?.newValue) { this.settings = { ...DEFAULT_SETTINGS, ...ch.lumen_settings_v2.newValue }; this.renderHelper(); }
+      if (ch.lumen_settings_v2?.newValue) { this.settings = { ...DEFAULT_SETTINGS, ...ch.lumen_settings_v2.newValue }; this.applySettings(); }
     });
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applySettings());
+    this.applySettings();
 
     chrome.runtime.onMessage.addListener((m, _s, reply) => {
       if (m?.type === "GET_HTML") { reply(pageHtml()); return; }
+      if (m?.type === "SHOW_PANEL") { this.showPanel(m.prompt); reply({ ok: true }); return; }
+      if (m?.type === "TOGGLE_PANEL") { this.togglePanel(); reply({ ok: true }); return; }
+      if (m?.type === "PANEL_CLOSE") { this.hidePanel(); reply({ ok: true }); return; }
       if (m?.type === "SCROLL_TO") {
         const el = document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`) as HTMLElement | null;
         if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.animate([{ filter: "brightness(1)" }, { filter: "brightness(.8)" }, { filter: "brightness(1)" }], { duration: 700 }); }
@@ -102,12 +109,67 @@ class Lumen {
     if (st.highlights.length) setTimeout(() => this.paint(), 2500);
   }
 
+  applySettings() {
+    this.host.classList.toggle("dark", resolveTheme(this.settings.theme ?? "system") === "dark");
+    this.renderHelper();
+    this.adaptMarks();
+  }
+
   paint() {
     unwrapMarks(document.body, "mark.lumen-mark");
     for (const h of [...this.highlights].sort((a, b) => b.position - a.position)) {
       const r = anchorToRange(document.body, h);
       if (r) wrapRange(r, { class: `lumen-mark lumen-${h.color}`, "data-lumen-id": h.id, title: h.note ? `Note: ${h.note}` : "Lumen highlight" });
     }
+    this.adaptMarks();
+  }
+
+  /** Light text means a dark page: switch that mark to a tint plus underline so it stays readable. */
+  adaptMarks() {
+    const style = this.settings.markStyle ?? "auto";
+    document.querySelectorAll<HTMLElement>("mark.lumen-mark").forEach((m) => {
+      m.classList.remove("lumen-dark", "lumen-ul");
+      if (style === "underline") { m.classList.add("lumen-ul"); return; }
+      if (style === "fill") return;
+      const c = getComputedStyle(m.parentElement ?? m).color.match(/\d+(\.\d+)?/g)?.map(Number) ?? [0, 0, 0];
+      const lum = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+      if (lum > 0.6) m.classList.add("lumen-dark");
+    });
+  }
+
+  /** The paragraph (or nearby blocks) around the current selection, so short phrases are read in context. */
+  contextFor(text: string): string | undefined {
+    const sel = window.getSelection();
+    const node = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+    let el = (node && (node.nodeType === 1 ? node : node.parentElement)) as HTMLElement | null;
+    while (el && el !== document.body && (el.innerText || "").length < 280) el = el.parentElement;
+    const ctx = (el?.innerText || "").replace(/\s+/g, " ").trim();
+    return ctx && ctx !== text ? ctx.slice(0, 1500) : undefined;
+  }
+
+  /* ---------- floating panel (over the page, never resizing it) ---------- */
+  showPanel(prompt?: string) {
+    if (this.settings.panel === "docked") { send({ type: "OPEN_PANEL", prompt }).catch(() => {}); return; }
+    this.hideBar();
+    if (!this.panelEl) {
+      this.panelEl = document.createElement("div");
+      this.panelEl.className = "fpanel";
+      this.root.appendChild(this.panelEl);
+    }
+    const src = chrome.runtime.getURL(`sidepanel.html?mode=float${prompt ? `&prompt=${encodeURIComponent(prompt)}` : ""}`);
+    const frame = this.panelEl.querySelector("iframe");
+    if (!frame || prompt) this.panelEl.innerHTML = `<iframe src="${src}" title="Lumen" allow="clipboard-write"></iframe>`;
+    requestAnimationFrame(() => { this.panelEl!.classList.add("open"); this.host.classList.add("panel-open"); });
+  }
+
+  hidePanel() {
+    this.panelEl?.classList.remove("open");
+    this.host.classList.remove("panel-open");
+  }
+
+  togglePanel() {
+    if (this.panelEl?.classList.contains("open")) this.hidePanel();
+    else this.showPanel();
   }
 
   onSelect(e: Event) {
@@ -182,10 +244,8 @@ class Lumen {
     };
   }
 
-  async openPanel(prompt?: string, fallbackText?: string) {
-    this.hideBar();
-    const r = await send<{ ok: boolean }>({ type: "OPEN_PANEL", prompt }).catch(() => ({ ok: false }));
-    if (!r?.ok && fallbackText) this.askBox(fallbackText);
+  async openPanel(prompt?: string, _fallbackText?: string) {
+    this.showPanel(prompt);
   }
 
   /* ---------- the page helper ---------- */
@@ -214,6 +274,7 @@ class Lumen {
         <button data-h="summary">${ICON.summarize}<span>Summarise this page</span></button>
         <button data-h="ask">${ICON.ask}<span>Ask about this page</span></button>
         <button data-h="panel">${ICON.panel}<span>Open the panel</span></button>
+        <button data-h="follow">${ICON.save}<span>Follow this blog</span></button>
         <div class="hsep"></div>
         <button data-h="hide">${ICON.eyeOff}<span>Hide on ${location.hostname}</span></button>
       </div>` : ""}
@@ -229,6 +290,11 @@ class Lumen {
       if (act === "summary") { const main = (document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body; return this.ai("summarize", (main.innerText || "").slice(0, 8000)); }
       if (act === "ask") return this.openPanel("Summarise this page and connect it to what I have saved before.", document.title);
       if (act === "panel") return this.openPanel();
+      if (act === "follow") {
+        type FollowResult = { ok: boolean; feed?: { title: string }; created?: boolean; error?: string };
+        const r: FollowResult = await send<FollowResult>({ type: "FOLLOW_SITE", url: location.href }).catch((e): FollowResult => ({ ok: false, error: String(e) }));
+        return this.toast(r.ok && r.feed ? (r.created ? `Following ${r.feed.title}. You'll hear when it publishes.` : `Already following ${r.feed.title}`) : r.error ?? "No feed found on this site", r.ok ? "ok" : "err");
+      }
       if (act === "hide") { await send({ type: "SET_HELPER_SITE", host: location.hostname, on: false }); this.toast(`${h.name} hidden here. Bring it back from the popup or right click.`); }
     };
   }
@@ -374,7 +440,7 @@ class Lumen {
         this.toast("Saved the passage with this answer as its note");
       }
     };
-    const r = await send<{ provider: string }>({ type: "AI_REQUEST", action, text, question, title: document.title }).catch(() => null);
+    const r = await send<{ provider: string }>({ type: "AI_REQUEST", action, text, question, title: document.title, context: this.contextFor(text) }).catch(() => null);
     const chip = this.card.querySelector("[data-prov]");
     if (chip && r) chip.textContent = ({ lumen: "Lumen", ollama: "Ollama", openai: "API", claude: "Claude" } as Record<string, string>)[r.provider] ?? r.provider;
   }

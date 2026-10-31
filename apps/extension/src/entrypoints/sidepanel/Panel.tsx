@@ -16,6 +16,15 @@ async function activeTab() {
   return t;
 }
 
+const params = new URLSearchParams(location.search);
+const FLOAT = params.get("mode") === "float";
+const START_PROMPT = params.get("prompt") ?? "";
+
+async function closeFloat() {
+  const t = await activeTab();
+  if (t?.id !== undefined) chrome.tabs.sendMessage(t.id, { type: "PANEL_CLOSE" }).catch(() => {});
+}
+
 export default function Panel() {
   const [tab, setTab] = useState<Tab>("ask");
   const [s, setS] = useState<Settings | null>(null);
@@ -48,6 +57,9 @@ export default function Panel() {
     chrome.tabs.onUpdated.addListener(onUpd);
     const onMsg = (m: { type?: string; prompt?: string }) => { if (m?.type === "PANEL_PROMPT" && m.prompt) { setTab("ask"); ask(m.prompt); } };
     chrome.runtime.onMessage.addListener(onMsg);
+    if (START_PROMPT) setTimeout(() => ask(START_PROMPT), 300);
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && FLOAT) closeFloat(); };
+    window.addEventListener("keydown", esc);
     return () => { chrome.tabs.onActivated.removeListener(onAct); chrome.tabs.onUpdated.removeListener(onUpd); chrome.runtime.onMessage.removeListener(onMsg); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -206,6 +218,7 @@ function Header() {
       <b style={{ color: "var(--ink)", fontSize: 16, letterSpacing: "-0.03em" }}>lumen</b>
       <span className="sp" />
       <button className="icon-btn" title="Settings" onClick={() => chrome.runtime.openOptionsPage()}>⚙</button>
+      {FLOAT && <button className="icon-btn" title="Close (Esc)" onClick={closeFloat}>✕</button>}
     </div>
   );
 }

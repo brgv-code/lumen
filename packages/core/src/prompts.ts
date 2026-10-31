@@ -2,7 +2,8 @@ import type { AIAction } from "./types.ts";
 
 export const READER_SYSTEM = `You are Lumen, a calm reading companion in the margin of an article.
 Answer in plain language, in at most 120 words, without preamble. Use short paragraphs or a short list.
-Never invent facts about the article beyond the passage and context you are given.`;
+Read the passage in the context of its surrounding text and the article title; technical terms usually have their technical meaning.
+Never invent facts about the article beyond the passage and context you are given. No analogies unless asked.`;
 
 /** The user message for a margin question. Shared by the API and the extension. */
 export function readerPrompt(action: AIAction, text: string, opts: { question?: string; title?: string; context?: string } = {}): string {
@@ -10,9 +11,9 @@ export function readerPrompt(action: AIAction, text: string, opts: { question?: 
   const ctx = opts.context ? `\nSurrounding text: """${opts.context.slice(0, 1500)}"""` : "";
   const passage = `Passage: """${text.slice(0, 6000)}"""${where}${ctx}`;
   const task = {
-    explain: "Explain what this passage means and why it matters, as if to a curious friend.",
+    explain: "Explain what this passage means here, using the surrounding text and the article title for context. Be concrete and specific to this article; do not generalise beyond it.",
     summarize: "Summarize this in two or three sentences.",
-    define: "Define the key term or concept in this passage, then give one short example.",
+    define: "Define the term or concept as it is used in this article (use the surrounding text), then give one short example.",
     simplify: "Rewrite this passage so a 12 year old understands it, keeping the meaning.",
     expand: "Expand on this passage: the background it assumes, why it is true or contested, and one concrete example. Keep it under 150 words.",
     ask: `Answer this question about the passage: ${opts.question?.slice(0, 500) || "What is this about?"}`,

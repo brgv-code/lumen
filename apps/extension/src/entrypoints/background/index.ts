@@ -57,24 +57,46 @@ export default defineBackground(() => {
 
   chrome.commands.onCommand.addListener(async (command) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (command === "open-panel" && tab?.windowId !== undefined) { chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {}); return; }
+    if (command === "open-panel" && tab) { openPanelFor(tab, undefined, true); return; }
     if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "CMD", cmd: command === "save-page" ? "save" : "highlight" }).catch(() => {});
   });
 
   // Reminders: a gentle nudge for articles you started and left.
   chrome.alarms.create("lumen-reminders", { periodInMinutes: 240, delayInMinutes: 1 });
   chrome.alarms.create("lumen-menus", { periodInMinutes: 60 });
+  chrome.alarms.create("lumen-follow", { periodInMinutes: 60, delayInMinutes: 2 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === "lumen-reminders") checkReminders().catch(() => {});
     if (a.name === "lumen-menus") buildMenus();
+    if (a.name === "lumen-follow") checkNewPosts().catch(() => {});
   });
   chrome.notifications.onClicked.addListener(async (nid) => {
+    if (nid.startsWith("lumen-post-")) {
+      const map = (await chrome.storage.local.get("lumen_post_urls")).lumen_post_urls ?? {};
+      const target = map[nid];
+      const s = await getSettings();
+      chrome.tabs.create({ url: target?.url ?? `${s.apiBase}/app/following` });
+      if (target?.id) cloud("POST", `/following/posts/${target.id}/seen`, {}).catch(() => {});
+      chrome.notifications.clear(nid);
+      return;
+    }
     if (!nid.startsWith("lumen-remind-")) return;
     const s = await getSettings();
     chrome.tabs.create({ url: `${s.apiBase}/app/read/${nid.slice("lumen-remind-".length)}` });
     chrome.notifications.clear(nid);
   });
 });
+
+/** Floating panel in the page by default; Chrome's docked side panel if chosen in settings. */
+async function openPanelFor(tab: chrome.tabs.Tab, prompt?: string, toggle = false) {
+  const s = await getSettings();
+  if (s.panel === "docked") {
+    await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+    if (prompt) setTimeout(() => chrome.runtime.sendMessage({ type: "PANEL_PROMPT", prompt }).catch(() => {}), 500);
+    return;
+  }
+  if (tab.id !== undefined) chrome.tabs.sendMessage(tab.id, toggle ? { type: "TOGGLE_PANEL" } : { type: "SHOW_PANEL", prompt }).catch(() => {});
+}
 
 /** After install or update, existing tabs have no (or a stale) content script: add the current one. */
 async function injectIntoOpenTabs() {
@@ -103,6 +125,7 @@ async function buildMenus() {
     const add = (o: chrome.contextMenus.CreateProperties) => chrome.contextMenus.create(o, () => void chrome.runtime.lastError);
     add({ id: "save-page", title: "Save page to Lumen", contexts: ["page"] });
     add({ id: "save-link", title: "Save link to Lumen", contexts: ["link"] });
+    add({ id: "follow", title: "Follow this blog in Lumen", contexts: ["page"] });
     add({ id: "highlight", title: "Highlight with Lumen", contexts: ["selection"] });
     add({ id: "explain", title: "Explain with Lumen", contexts: ["selection"] });
     add({ id: "ask", title: "Ask Lumen about “%s”", contexts: ["selection"] });
@@ -125,11 +148,14 @@ async function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.T
   const id = String(info.menuItemId);
   const tabMsg = (m: object) => chrome.tabs.sendMessage(tab.id!, m).catch(() => {});
   if (id === "panel" || id === "ask") {
-    await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
-    if (id === "ask" && info.selectionText) setTimeout(() => chrome.runtime.sendMessage({ type: "PANEL_PROMPT", prompt: `What does this mean: “${info.selectionText}”` }).catch(() => {}), 500);
-    return;
+    const prompt = id === "ask" && info.selectionText ? `What does this mean: “${info.selectionText}”` : undefined;
+    return openPanelFor(tab, prompt);
   }
   if (id === "save-page") return tabMsg({ type: "CMD", cmd: "save" });
+  if (id === "follow" && tab.url) {
+    const r = await cloud<{ feed: { title: string }; created: boolean }>("POST", "/following", { url: tab.url }).catch((e) => ({ error: (e as Error).message }));
+    return tabMsg({ type: "TOAST", text: "error" in r ? r.error : r.created ? `Following ${r.feed.title}. You'll hear when it publishes.` : `Already following ${r.feed.title}`, tone: "error" in r ? "err" : "ok" });
+  }
   if (id === "highlight") return tabMsg({ type: "CMD", cmd: "highlight" });
   if (id === "explain") return tabMsg({ type: "CMD", cmd: "explain" });
   if (id === "save-link" && info.linkUrl) {
@@ -246,6 +272,11 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     }
 
     case "OPEN_PANEL": {
+      if (!sender.tab && msg.tabId !== undefined) {
+        const t = await chrome.tabs.get(msg.tabId);
+        await openPanelFor(t, msg.prompt);
+        return { ok: true };
+      }
       const winId = sender.tab?.windowId;
       try {
         if (winId !== undefined) await chrome.sidePanel.open({ windowId: winId });
@@ -393,6 +424,21 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       return { ok: true, item: r.item, created: r.created };
     }
 
+    case "FOLLOW_SITE": {
+      const r = await cloud<{ feed: { id: string; title: string }; created: boolean }>("POST", "/following", { url: msg.url });
+      return { ok: true, ...r };
+    }
+
+    case "UNFOLLOW_SITE":
+      await cloud("DELETE", `/following/${msg.id}`);
+      return { ok: true };
+
+    case "GET_FOLLOW": {
+      if (!(await connected())) return { ok: false };
+      const r = await cloud<{ feed: { id: string; title: string } | null }>("GET", `/following/lookup?url=${encodeURIComponent(msg.url)}`).catch(() => ({ feed: null }));
+      return { ok: true, feed: r.feed };
+    }
+
     case "OPEN_OPTIONS":
       await chrome.runtime.openOptionsPage();
       return { ok: true };
@@ -403,6 +449,28 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       return { ok: true };
     }
   }
+}
+
+/** New posts from followed blogs: one notification per post (up to 3), or one summary. */
+async function checkNewPosts() {
+  const s = await getSettings();
+  if (!s.token) return;
+  const r = await cloud<{ data: { id: string; url: string; title: string; feedTitle: string }[] }>("POST", "/following/notify", {});
+  if (!r.data.length) return;
+  const map: Record<string, { id: string; url: string }> = (await chrome.storage.local.get("lumen_post_urls")).lumen_post_urls ?? {};
+  if (r.data.length > 3) {
+    const nid = `lumen-post-summary-${Date.now()}`;
+    map[nid] = { id: "", url: `${s.apiBase}/app/following` };
+    chrome.notifications.create(nid, { type: "basic", iconUrl: "icons/icon128.png", title: `${r.data.length} new posts from blogs you follow`, message: r.data.slice(0, 3).map((p) => `${p.feedTitle}: ${p.title}`).join("\n"), priority: 0 });
+  } else {
+    for (const p of r.data) {
+      const nid = `lumen-post-${p.id}`;
+      map[nid] = { id: p.id, url: p.url };
+      chrome.notifications.create(nid, { type: "basic", iconUrl: "icons/icon128.png", title: `New from ${p.feedTitle}`, message: p.title, priority: 0 });
+    }
+  }
+  const keys = Object.keys(map); for (const k of keys.slice(0, Math.max(0, keys.length - 50))) delete map[k];
+  await chrome.storage.local.set({ lumen_post_urls: map });
 }
 
 async function checkReminders() {

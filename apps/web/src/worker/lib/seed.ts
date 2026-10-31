@@ -233,6 +233,10 @@ export async function seedDemo(db: D1Database, opts: { isDemo?: number; name?: s
       .bind(id("idea_"), userId, i.title, i.angle, JSON.stringify(i.outline), JSON.stringify(i.src), "new", t - 3600_000));
   }
 
+  // two real blogs to follow, fetched the first time Following is opened
+  for (const [site, feed, title] of [["https://simonwillison.net", "https://simonwillison.net/atom/everything/", "Simon Willison's Weblog"], ["https://blog.cloudflare.com", "https://blog.cloudflare.com/rss/", "The Cloudflare Blog"]]) {
+    stmts.push(db.prepare("INSERT INTO feeds (id, user_id, site_url, feed_url, title, created_at) VALUES (?,?,?,?,?,?)").bind(id("feed_"), userId, site, feed, title, t));
+  }
   for (const topic of ["llm", "obsidian", "design systems"]) {
     stmts.push(db.prepare("INSERT INTO topics (id, user_id, name, source, created_at) VALUES (?,?,?,?,?)").bind(id("top_"), userId, topic, "manual", t));
   }

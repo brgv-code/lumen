@@ -7,10 +7,12 @@ export default defineConfig({
   manifest: {
     name: "Lumen",
     description: "Highlight, ask and send what you read to Obsidian, Notion or markdown.",
-    version: "2.3.1",
+    version: "2.5.0",
     // Fixed public key so the extension id stays ffjconacpmnbadoeegamifkellcddfja when loaded unpacked,
     // which lets the dashboard connect to it with one click (externally_connectable).
     key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjfebb4JAs0K8ouxFm4bwltGuYlOvYdZ/uVfmW3uHrhARynIWqjmQ7TrsM0+7gWuBM1IPSK2+GpG+R6ylCDkpMwIhcHR6HLBbO7e5dZ2cxE80OEPO3vP3MaFWa2uEb47zILzXPveoah9rE4W21HaediTDzS6aGG4oFbC0k0nLHPRvcPNyrA6FCbBAfqU4fxB5cGDxgvJ7Kf+pNex2kTcjysAevUju5JfSF2s/A72GD40bH1ZvWbXir98kSnIFFfOG8JQJOH3XfCagIldqT2xwuoqiy8uQI62YoOTxoHw7yo7HCs1Jd3iirirlu+C9KU+G2wXCieNvfsovr4baG+yn6wIDAQAB",
+    // The floating panel is the side panel page, framed inside the page by the content script.
+    web_accessible_resources: [{ resources: ["sidepanel.html", "chunks/*", "assets/*", "icons/*"], matches: ["<all_urls>"] }],
     externally_connectable: {
       matches: ["https://lumen.brgv95.workers.dev/*", "http://localhost:8787/*", "http://localhost:5173/*"],
     },

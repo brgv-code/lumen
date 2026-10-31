@@ -14,6 +14,8 @@ export default function Popup() {
   const [streak, setStreak] = useState<number | null>(null);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [msg, setMsg] = useState("");
+  const [follow, setFollow] = useState<{ id: string; title: string } | null | undefined>(undefined);
+  const [followBusy, setFollowBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -29,6 +31,7 @@ export default function Popup() {
       if (r.settings.token) {
         send<{ collections: Collection[] }>({ type: "GET_COLLECTIONS" }).then((c) => setCols(c.collections ?? [])).catch(() => {});
         send<{ stats: { streak: number } | null }>({ type: "GET_HOME" }).then((h) => setStreak(h?.stats?.streak ?? null)).catch(() => {});
+        if (t?.url?.startsWith("http")) send<{ feed: { id: string; title: string } | null }>({ type: "GET_FOLLOW", url: t.url }).then((r) => setFollow(r?.feed ?? null)).catch(() => setFollow(null));
       }
     })();
   }, []);
@@ -87,16 +90,33 @@ export default function Popup() {
             onChange={async (id) => { await send({ type: "SET_TARGET", collectionId: id }); setS({ ...s, targetCollectionId: id }); if (page?.item) setPage({ ...page, item: { ...page.item, collectionId: id || null } }); if (state === "saved") setState("idle"); }}
             onCreated={(c) => { setCols((l) => [c, ...l]); setS({ ...s, targetCollectionId: c.id }); if (state === "saved") setState("idle"); }} />
           <input placeholder="Tags, comma separated" value={tags} onChange={(e) => { setTags(e.target.value); if (state === "saved") setState("idle"); }} onKeyDown={(e) => e.key === "Enter" && save()} />
-          <button className="key lamp" style={{ height: 42 }} disabled={state === "saving"} onClick={save}>
+          <div className="row" style={{ gap: 8 }}>
+          <button className="key lamp" style={{ height: 42, flex: 1 }} disabled={state === "saving"} onClick={save}>
             {state === "saving" ? "Saving…" : state === "saved" ? (page?.item ? "Saved ✓  ·  update" : "Saved ✓") : page?.item ? "Update" : "Save to Lumen"}
           </button>
+          <button className={`key ${follow ? "" : "ghost"}`} style={{ height: 42, padding: "0 12px", flex: "none" }} disabled={followBusy || follow === undefined}
+            title={follow ? `Following ${follow.title}. Click to unfollow.` : "Follow this blog and get notified about new posts"}
+            onClick={async () => {
+              setFollowBusy(true);
+              if (follow) { await send({ type: "UNFOLLOW_SITE", id: follow.id }); setFollow(null); setMsg("Unfollowed"); }
+              else {
+                const r = await send<{ ok: boolean; feed?: { id: string; title: string }; error?: string }>({ type: "FOLLOW_SITE", url: tab!.url! });
+                if (r.ok && r.feed) { setFollow(r.feed); setMsg(`Following ${r.feed.title}. You'll hear when it publishes.`); } else setMsg(r.error ?? "No feed found on this site");
+              }
+              setFollowBusy(false);
+            }}>{follow ? "♥ Following" : "♡ Follow"}</button>
+          </div>
           {msg && <div className="small muted" style={{ textAlign: "center" }}>{msg}</div>}
         </div>
       )}
 
       {connected && (
         <div className="row" style={{ gap: 8 }}>
-          <button className="key ghost" style={{ flex: 1 }} onClick={async () => { const w = await chrome.windows.getCurrent(); await chrome.sidePanel.open({ windowId: w.id! }); window.close(); }}>Ask &amp; explore ▸</button>
+          <button className="key ghost" style={{ flex: 1 }} onClick={async () => {
+            if (s.panel === "docked") { const w = await chrome.windows.getCurrent(); await chrome.sidePanel.open({ windowId: w.id! }); }
+            else if (tab?.id !== undefined) await chrome.tabs.sendMessage(tab.id, { type: "SHOW_PANEL" }).catch(() => {});
+            window.close();
+          }}>Ask &amp; explore ▸</button>
           {onPage && (
             <label className="row" style={{ display: "flex", gap: 8, fontWeight: 400, fontSize: 13 }} title={`Show ${s.helper.name} on ${host}`}>
               {s.helper.name}

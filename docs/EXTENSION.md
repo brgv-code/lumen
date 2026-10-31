@@ -13,11 +13,14 @@ panel, an optional page button with per site control):
 |---|---|---|
 | **Selection toolbar** | Act on a passage without leaving: highlight (hover for colours), note, explain, expand, summary, define, ask, save, copy with link | Selecting text; Alt+Shift+H highlights |
 | **Popup** | Save this page to the right collection, with tags | The toolbar icon; Alt+Shift+S |
-| **Side panel** | Ask: chat with this page and your whole Lumen library, answers cite your own highlights and notes. This page: save state, collection, highlights here. For you: today's reads and trending in your topics | "Ask & explore" in the popup, right click, Lumi, Alt+Shift+L |
+| **Panel** (floats over the page; can dock) | Ask: chat with this page and your whole Lumen library, answers cite your own highlights and notes. This page: save state, collection, highlights here. For you: today's reads and trending in your topics | "Ask & explore" in the popup, right click, Lumi, Alt+Shift+L |
 | **Lumi, the page helper** | A small lamp at the edge of chosen sites: save, summarise, ask, open the panel, hide here | Off, sites you choose (default) or everywhere |
+| **Following** | Follow the blog you are on (♡ in the popup, Lumi's menu, or right click); new posts arrive as notifications, checked hourly | The popup, Lumi, right click |
 | **Right click** | Save page or link; Send to Lumen ▸ any collection; highlight, explain or ask about a selection; show or hide Lumi on this site | The context menu |
 
 ## Settings
+- **Appearance:** one theme (match system, light, dark) for every surface; the panel floats over
+  the page (default) or docks to the side; highlights adapt to dark pages, or use fill or underline.
 - **Selection toolbar:** on or off; which actions, in which order (live preview); words next to
   icons; sites where it stays off (also from ⋯ on the toolbar).
 - **Page helper:** name it, never / sites I choose / everywhere, left or right, and the site lists.

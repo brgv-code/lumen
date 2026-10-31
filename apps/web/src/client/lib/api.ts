@@ -1,5 +1,7 @@
 import type { AIAction, Collection, Destination, Highlight, Idea, Item, ItemWithContent, Page, Stats, User } from "@lumen/core";
 
+export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
+export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
 export interface Token { id: string; name: string; prefix: string; kind: string; client: string | null; lastUsedAt: number | null; createdAt: number }
 export interface Trend { id: string; topic: string; url: string; title: string; source: string; score: number; comments?: number; publishedAt?: number | null; saved?: boolean }
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
@@ -103,6 +105,14 @@ export const api = {
   dismissTrend: (id: string) => req<{ ok: true }>("POST", `/api/v1/trends/${id}/dismiss`, {}),
   similar: () => req<{ data: Similar[]; optedOut: boolean }>("GET", "/api/v1/similar"),
   analytics: () => req<Analytics>("GET", "/api/v1/analytics"),
+  following: () => req<{ feeds: FollowedFeed[]; unseenTotal: number; refreshing: boolean }>("GET", "/api/v1/following"),
+  follow: (url: string) => req<{ feed: FollowedFeed; created: boolean }>("POST", "/api/v1/following", { url }),
+  unfollow: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/following/${id}`),
+  setFeedNotify: (id: string, notify: boolean) => req<{ ok: true }>("PATCH", `/api/v1/following/${id}`, { notify }),
+  feedPosts: (q: { unseen?: boolean; feed?: string; limit?: number } = {}) => req<{ data: FeedPost[] }>("GET", "/api/v1/following/posts" + qs({ unseen: q.unseen ? 1 : undefined, feed: q.feed, limit: q.limit })),
+  markPostSeen: (id: string) => req<{ ok: true }>("POST", `/api/v1/following/posts/${id}/seen`, {}),
+  markAllSeen: (feedId?: string) => req<{ ok: true }>("POST", "/api/v1/following/seen", { feedId }),
+  refreshFollowing: () => req<{ new: number }>("POST", "/api/v1/following/refresh", {}),
   billing: () => req<{ configured: boolean; user: User }>("GET", "/api/v1/billing"),
   checkout: () => req<{ url: string }>("POST", "/api/v1/billing/checkout", {}),
   portal: () => req<{ url: string }>("POST", "/api/v1/billing/portal", {}),

@@ -10,6 +10,8 @@ import { destinations } from "./routes/destinations";
 import { ai, ideas } from "./routes/ai";
 import { me } from "./routes/me";
 import { discover } from "./routes/discover";
+import { following } from "./routes/following";
+import { refreshDueFeeds } from "./lib/feeds";
 import { mcpApp } from "./routes/mcp";
 import { billing, stripeWebhook } from "./routes/billing";
 import { seo, notFound } from "./seo/routes";
@@ -61,6 +63,7 @@ app.route("/api/v1/destinations", destinations);
 app.route("/api/v1/ai", ai);
 app.route("/api/v1/ideas", ideas);
 app.route("/api/v1/billing", billing);
+app.route("/api/v1/following", following);
 
 app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 
@@ -89,5 +92,6 @@ export default {
   async scheduled(_e: ScheduledController, env: Env) {
     await purgeDemos(env.DB);
     await refreshActiveRadars(env.DB);
+    await refreshDueFeeds(env.DB);
   },
 } satisfies ExportedHandler<Env>;

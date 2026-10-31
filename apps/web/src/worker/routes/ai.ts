@@ -29,7 +29,7 @@ ai.post("/run", async (c) => {
   await spend(c.env.DB, u);
   let stream: ReadableStream;
   try {
-    stream = (await c.env.AI.run((c.env.AI_MODEL || DEFAULT_MODEL) as Parameters<Ai["run"]>[0], {
+    stream = (await c.env.AI.run((c.env.AI_MODEL || CHAT_MODEL) as Parameters<Ai["run"]>[0], {
       messages: promptFor(action, text, { question: b.question, title: b.title, context: b.context }),
       stream: true,
       max_tokens: 400,

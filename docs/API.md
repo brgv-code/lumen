@@ -103,6 +103,21 @@ Webhook payload:
 `GET /api/v1/items/:id` also returns `alsoSaving`: how many readers like you saved the same URL (0 when fewer than 2).
 `PATCH /api/v1/me` accepts `shareSignals` and `reminders` (booleans). `POST /api/v1/tokens` accepts `kind: "agent"`.
 
+## Following (favourite blogs)
+| Method | Path | Body / query | Notes |
+|---|---|---|---|
+| GET | `/api/v1/following` | | followed blogs with unseen counts; stale feeds refresh in the background |
+| POST | `/api/v1/following` | `{ url }` (blog or feed) | finds the RSS or Atom feed (link tags, then common paths); free plan follows up to 20 |
+| GET | `/api/v1/following/lookup?url=` | | is this site followed |
+| PATCH | `/api/v1/following/:id` | `{ notify?, title? }` | |
+| DELETE | `/api/v1/following/:id` | | |
+| GET | `/api/v1/following/posts` | `unseen=1`, `feed`, `limit` | newest first, with `saved` |
+| POST | `/api/v1/following/posts/:id/seen`, `/api/v1/following/seen` | `{ feedId? }` | mark read |
+| POST | `/api/v1/following/refresh` | | check now |
+| POST | `/api/v1/following/notify` | | new posts not announced yet, marked announced (used by extension notifications) |
+
+Feeds are checked by Cron every 6 hours (oldest first) and whenever Following is opened.
+
 ## MCP
 `POST /mcp` speaks MCP over Streamable HTTP with a Bearer key. See [MCP.md](MCP.md).
 

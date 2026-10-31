@@ -2,13 +2,13 @@
 import { READER_SYSTEM, readerPrompt, type AIAction } from "@lumen/core";
 import type { Settings } from "./types";
 
-interface Req { action: AIAction; text: string; question?: string; title?: string }
+interface Req { action: AIAction; text: string; question?: string; title?: string; context?: string }
 type On = { chunk: (t: string) => void; done: () => void; error: (e: string) => void };
 
 export async function streamAnswer(req: Req, s: Settings, on: On) {
   try {
     if (s.provider === "lumen") return await viaLumen(req, s, on);
-    const prompt = readerPrompt(req.action, req.text, { question: req.question, title: req.title });
+    const prompt = readerPrompt(req.action, req.text, { question: req.question, title: req.title, context: req.context });
     if (s.provider === "ollama") return await viaOllama(prompt, s, on);
     if (s.provider === "openai") return await viaOpenAI(prompt, s, on);
     return await viaClaude(prompt, s, on);

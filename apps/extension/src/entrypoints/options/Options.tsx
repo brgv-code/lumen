@@ -28,7 +28,7 @@ export default function Options() {
   const [s, setS] = useState<Settings | null>(null);
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
   const [saved, setSaved] = useState(false);
-  const [section, setSection] = useState("toolbar");
+  const [section, setSection] = useState("appearance");
   useEffect(() => { send<{ settings: Settings }>({ type: "GET_SETTINGS" }).then((r) => setS(r.settings)); }, []);
   if (!s) return null;
 
@@ -47,7 +47,7 @@ export default function Options() {
   const toggle = (a: ToolbarAction) => setTb({ actions: tb.actions.includes(a) ? tb.actions.filter((x) => x !== a) : [...tb.actions, a] });
   const ordered = [...tb.actions, ...TOOLBAR_ACTIONS.filter((a) => !tb.actions.includes(a))];
 
-  const NAV: [string, string][] = [["toolbar", "Selection toolbar"], ["helper", `Page helper (${hp.name})`], ["account", "Account"], ["model", "Model"], ["obsidian", "Obsidian"], ["more", "Reminders"]];
+  const NAV: [string, string][] = [["appearance", "Appearance"], ["toolbar", "Selection toolbar"], ["helper", `Page helper (${hp.name})`], ["account", "Account"], ["model", "Model"], ["obsidian", "Obsidian"], ["more", "Reminders"]];
 
   return (
     <div className="opt">
@@ -58,6 +58,30 @@ export default function Options() {
       </aside>
 
       <main className="opt__main stack" style={{ gap: 16 }}>
+        {section === "appearance" && (
+          <>
+            <h1 style={{ fontSize: 28 }}><span className="lead">How Lumen</span> looks</h1>
+            <p className="muted" style={{ margin: 0 }}>One setting for every surface: the toolbar, answer cards, {hp.name}, the panel, the popup and this page.</p>
+            <div className="surface stack">
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Theme</span>
+              <div className="seg">{([["system", "Match my system"], ["light", "Light"], ["dark", "Dark"]] as const).map(([v, l]) => <button key={v} aria-pressed={(s.theme ?? "system") === v} onClick={() => { const n = { ...s, theme: v }; setS(n); save(n); }}>{l}</button>)}</div>
+            </div>
+            <div className="surface stack">
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Panel</span>
+              <div className="seg">{([["floating", "Float over the page"], ["docked", "Dock to the side"]] as const).map(([v, l]) => <button key={v} aria-pressed={(s.panel ?? "floating") === v} onClick={() => { const n = { ...s, panel: v }; setS(n); save(n); }}>{l}</button>)}</div>
+              <span className="small muted">{(s.panel ?? "floating") === "floating" ? "The panel floats on the right and the page keeps its full width. Esc closes it." : "Uses the browser's side panel, which makes the page narrower."}</span>
+            </div>
+            <div className="surface stack">
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Highlights</span>
+              <div className="seg">{([["auto", "Adapt to the page"], ["fill", "Marker fill"], ["underline", "Underline"]] as const).map(([v, l]) => <button key={v} aria-pressed={(s.markStyle ?? "auto") === v} onClick={() => { const n = { ...s, markStyle: v }; setS(n); save(n); }}>{l}</button>)}</div>
+              <div className="grid2">
+                <div className="mark-demo light"><span className="eyebrow">Light page</span><p>Most reading is sorting. <mark className={`m-${s.markStyle === "underline" ? "ul" : "fill"} m-iris`}>A margin note is a conversation</mark> with yourself.</p></div>
+                <div className="mark-demo dark"><span className="eyebrow" style={{ color: "#8b8b93" }}>Dark page</span><p>Most reading is sorting. <mark className={`m-${s.markStyle === "underline" ? "ul" : s.markStyle === "fill" ? "fill" : "tint"} m-iris`}>A margin note is a conversation</mark> with yourself.</p></div>
+              </div>
+            </div>
+          </>
+        )}
+
         {section === "toolbar" && (
           <>
             <h1 style={{ fontSize: 28 }}><span className="lead">Selection</span> toolbar</h1>

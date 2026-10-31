@@ -530,3 +530,9 @@
 .answer-md .md-list { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; }
 .answer-md b { color: var(--ink); }
 .answer-md .cite { border: 0; cursor: pointer; display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; margin: 0 1px; border-radius: 6px; font: 700 11px var(--font-ui); color: #fff; background: var(--key-iris); vertical-align: 1px; }
+.feed-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 12px; border: 0; background: transparent; font: inherit; font-size: 13.5px; color: var(--ink-2); cursor: pointer; text-align: left; }
+.feed-row:hover { background: color-mix(in srgb, var(--raised) 60%, transparent); }
+.feed-row.on { background: var(--raised); color: var(--ink); box-shadow: var(--shadow-soft); }
+.feed-row .icon-btn { width: 26px; height: 26px; opacity: 0.6; }
+.feed-row:hover .icon-btn { opacity: 1; }
+@media (max-width: 900px) { .grid-2[style*="300px"] { grid-template-columns: 1fr !important; } }

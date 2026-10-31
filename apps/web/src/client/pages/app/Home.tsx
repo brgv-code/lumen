@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Bot, Clock, Flame, Highlighter, Plus, Radar, Sparkles, Trophy, Users, BellRing, ExternalLink } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Clock, Flame, Highlighter, Plus, Radar, Sparkles, Trophy, Users, BellRing, ExternalLink, Heart } from "lucide-react";
 import { LEVELS } from "@lumen/core";
 import { useApp } from "./Layout";
 import { useAsync, hostOf } from "../../lib/hooks";
@@ -24,6 +24,7 @@ export default function Home() {
   const similar = useAsync(() => api.similar(), []);
   const radar = useAsync(() => (user.pro ? api.radar() : Promise.resolve(null)), [user.pro]);
   const hls = useAsync(() => api.highlights({}), []);
+  const fresh = useAsync(() => api.feedPosts({ unseen: true, limit: 4 }), []);
   const first = user.name.replace(/\s*\(demo\)$/, "").split(" ")[0];
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
   const maxWeek = stats ? Math.max(10, ...stats.week.map((d) => d.glow)) : 10;
@@ -140,6 +141,20 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {fresh.data && fresh.data.data.length > 0 && (
+        <section className="panel">
+          <div className="row" style={{ marginBottom: 14 }}><span className="tile tile--sm tile--peach"><Heart /></span><h2>New from blogs you follow</h2><span className="spacer" /><Link to="/app/following" className="key key--quiet key--sm">All <ArrowRight size={14} /></Link></div>
+          <div className="grid-2" style={{ gap: 10 }}>
+            {fresh.data.data.map((p) => (
+              <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="card-flat" style={{ padding: 12, display: "grid", gap: 4 }} onClick={() => api.markPostSeen(p.id).catch(() => {})}>
+                <span className="small muted">{p.feedTitle}</span>
+                <span style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14.5 }}>{p.title}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid-2">
         <section className="panel">

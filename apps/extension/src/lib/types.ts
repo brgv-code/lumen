@@ -17,6 +17,9 @@ export interface Settings {
   reminders: boolean;       // daily nudge for articles left half read
   toolbar: ToolbarSettings;
   helper: HelperSettings;
+  theme: "system" | "light" | "dark";   // drives every Lumen surface
+  panel: "floating" | "docked";         // floating over the page, or Chrome's side panel
+  markStyle: "auto" | "fill" | "underline"; // auto adapts to dark pages
 }
 
 export const TOOLBAR_ACTIONS = ["highlight", "note", "explain", "expand", "summarize", "define", "ask", "save", "copy"] as const;
@@ -52,6 +55,9 @@ export const DEFAULT_SETTINGS: Settings = {
   reminders: true,
   toolbar: { enabled: true, actions: ["highlight", "note", "explain", "expand", "summarize", "save", "copy"], labels: false, disabledSites: [] },
   helper: { mode: "chosen", sites: [], hiddenOn: [], name: "Lumi", side: "right" },
+  theme: "system",
+  panel: "floating",
+  markStyle: "auto",
 };
 
 export interface PageState {
@@ -61,7 +67,7 @@ export interface PageState {
 }
 
 export type Msg =
-  | { type: "AI_REQUEST"; action: AIAction; text: string; question?: string; title?: string }
+  | { type: "AI_REQUEST"; action: AIAction; text: string; question?: string; title?: string; context?: string }
   | { type: "PAGE_STATE"; url: string }
   | { type: "SAVE_PAGE"; url: string; title: string; html: string }
   | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; quote: TextQuote; color: string; note?: string; collectionId?: string }
@@ -77,12 +83,15 @@ export type Msg =
   | { type: "GET_HOME" }
   | { type: "GET_DESTINATIONS" }
   | { type: "CREATE_COLLECTION"; name: string; emoji: string; destinationId?: string; obsidianNote?: string }
-  | { type: "OPEN_PANEL"; prompt?: string }
+  | { type: "OPEN_PANEL"; prompt?: string; tabId?: number }
   | { type: "SET_HELPER_SITE"; host: string; on: boolean }
   | { type: "SET_TOOLBAR_SITE"; host: string; on: boolean }
   | { type: "SAVE_PAGE_TO"; url: string; title: string; html: string; collectionId?: string; tags?: string[] }
   | { type: "GET_RADAR" }
   | { type: "OPEN_OPTIONS" }
-  | { type: "SAVE_URL"; url: string; title?: string };
+  | { type: "SAVE_URL"; url: string; title?: string }
+  | { type: "FOLLOW_SITE"; url: string }
+  | { type: "UNFOLLOW_SITE"; id: string }
+  | { type: "GET_FOLLOW"; url: string };
 
 export type { Collection, Highlight, Item };

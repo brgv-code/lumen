@@ -21,6 +21,7 @@ const Analytics = lazy(() => import("./pages/app/Analytics"));
 import NotFound from "./pages/NotFound";
 const Upgrade = lazy(() => import("./pages/app/Upgrade"));
 const Ask = lazy(() => import("./pages/app/Ask"));
+const Following = lazy(() => import("./pages/app/Following"));
 import { ProGate } from "./pages/app/ProGate";
 
 createRoot(document.getElementById("root")!).render(
@@ -45,6 +46,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="analytics" element={<ProGate feature="analytics"><Analytics /></ProGate>} />
               <Route path="upgrade" element={<Upgrade />} />
               <Route path="ask" element={<Ask />} />
+              <Route path="following" element={<Following />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

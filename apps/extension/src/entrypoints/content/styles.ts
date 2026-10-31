@@ -30,6 +30,16 @@ button { font: inherit; cursor: pointer; border: 0; }
 .flyout .sw:hover { transform: scale(1.2); }
 .sep { width: 1px; height: 16px; background: rgba(255,255,255,.14); margin: 0 3px; }
 
+/* floating panel: sits over the page, never resizes it */
+.fpanel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(400px, calc(100vw - 24px)); z-index: 2147483647;
+  border-radius: 20px; overflow: hidden; background: #f6f6f5; box-shadow: 0 0 0 1px rgba(14,14,16,.08), 0 30px 80px -20px rgba(0,0,0,.45);
+  transform: translateX(calc(100% + 24px)); transition: transform 320ms cubic-bezier(.22,1,.36,1); }
+.fpanel.open { transform: none; }
+.fpanel iframe { width: 100%; height: 100%; border: 0; display: block; background: transparent; color-scheme: normal; }
+:host(.dark) .fpanel { background: #111113; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 80px -20px rgba(0,0,0,.8); }
+:host(.panel-open) .helper.right { right: 424px; }
+:host(.panel-open) .card { right: 424px; }
+
 /* the page helper */
 :host(.has-helper) .card { bottom: 84px; }
 :host(.has-helper.helper-left) .card { bottom: 18px; }
@@ -93,29 +103,47 @@ textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px r
   background: #121215; color: #fff; font-size: 13.5px; font-weight: 500; box-shadow: 0 18px 34px -12px rgba(0,0,0,.5);
   animation: pop 300ms cubic-bezier(.34,1.56,.64,1) both; }
 .toast.err { background: #b42318; }
-@media (prefers-color-scheme: dark) {
-  .hmenu { background: #18181b; } .hhead b { color: #f4f4f5; }
-  .hmenu button, .menu button { color: #c9c9ce; } .hmenu button:hover, .menu button:hover { background: #232327; color: #fff; }
-  .hsep { background: rgba(255,255,255,.08); } .hname { background: rgba(34,34,38,.92); color: #e4e4e7; }
-  .card { background: #18181b; color: #c9c9ce; box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 60px -20px rgba(0,0,0,.8); }
-  .head b, .q, textarea, input { color: #f4f4f5; }
-  .q, .note, .answer, textarea, input, .key.ghost, .chip { background: #222226; }
-  .q.lumen-sun { background: rgba(255,213,74,.22); } .q.lumen-mint { background: rgba(46,204,142,.2); } .q.lumen-iris { background: rgba(140,125,255,.24); }
-  .q.lumen-peach { background: rgba(255,130,100,.22); } .q.lumen-sky { background: rgba(80,150,255,.22); }
-  .answer { color: #c9c9ce; } .chip { color: #c9c9ce; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
-  .key.ghost { color: #f4f4f5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
-  .x:hover { background: #2a2a2f; color: #fff; }
-  textarea, input { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
-  .row .sw.on { box-shadow: 0 0 0 2px #18181b, 0 0 0 4px #f4f4f5; }
-}
+/* dark theme (from the Appearance setting, or the system when set to System) */
+:host(.dark) .hmenu { background: #18181b; }
+:host(.dark) .hhead b { color: #f4f4f5; }
+:host(.dark) .hmenu button, :host(.dark) .menu button { color: #c9c9ce; }
+:host(.dark) .hmenu button:hover, :host(.dark) .menu button:hover { background: #232327; color: #fff; }
+:host(.dark) .hsep { background: rgba(255,255,255,.08); }
+:host(.dark) .hname { background: rgba(34,34,38,.92); color: #e4e4e7; }
+:host(.dark) .card { background: #18181b; color: #c9c9ce; box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 60px -20px rgba(0,0,0,.8); }
+:host(.dark) .head b, :host(.dark) .q, :host(.dark) textarea, :host(.dark) input { color: #f4f4f5; }
+:host(.dark) .q, :host(.dark) .note, :host(.dark) .answer, :host(.dark) textarea, :host(.dark) input, :host(.dark) .key.ghost, :host(.dark) .chip { background: #222226; }
+:host(.dark) .q.lumen-sun { background: rgba(255,213,74,.22); }
+:host(.dark) .q.lumen-mint { background: rgba(46,204,142,.2); }
+:host(.dark) .q.lumen-iris { background: rgba(140,125,255,.24); }
+:host(.dark) .q.lumen-peach { background: rgba(255,130,100,.22); }
+:host(.dark) .q.lumen-sky { background: rgba(80,150,255,.22); }
+:host(.dark) .answer { color: #c9c9ce; }
+:host(.dark) .chip { color: #c9c9ce; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+:host(.dark) .key.ghost { color: #f4f4f5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+:host(.dark) .x:hover { background: #2a2a2f; color: #fff; }
+:host(.dark) textarea, :host(.dark) input { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+:host(.dark) .row .sw.on { box-shadow: 0 0 0 2px #18181b, 0 0 0 4px #f4f4f5; }
 `;
 
 // In the page itself: only the marks, nothing else.
 export const MARK_CSS = `
 mark.lumen-mark { color: inherit !important; border-radius: 3px; padding: 0 1px; cursor: pointer;
-  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: filter 150ms ease; }
-mark.lumen-mark:hover { filter: saturate(1.5) brightness(.97); }
+  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: filter 150ms ease, background-color 150ms ease; }
+mark.lumen-mark:hover { filter: saturate(1.4) brightness(1.05); }
+/* light pages: soft marker fills */
 mark.lumen-sun { background: #ffe58a !important; } mark.lumen-mint { background: #bdefd5 !important; }
 mark.lumen-iris { background: #dcd6ff !important; } mark.lumen-peach { background: #ffd5c6 !important; }
 mark.lumen-sky { background: #cfe2ff !important; }
+/* dark pages (light text): translucent tint plus a coloured underline, so the text stays readable */
+mark.lumen-mark.lumen-dark { box-shadow: inset 0 -2px 0 var(--lm) !important; }
+mark.lumen-dark.lumen-sun { --lm: #ffd34d; background: rgba(255, 211, 77, .22) !important; }
+mark.lumen-dark.lumen-mint { --lm: #3fd39a; background: rgba(63, 211, 154, .2) !important; }
+mark.lumen-dark.lumen-iris { --lm: #a99cff; background: rgba(138, 123, 255, .26) !important; }
+mark.lumen-dark.lumen-peach { --lm: #ff8a6b; background: rgba(255, 138, 107, .22) !important; }
+mark.lumen-dark.lumen-sky { --lm: #6fa8ff; background: rgba(91, 155, 255, .24) !important; }
+/* underline style (any page) */
+mark.lumen-mark.lumen-ul { background: transparent !important; border-radius: 0; padding: 0; box-shadow: inset 0 -3px 0 var(--lm) !important; }
+mark.lumen-ul.lumen-sun { --lm: #ffc61a; } mark.lumen-ul.lumen-mint { --lm: #2fc489; } mark.lumen-ul.lumen-iris { --lm: #8a7bff; }
+mark.lumen-ul.lumen-peach { --lm: #ff7a57; } mark.lumen-ul.lumen-sky { --lm: #4d90ff; }
 `;
