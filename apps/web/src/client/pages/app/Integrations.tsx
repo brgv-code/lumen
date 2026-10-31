@@ -4,6 +4,7 @@ import { Check, Cpu, Download, FileText, KeyRound, NotebookPen, Plus, Puzzle, Re
 import { api } from "../../lib/api";
 import { Modal, useToast } from "../../components/ui";
 import { timeAgo } from "../../lib/hooks";
+import { useApp } from "./Layout";
 
 const KINDS = {
   obsidian: { label: "Obsidian", tile: "tile--iris", icon: <NotebookPen />, blurb: "Append to a note in your vault through the Local REST API plugin. Runs in your browser; the key never leaves it." },
@@ -18,6 +19,7 @@ const getKey = (id: string) => { try { return localStorage.getItem(keyFor(id)) ?
 
 export default function Integrations() {
   const toast = useToast();
+  const { openAgent } = useApp();
   const [dests, setDests] = useState<Destination[] | null>(null);
   const [adding, setAdding] = useState<Kind | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -110,12 +112,13 @@ export default function Integrations() {
       <div className="grid-2">
         <ExtensionPanel />
         <section className="panel">
-          <div className="row" style={{ marginBottom: 12 }}><span className="tile tile--lamp"><Cpu /></span><h2>Models</h2></div>
+          <div className="row" style={{ marginBottom: 12 }}><span className="tile tile--lamp"><Cpu /></span><h2>Models and agents</h2><span className="spacer" /><button className="key key--iris key--sm" onClick={openAgent}>Connect agent</button></div>
           <div className="stack small">
             <Model name="Lumen (Workers AI)" chip="default" text="Hosted on Cloudflare. 100 answers a day on Reader, more on Pro." />
             <Model name="Ollama" chip="local" text="Runs on your machine. Set it in the extension; start Ollama with OLLAMA_ORIGINS='chrome-extension://*'." />
             <Model name="OpenAI compatible" chip="your key" text="OpenAI, Groq, Mistral, LM Studio: any /v1/chat/completions endpoint." />
             <Model name="Claude (local CLI)" chip="claude -p" text="The Lumen helper runs claude -p with the model you pick, through Chrome native messaging." />
+            <Model name="Your agent (MCP)" chip="/mcp" text="Claude Code, Claude Desktop, Cursor or any MCP client can search, read, save and analyse your library." />
           </div>
         </section>
       </div>

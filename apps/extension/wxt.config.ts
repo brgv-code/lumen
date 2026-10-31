@@ -7,8 +7,8 @@ export default defineConfig({
   manifest: {
     name: "Lumen",
     description: "Highlight, ask and send what you read to Obsidian, Notion or markdown.",
-    version: "2.0.0",
-    permissions: ["storage", "activeTab", "contextMenus", "nativeMessaging"],
+    version: "2.1.0",
+    permissions: ["storage", "activeTab", "contextMenus", "nativeMessaging", "alarms", "notifications"],
     host_permissions: ["<all_urls>"],
     action: {
       default_popup: "popup.html",

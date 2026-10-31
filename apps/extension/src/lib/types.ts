@@ -14,6 +14,7 @@ export interface Settings {
   targetCollectionId: string;
   obsidianKey: string;      // Local REST API key, stays in the extension
   autoSend: boolean;        // push new highlights to the target's Obsidian note right away
+  reminders: boolean;       // daily nudge for articles left half read
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   targetCollectionId: "",
   obsidianKey: "",
   autoSend: true,
+  reminders: true,
 };
 
 export interface PageState {

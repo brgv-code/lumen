@@ -19,12 +19,20 @@ into a new note, duplicate highlights when you clip a page twice, and cannot tou
 - **works with any notes app.** Markdown is the format; integrations are just places it goes.
 - **lets you pick the model.** Lumen's hosted model, Ollama, any OpenAI compatible API, or Claude via your local CLI.
 
+## New in 2.1
+- **Connect your agent:** Lumen is an MCP server for Claude Code, Claude Desktop, Cursor and others ([docs/MCP.md](docs/MCP.md)).
+- **Radar:** trending stories this week in your topics (Hacker News, dev.to).
+- **Daily and weekly reads, reminders, readers like you, analytics.**
+- **Docs, comparisons and answers** served as crawlable pages, with sitemap, robots and llms.txt.
+
 ## What is in the box
 
 | Part | What it does |
 |---|---|
 | Web app | Landing page, SSO (Google, GitHub), dashboard, library, reader view with highlights and notes, collections, Spark writing ideas, integrations, settings, export |
 | API | Cloudflare Worker (Hono) on D1, Workers AI for margin answers; see [docs/API.md](docs/API.md) |
+| MCP | `/mcp` for agents: search, read, highlight, save, trends, stats, content ideas |
+| Site | Server rendered docs, comparisons and answers for search and answer engines |
 | Extension | Selection toolbar on any page, persistent highlights, target collection picker, auto send to Obsidian, four AI providers |
 | Claude helper | Native messaging host that runs `claude -p --model <haiku/sonnet/opus>` |
 | Core | Shared anchoring, citation links, markdown formats and glow rules, with tests |
@@ -45,6 +53,9 @@ Node 22+ required. Full instructions, SSO setup and deployment: [docs/DEPLOY.md]
 - [API](docs/API.md): every endpoint, payload and error code
 - [Data model](docs/DATA_MODEL.md): tables and relations
 - [Deploy](docs/DEPLOY.md): local, Cloudflare, SSO, extension, Claude helper
+- [MCP](docs/MCP.md): connect Claude, Cursor or any agent
+- [Extension](docs/EXTENSION.md): toolbar, shortcuts, providers, reminders
+- [Audit](docs/AUDIT.md): what was reviewed, fixed, and what is left
 
 ## Stack
 Cloudflare Workers + D1 + Workers AI · Hono · React 18 + Vite · WXT (Manifest V3) · TypeScript.

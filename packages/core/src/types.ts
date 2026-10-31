@@ -25,6 +25,8 @@ export interface User {
   isDemo: boolean;
   plan: "free" | "pro";
   dailyGoal: number;
+  shareSignals: boolean;
+  reminders: boolean;
   createdAt: number;
 }
 

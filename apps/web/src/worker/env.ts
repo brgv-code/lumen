@@ -21,7 +21,11 @@ export interface SessionUser {
   daily_goal: number;
   timezone: string;
   ai_provider: string;
+  share_signals: number;
+  reminders: number;
   created_at: number;
 }
 
-export type AppEnv = { Bindings: Env; Variables: { user: SessionUser; via: "cookie" | "token" } };
+export type SelfFetch = (path: string, init?: RequestInit) => Promise<Response>;
+
+export type AppEnv = { Bindings: Env; Variables: { user: SessionUser; via: "cookie" | "token"; selfFetch: SelfFetch } };

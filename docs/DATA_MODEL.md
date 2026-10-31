@@ -35,6 +35,13 @@ erDiagram
 | `activity` | glow ledger | `day` in the reader's time zone, `kind`, `glow` |
 | `ideas` | Spark output | `outline` and `source_item_ids` as JSON |
 | `ai_usage` | daily quota counter | PK `(user_id, day)`, upserted with `RETURNING count` |
+| `topics` | what the radar watches | `source` auto or manual, `muted`; auto topics come from tags |
+| `trends` | stories found per user | unique `(user_id, url)`, `score`, `comments`, `dismissed` |
+| `radar_runs` | last refresh per user | refreshed every 6 hours by Cron or on view |
+| `demo_creations` | demo abuse guard | hashed address, purged daily |
+
+Added in migration 0002: `items.remind_after`, `items.last_opened_at`, `users.share_signals`,
+`users.reminders`, `api_tokens.kind` (extension or agent) and `api_tokens.client`.
 
 All foreign keys cascade from `users`, so deleting an account (or purging a demo) removes
 everything in one statement. Migrations live in `apps/web/migrations`.

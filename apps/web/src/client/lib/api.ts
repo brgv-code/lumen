@@ -1,5 +1,21 @@
 import type { AIAction, Collection, Destination, Highlight, Idea, Item, ItemWithContent, Page, Stats, User } from "@lumen/core";
 
+export interface Token { id: string; name: string; prefix: string; kind: string; client: string | null; lastUsedAt: number | null; createdAt: number }
+export interface Trend { id: string; topic: string; url: string; title: string; source: string; score: number; comments?: number; publishedAt?: number | null; saved?: boolean }
+export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
+export interface Reminder { item: Item; minutesLeft: number; idleDays: number }
+export interface Radar { topics: { name: string; source: string; muted: number }[]; trends: Trend[]; lastRunAt: number | null; refreshed: boolean }
+export interface Similar { url: string; title: string; site_name: string | null; excerpt: string | null; reading_minutes: number | null; readers: number }
+export interface Analytics {
+  heatmap: { day: string; glow: number }[];
+  weeks: { week: string; minutes: number; words: number; items: number }[];
+  topics: { name: string; items: number; highlights: number }[];
+  sites: { site: string; items: number }[];
+  colors: { color: string; n: number }[];
+  hours: number[];
+  totals: { saved: number; done: number; words: number; minutes: number; completion: number };
+}
+
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
@@ -33,14 +49,14 @@ export const api = {
   logout: () => req<{ ok: true }>("POST", "/auth/logout", {}),
 
   me: () => req<{ user: User }>("GET", "/api/v1/me"),
-  updateMe: (d: Partial<{ name: string; dailyGoal: number; timezone: string; aiProvider: string }>) => req<{ user: User }>("PATCH", "/api/v1/me", d),
+  updateMe: (d: Partial<{ name: string; dailyGoal: number; timezone: string; aiProvider: string; shareSignals: boolean; reminders: boolean }>) => req<{ user: User }>("PATCH", "/api/v1/me", d),
   deleteMe: () => req<{ ok: true }>("DELETE", "/api/v1/me"),
   stats: () => req<Stats>("GET", "/api/v1/stats"),
   tags: () => req<{ data: { name: string; count: number }[] }>("GET", "/api/v1/tags"),
 
   items: (q: { status?: string; collection?: string; tag?: string; q?: string; favorite?: boolean; cursor?: string | null; limit?: number } = {}) =>
     req<Page<Item>>("GET", "/api/v1/items" + qs({ ...q, favorite: q.favorite ? 1 : undefined })),
-  item: (id: string) => req<{ item: ItemWithContent; highlights: Highlight[] }>("GET", `/api/v1/items/${id}`),
+  item: (id: string) => req<{ item: ItemWithContent; highlights: Highlight[]; alsoSaving: number }>("GET", `/api/v1/items/${id}`),
   saveItem: (d: { url: string; collectionId?: string; tags?: string[] }) => req<{ item: Item; created: boolean }>("POST", "/api/v1/items", d),
   updateItem: (id: string, d: Partial<{ status: string; progress: number; favorite: boolean; collectionId: string | null; tags: string[]; title: string }>) =>
     req<{ item: Item }>("PATCH", `/api/v1/items/${id}`, d),
@@ -72,8 +88,20 @@ export const api = {
   spark: () => req<{ data: Idea[] }>("POST", "/api/v1/ai/spark", {}),
   updateIdea: (id: string, status: string) => req<{ idea: Idea }>("PATCH", `/api/v1/ideas/${id}`, { status }),
 
-  tokens: () => req<{ data: { id: string; name: string; prefix: string; lastUsedAt: number | null; createdAt: number }[] }>("GET", "/api/v1/tokens"),
-  createToken: (name: string) => req<{ id: string; token: string }>("POST", "/api/v1/tokens", { name }),
+  tokens: () => req<{ data: Token[] }>("GET", "/api/v1/tokens"),
+  createToken: (name: string, kind: "extension" | "agent" = "extension") => req<{ id: string; token: string }>("POST", "/api/v1/tokens", { name, kind }),
+
+  reads: (period: "daily" | "weekly") => req<Reads>("GET", `/api/v1/reads?period=${period}`),
+  reminders: () => req<{ data: Reminder[] }>("GET", "/api/v1/reminders"),
+  snooze: (id: string, days: number) => req<{ ok: true }>("POST", `/api/v1/items/${id}/snooze`, { days }),
+  radar: () => req<Radar>("GET", "/api/v1/radar"),
+  refreshRadar: () => req<{ ok: true }>("POST", "/api/v1/radar/refresh", {}),
+  followTopic: (name: string) => req<{ ok: true }>("POST", "/api/v1/topics", { name }),
+  muteTopic: (name: string) => req<{ ok: true }>("DELETE", `/api/v1/topics/${encodeURIComponent(name)}`),
+  saveTrend: (id: string) => req<{ item: Item; created: boolean }>("POST", `/api/v1/trends/${id}/save`, {}),
+  dismissTrend: (id: string) => req<{ ok: true }>("POST", `/api/v1/trends/${id}/dismiss`, {}),
+  similar: () => req<{ data: Similar[]; optedOut: boolean }>("GET", "/api/v1/similar"),
+  analytics: () => req<Analytics>("GET", "/api/v1/analytics"),
   deleteToken: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/tokens/${id}`),
 };
 

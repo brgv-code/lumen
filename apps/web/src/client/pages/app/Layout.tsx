@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { Collection, Stats, User } from "@lumen/core";
-import { Home, Library, Highlighter, FolderHeart, Sparkles, Plug, Settings, Search, Plus, Flame, LogOut, Puzzle } from "lucide-react";
+import { Home, Library, Highlighter, FolderHeart, Sparkles, Plug, Settings, Search, Plus, Flame, LogOut, Puzzle, Radar, BarChart3, Bot } from "lucide-react";
+import { ConnectAgent } from "../../components/ConnectAgent";
 import { Logo, Modal, useToast } from "../../components/ui";
 import { api } from "../../lib/api";
 import "../../styles/app.css";
@@ -12,6 +13,7 @@ interface Ctx {
   collections: Collection[];
   refresh: () => void;
   openSave: () => void;
+  openAgent: () => void;
 }
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
@@ -21,6 +23,7 @@ export default function Layout() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
   const nav = useNavigate();
   const toast = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -48,7 +51,7 @@ export default function Layout() {
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
 
   return (
-    <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true) }}>
+    <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true) }}>
       <div className="shell">
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
@@ -57,7 +60,9 @@ export default function Layout() {
             <NavLink to="/app/library" className="side__link"><Library /> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
             <NavLink to="/app/highlights" className="side__link"><Highlighter /> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
             <NavLink to="/app/collections" className="side__link"><FolderHeart /> Collections</NavLink>
+            <NavLink to="/app/radar" className="side__link"><Radar /> Radar</NavLink>
             <NavLink to="/app/spark" className="side__link"><Sparkles /> Spark</NavLink>
+            <NavLink to="/app/analytics" className="side__link"><BarChart3 /> Analytics</NavLink>
             <div className="side__section">Connect</div>
             <NavLink to="/app/integrations" className="side__link"><Plug /> Integrations</NavLink>
             <NavLink to="/app/settings" className="side__link"><Settings /> Settings</NavLink>
@@ -109,7 +114,8 @@ export default function Layout() {
             <span className="kbd" style={{ marginLeft: -4 }}>⌘K</span>
             <span className="spacer" />
             {user.isDemo && <span className="chip chip--iris hide-sm">Demo sandbox</span>}
-            <a className="key key--ghost key--sm hide-sm" href="https://github.com/brgv-code/lumen#quick-start" target="_blank" rel="noreferrer"><Puzzle size={15} /> Extension</a>
+            <a className="key key--ghost key--sm hide-sm" href="/docs/extension" target="_blank" rel="noreferrer"><Puzzle size={15} /> Extension</a>
+            <button className="key key--iris key--sm" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
             <button className="key key--sm" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
           </div>
           <Outlet />
@@ -119,10 +125,11 @@ export default function Layout() {
           <NavLink end to="/app"><Home size={19} />Home</NavLink>
           <NavLink to="/app/library"><Library size={19} />Library</NavLink>
           <NavLink to="/app/highlights"><Highlighter size={19} />Highlights</NavLink>
-          <NavLink to="/app/spark"><Sparkles size={19} />Spark</NavLink>
+          <NavLink to="/app/radar"><Radar size={19} />Radar</NavLink>
           <NavLink to="/app/settings"><Settings size={19} />More</NavLink>
         </nav>
       </div>
+      <ConnectAgent open={agentOpen} onClose={() => setAgentOpen(false)} />
       <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast(<>Saved. <span className="muted">+1 glow</span></>, "glow"); nav(`/app/read/${id}`); }} />
     </AppCtx.Provider>
   );

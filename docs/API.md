@@ -85,6 +85,27 @@ Webhook payload:
                    "source": { "title": "…", "url": "…", "link": "…#:~:text=…" } }] }
 ```
 
+## Discover
+| Method | Path | Body / query | Returns |
+|---|---|---|---|
+| GET | `/api/v1/reads?period=daily\|weekly` | | `{ picks, resurface, trending, minutes, budgetMinutes }`: a plan that fits the daily goal |
+| GET | `/api/v1/reminders` | | items in progress, idle 20+ hours, with `minutesLeft` and `idleDays` |
+| POST | `/api/v1/items/:id/snooze` | `{ days }` (1 to 30) | hides the reminder until then |
+| GET | `/api/v1/radar` | | `{ topics, trends, lastRunAt }`; refreshes if older than 6 hours |
+| POST | `/api/v1/radar/refresh` | | forces a refresh |
+| POST | `/api/v1/topics` | `{ name }` | follow a topic |
+| DELETE | `/api/v1/topics/:name` | | mute a topic (auto topics come from tags) |
+| POST | `/api/v1/trends/:id/save` | | saves the story to the library |
+| POST | `/api/v1/trends/:id/dismiss` | | hides it |
+| GET | `/api/v1/similar` | | readers like you: URLs saved by 2+ readers whose libraries overlap with yours |
+| GET | `/api/v1/analytics` | | 84 day heatmap, weekly minutes and words, topics, sites, colours, hours, totals |
+
+`GET /api/v1/items/:id` also returns `alsoSaving`: how many readers like you saved the same URL (0 when fewer than 2).
+`PATCH /api/v1/me` accepts `shareSignals` and `reminders` (booleans). `POST /api/v1/tokens` accepts `kind: "agent"`.
+
+## MCP
+`POST /mcp` speaks MCP over Streamable HTTP with a Bearer key. See [MCP.md](MCP.md).
+
 ## AI
 | Method | Path | Body | Returns |
 |---|---|---|---|

@@ -5,6 +5,7 @@ import { body, decodeCursor, encodeCursor, fail, id, isHttpUrl, now, oneOf, str 
 import { toHighlight, toItem } from "../lib/map";
 import { extractFromHtml, extractFromUrl } from "../lib/extract";
 import { glowStmt } from "../lib/glow";
+import { peerFilter } from "./discover";
 
 export const items = new Hono<AppEnv>();
 
@@ -94,8 +95,15 @@ items.get("/:id", async (c) => {
   const row = await c.env.DB.prepare(`${ITEM_SELECT.replace("FROM items i", ", i.content_html FROM items i")} WHERE i.user_id = ? AND i.id = ?`)
     .bind(u.id, c.req.param("id")).first();
   if (!row) fail(404, "not_found", "No such item.");
-  const { results } = await c.env.DB.prepare("SELECT * FROM highlights WHERE item_id = ? ORDER BY position").bind(row.id).all();
-  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: results.map(toHighlight) });
+  const u2 = c.get("user");
+  const [hl, peers] = await c.env.DB.batch([
+    c.env.DB.prepare("SELECT * FROM highlights WHERE item_id = ? ORDER BY position").bind(row.id),
+    c.env.DB.prepare(`SELECT count(DISTINCT i.user_id) AS n FROM items i JOIN users u ON u.id = i.user_id
+      WHERE i.url = ? AND i.user_id != ? AND u.share_signals = 1 AND ${peerFilter(u2.is_demo)}`).bind(row.url, u2.id),
+    c.env.DB.prepare("UPDATE items SET last_opened_at = ? WHERE id = ?").bind(now(), row.id),
+  ]);
+  const n = (peers.results[0] as { n: number }).n;
+  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: hl.results.map((r) => toHighlight(r as Record<string, unknown>)), alsoSaving: n >= 2 ? n : 0 });
 });
 
 items.patch("/:id", async (c) => {

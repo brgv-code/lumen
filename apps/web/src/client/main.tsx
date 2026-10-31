@@ -1,6 +1,6 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import { ToastProvider } from "./components/ui";
@@ -16,6 +16,9 @@ const Collections = lazy(() => import("./pages/app/Collections"));
 const Spark = lazy(() => import("./pages/app/Spark"));
 const Integrations = lazy(() => import("./pages/app/Integrations"));
 const Settings = lazy(() => import("./pages/app/Settings"));
+const Radar = lazy(() => import("./pages/app/Radar"));
+const Analytics = lazy(() => import("./pages/app/Analytics"));
+import NotFound from "./pages/NotFound";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -35,8 +38,10 @@ createRoot(document.getElementById("root")!).render(
               <Route path="spark" element={<Spark />} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="radar" element={<Radar />} />
+              <Route path="analytics" element={<Analytics />} />
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

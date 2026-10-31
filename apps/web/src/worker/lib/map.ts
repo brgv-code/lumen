@@ -11,6 +11,8 @@ export const toUser = (u: SessionUser): User => ({
   isDemo: Boolean(u.is_demo),
   plan: u.plan === "pro" ? "pro" : "free",
   dailyGoal: u.daily_goal,
+  shareSignals: Boolean(u.share_signals),
+  reminders: Boolean(u.reminders),
   createdAt: u.created_at,
 });
 

@@ -22,6 +22,7 @@ export default function Reader() {
   const [item, setItem] = useState<ItemWithContent | null>(null);
   const [hls, setHls] = useState<Highlight[]>([]);
   const [missing, setMissing] = useState(false);
+  const [alsoSaving, setAlsoSaving] = useState(0);
   const [sel, setSel] = useState<Sel | null>(null);
   const [ai, setAi] = useState<AIState | null>(null);
   const [ask, setAsk] = useState("");
@@ -32,7 +33,7 @@ export default function Reader() {
 
   useEffect(() => {
     setItem(null); setHls([]); setMissing(false); setAi(null);
-    api.item(id).then((r) => { setItem(r.item); setHls(r.highlights); }).catch(() => setMissing(true));
+    api.item(id).then((r) => { setItem(r.item); setHls(r.highlights); setAlsoSaving(r.alsoSaving ?? 0); }).catch(() => setMissing(true));
     window.scrollTo(0, 0);
   }, [id]);
 
@@ -179,6 +180,7 @@ export default function Reader() {
               <span className="chip">{item.siteName || hostOf(item.url)}</span>
               {item.author && <span>{item.author}</span>}
               <span>· {item.readingMinutes} min read</span>
+              {alsoSaving > 0 && <span className="chip chip--mint">{alsoSaving} readers like you saved this</span>}
             </div>
             <h1>{item.title}</h1>
           </header>

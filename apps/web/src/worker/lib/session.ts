@@ -46,6 +46,10 @@ async function userFromToken(env: Env, token: string): Promise<SessionUser | nul
   return row;
 }
 
+export async function userForBearer(env: Env, token: string) {
+  return userFromToken(env, token) as Promise<(SessionUser & { token_id: string }) | null>;
+}
+
 /** Resolve the caller from a Bearer token (extension) or the session cookie (web). */
 export async function requireUser(c: Context<AppEnv>, next: Next) {
   const auth = c.req.header("authorization");
@@ -70,11 +74,11 @@ export async function requireUser(c: Context<AppEnv>, next: Next) {
   await next();
 }
 
-export async function newApiToken(env: Env, userId: string, name: string) {
+export async function newApiToken(env: Env, userId: string, name: string, kind = "extension") {
   const raw = "lum_" + randomToken(24);
   const tokenId = id("tok_");
-  await env.DB.prepare("INSERT INTO api_tokens (id, user_id, name, token_hash, prefix, created_at) VALUES (?,?,?,?,?,?)")
-    .bind(tokenId, userId, name, await sha256(raw), raw.slice(0, 8), now())
+  await env.DB.prepare("INSERT INTO api_tokens (id, user_id, name, token_hash, prefix, kind, created_at) VALUES (?,?,?,?,?,?,?)")
+    .bind(tokenId, userId, name, await sha256(raw), raw.slice(0, 8), kind, now())
     .run();
   return { id: tokenId, token: raw };
 }

@@ -33,6 +33,10 @@ export default function Options() {
           <input type="checkbox" checked={s.autoSend} onChange={(e) => set("autoSend", e.target.checked)} style={{ width: 18, height: 18 }} />
           Send new highlights to the target collection's destination right away
         </label>
+        <label className="row" style={{ display: "flex", gap: 10 }}>
+          <input type="checkbox" checked={s.reminders} onChange={(e) => set("reminders", e.target.checked)} style={{ width: 18, height: 18 }} />
+          Remind me about articles I started and left (a notification, at most once a day per article)
+        </label>
       </section>
 
       <section className="surface stack" style={{ padding: 22 }}>

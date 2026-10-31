@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Download, KeyRound, LogOut, Moon, Trash2 } from "lucide-react";
-import { api } from "../../lib/api";
+import { api, type Token } from "../../lib/api";
 import { getTheme, setTheme, timeAgo } from "../../lib/hooks";
 import { Segmented, useToast } from "../../components/ui";
 import { useApp } from "./Layout";
@@ -13,7 +13,9 @@ export default function Settings() {
   const [name, setName] = useState(user.name);
   const [goal, setGoal] = useState(user.dailyGoal);
   const [theme, setT] = useState(getTheme());
-  const [tokens, setTokens] = useState<{ id: string; name: string; prefix: string; lastUsedAt: number | null; createdAt: number }[]>([]);
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [share, setShare] = useState(user.shareSignals);
+  const [remind, setRemind] = useState(user.reminders);
   const loadTokens = () => api.tokens().then((r) => setTokens(r.data)).catch(() => {});
   useEffect(() => { loadTokens(); }, []);
 
@@ -38,6 +40,12 @@ export default function Settings() {
       </form>
 
       <section className="panel stack">
+        <h2>Reading and privacy</h2>
+        <Toggle on={remind} label="Reminders" hint="Nudge me about articles I started and left for a day or more (dashboard and extension)." onChange={async (v) => { setRemind(v); await api.updateMe({ reminders: v }); refresh(); }} />
+        <Toggle on={share} label="Anonymous reading signals" hint="Count my saved public links toward “readers like you” suggestions. Only links saved by two or more readers are ever shown, never who saved them, never highlights or notes." onChange={async (v) => { setShare(v); await api.updateMe({ shareSignals: v }); refresh(); }} />
+      </section>
+
+      <section className="panel stack">
         <div className="row"><span className="tile tile--sm tile--ink"><Moon /></span><h2>Appearance</h2></div>
         <Segmented label="Theme" size="sm" value={theme} onChange={(v) => { setT(v); setTheme(v); }} options={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
       </section>
@@ -47,7 +55,7 @@ export default function Settings() {
         {tokens.length === 0 && <p className="small muted">No tokens. The extension needs one to sync.</p>}
         {tokens.map((t) => (
           <div key={t.id} className="card-flat row" style={{ padding: 12 }}>
-            <code className="mono small">{t.prefix}…</code><b style={{ color: "var(--ink)", fontSize: 14 }}>{t.name}</b>
+            <code className="mono small">{t.prefix}…</code><b style={{ color: "var(--ink)", fontSize: 14 }}>{t.client ?? t.name}</b><span className={`chip ${t.kind === "agent" ? "chip--iris" : ""}`}>{t.kind === "agent" ? "Agent" : "Extension"}</span>
             <span className="spacer" /><span className="small muted">{t.lastUsedAt ? `used ${timeAgo(t.lastUsedAt)}` : "never used"}</span>
             <button className="icon-btn" aria-label="Revoke" onClick={async () => { await api.deleteToken(t.id); loadTokens(); toast("Token revoked"); }}><Trash2 size={15} /></button>
           </div>
@@ -65,5 +73,17 @@ export default function Settings() {
         </div>
       </section>
     </div>
+  );
+}
+
+function Toggle({ on, label, hint, onChange }: { on: boolean; label: string; hint: string; onChange: (v: boolean) => void }) {
+  return (
+    <label className="row" style={{ alignItems: "flex-start", gap: 14, cursor: "pointer" }}>
+      <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)}
+        style={{ flex: "none", width: 44, height: 26, borderRadius: 99, border: 0, padding: 3, cursor: "pointer", background: on ? "var(--key-lamp)" : "var(--well)", transition: "background 200ms ease", boxShadow: "inset 0 1px 2px rgba(0,0,0,.12)" }}>
+        <span style={{ display: "block", width: 20, height: 20, borderRadius: 99, background: "#fff", boxShadow: "0 2px 4px rgba(0,0,0,.2)", transform: on ? "translateX(18px)" : "none", transition: "transform 220ms var(--ease-spring)" }} />
+      </button>
+      <span><b style={{ color: "var(--ink)", fontWeight: 500 }}>{label}</b><br /><span className="small muted">{hint}</span></span>
+    </label>
   );
 }

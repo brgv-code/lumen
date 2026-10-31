@@ -42,12 +42,24 @@ While researching a piece of writing that breaks three ways:
 | Claude | Native messaging helper that runs `claude -p --model <m>` |
 | Data | JSON export, collection export as markdown, account deletion |
 
+### Shipped in 2.1
+| Area | Feature |
+|---|---|
+| Agents | MCP server (14 tools, 2 prompts), Connect agent flow, agent keys with client names |
+| Discover | Radar (Hacker News, dev.to) per topic, follow and mute topics, save trending stories |
+| Habit | Daily and weekly reads within the time budget, resurfaced highlights, reminders with snooze, extension notifications |
+| Social | Readers like you (anonymous, at least two readers), per item "readers like you saved this" |
+| Insight | Analytics page |
+| Growth | Docs, comparisons, answers, legal and changelog pages with structured data; sitemap, robots, llms.txt, Open Graph image |
+
 ### Next
 | Priority | Feature | Notes |
 |---|---|---|
 | P1 | PDF highlighting | Open PDF links in a bundled pdf.js viewer page inside the extension; store files in R2 |
 | P1 | Billing | Stripe Checkout + webhook to flip `users.plan`; enforce Pro limits |
+| P0 | MCP OAuth | Authorization server metadata and dynamic client registration for native Claude connectors |
 | P1 | Email magic link | Cloudflare Email Sending; same session machinery |
+| P1 | Imports | Pocket CSV, Readwise, Omnivore, Instapaper |
 | P2 | Image and region clips | `captureVisibleTab`, crop, optional OCR, stored in R2 |
 | P2 | Full text search | D1 FTS5 table over items and highlights |
 | P2 | Shared collections (Team) | `collection_members` table, roles |

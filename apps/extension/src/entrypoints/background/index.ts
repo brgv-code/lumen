@@ -1,6 +1,6 @@
 import type { Highlight } from "@lumen/core";
 import { streamAnswer, testProvider } from "../../lib/ai";
-import { cloudApi, syncTarget } from "../../lib/cloud";
+import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
 import type { Msg, PageState } from "../../lib/types";
 
@@ -21,6 +21,16 @@ export default defineBackground(() => {
     if (!tab?.id) return;
     const cmd = info.menuItemId === "lumen-highlight" ? "highlight" : info.menuItemId === "lumen-explain" ? "explain" : "save";
     chrome.tabs.sendMessage(tab.id, { type: "CMD", cmd }).catch(() => {});
+  });
+
+  // Reminders: a gentle nudge for articles you started and left.
+  chrome.alarms.create("lumen-reminders", { periodInMinutes: 240, delayInMinutes: 1 });
+  chrome.alarms.onAlarm.addListener((a) => { if (a.name === "lumen-reminders") checkReminders().catch(() => {}); });
+  chrome.notifications.onClicked.addListener(async (nid) => {
+    if (!nid.startsWith("lumen-remind-")) return;
+    const s = await getSettings();
+    chrome.tabs.create({ url: `${s.apiBase}/app/read/${nid.slice("lumen-remind-".length)}` });
+    chrome.notifications.clear(nid);
   });
 
   chrome.commands.onCommand.addListener(async (command) => {
@@ -144,4 +154,27 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       return { ok: true };
     }
   }
+}
+
+async function checkReminders() {
+  const s = await getSettings();
+  if (!s.token || !s.reminders) { chrome.action.setBadgeText({ text: "" }); return; }
+  const r = await cloud<{ data: { item: { id: string; title: string; progress: number }; minutesLeft: number }[] }>("GET", "/reminders");
+  chrome.action.setBadgeBackgroundColor({ color: "#FF8A1F" });
+  chrome.action.setBadgeText({ text: r.data.length ? String(r.data.length) : "" });
+  if (!r.data.length) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const key = "lumen_reminded";
+  const seen: Record<string, string> = (await chrome.storage.local.get(key))[key] ?? {};
+  const next = r.data.find((x) => seen[x.item.id] !== today);
+  if (!next) return;
+  seen[next.item.id] = today;
+  await chrome.storage.local.set({ [key]: seen });
+  chrome.notifications.create(`lumen-remind-${next.item.id}`, {
+    type: "basic",
+    iconUrl: "icons/icon128.png",
+    title: "Pick up where you left off",
+    message: `You were ${Math.round(next.item.progress * 100)}% through “${next.item.title}”. About ${next.minutesLeft} min to finish.`,
+    priority: 0,
+  });
 }

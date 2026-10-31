@@ -2,14 +2,16 @@ import { useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight, BookOpen, Check, Copy, FileText, Flame, Github, Highlighter, Library, Link2, Lock, MessageSquareText,
-  NotebookPen, Puzzle, Send, Sparkles, Webhook, Wand2, Cpu, Download, Quote,
+  NotebookPen, Puzzle, Send, Sparkles, Webhook, Wand2, Cpu, Download, Quote, Bot, Search, KeyRound,
+  Radar as RadarIcon, BellRing, Users, BarChart3, Clock,
 } from "lucide-react";
+import { SiteFooter } from "../components/SiteFooter";
 import { AppIcon, Logo, Segmented, Sparkle, useToast } from "../components/ui";
 import { useReveal } from "../lib/hooks";
 import { api } from "../lib/api";
 import "../styles/landing.css";
 
-type Tab = "highlight" | "ask" | "send" | "library" | "spark";
+type Tab = "highlight" | "ask" | "send" | "library" | "spark" | "agents";
 
 const TABS: { value: Tab; label: string }[] = [
   { value: "highlight", label: "Highlight" },
@@ -17,6 +19,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "send", label: "Send anywhere" },
   { value: "library", label: "Library" },
   { value: "spark", label: "Spark" },
+  { value: "agents", label: "Agents" },
 ];
 
 const FEATURE: Record<Tab, { pill: string; lead: string; pay: string; body: string; mesh: string; ticks: [ReactNode, string, string][] }> = {
@@ -85,6 +88,19 @@ const FEATURE: Record<Tab, { pill: string; lead: string; pay: string; body: stri
       [<Flame />, "Glow for ideas you keep", "ink"],
     ],
   },
+  agents: {
+    pill: "Connect your agent",
+    lead: "Your library,",
+    pay: "in every agent.",
+    body: "Lumen is an MCP server. Connect Claude Code, Claude Desktop or Cursor in one step, then ask it to review your week, find what is trending in your topics, quote your own highlights back, or save what it finds.",
+    mesh: "mesh-iris",
+    ticks: [
+      [<Bot />, "Claude, Cursor and any MCP client", "ink"],
+      [<Search />, "Search, read, highlight and save", "ink"],
+      [<RadarIcon />, "Trending topics, watched for you", "ink"],
+      [<KeyRound />, "One revocable key per agent", "ink"],
+    ],
+  },
 };
 
 export default function Landing() {
@@ -112,10 +128,10 @@ export default function Landing() {
           <Link to="/" aria-label="Lumen home"><Logo /></Link>
           <div className="lp-nav__links">
             <a href="#features">Features</a>
-            <a href="#how">How it works</a>
-            <a href="#glow">Glow</a>
+            <a href="#agents">Agents</a>
+            <a href="/compare">Compare</a>
+            <a href="/docs">Docs</a>
             <a href="#pricing">Pricing</a>
-            <a href="https://github.com/brgv-code/lumen" target="_blank" rel="noreferrer">GitHub</a>
           </div>
           <div className="row">
             <Link to="/login" className="key key--quiet key--sm">Log in</Link>
@@ -273,6 +289,49 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* DAY */}
+        <section className="lp-sec" id="agents">
+          <div className="lp-head reveal">
+            <div>
+              <span className="label-pill">One place for everything you read</span>
+              <h2 className="h2"><span className="lead-in">Your reading day,</span> <span className="payoff">already planned.</span></h2>
+            </div>
+            <p className="muted" style={{ maxWidth: 400 }}>A plan that fits the time you have, nudges for what you left half read, what is trending in your topics, what readers like you save, and the numbers behind it all. Your agent can see all of it too.</p>
+          </div>
+          <div className="day-grid">
+            <div className="cell reveal" style={{ ["--i" as string]: 0 }}>
+              <div className="row"><span className="tile tile--sm tile--lamp"><Clock /></span><b>Today's reads</b><span className="spacer" /><span className="chip chip--lamp">18 of 24 min</span></div>
+              {["Reading slowly on purpose · continue, 42%", "Designing for calm · 3 min", "Small models, sharp tools · 4 min"].map((t, k) => <div key={t} className="day-row"><span className="mono muted">{k + 1}</span>{t}</div>)}
+            </div>
+            <div className="cell reveal" style={{ ["--i" as string]: 1 }}>
+              <div className="row"><span className="tile tile--sm tile--lamp"><BellRing /></span><b>Reminders</b></div>
+              <div className="day-row" style={{ background: "var(--lamp-tint)" }}>You were 42% through “Reading slowly on purpose”. 3 min to finish.</div>
+              <div className="row" style={{ gap: 6 }}><span className="chip chip--lamp">Continue</span><span className="chip">Snooze 2 days</span></div>
+            </div>
+            <div className="cell reveal" style={{ ["--i" as string]: 2 }}>
+              <div className="row"><span className="tile tile--sm tile--sky"><RadarIcon /></span><b>Radar</b><span className="spacer" /><span className="chip chip--sky">#obsidian</span></div>
+              <div className="day-row">Trending this week in the topics you read, from Hacker News and dev.to.</div>
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}><span className="chip chip--sky">#llm</span><span className="chip chip--sky">#design systems</span><span className="chip chip--sky">#reading</span></div>
+            </div>
+            <div className="cell reveal" style={{ ["--i" as string]: 3 }}>
+              <div className="row"><span className="tile tile--sm tile--mint"><Users /></span><b>Readers like you</b></div>
+              <div className="day-row" style={{ display: "block" }}>“One note per project”<br /><span className="small muted">4 readers like you saved this</span></div>
+              <p className="small muted">Anonymous and aggregate: never who, never your notes.</p>
+            </div>
+            <div className="cell cell--wide reveal" style={{ ["--i" as string]: 4 }}>
+              <div className="row"><span className="tile tile--sm tile--iris"><BarChart3 /></span><b>Analytics</b><span className="spacer" /><span className="small muted">12 weeks</span></div>
+              <div className="heat">{Array.from({ length: 84 }, (_, k) => { const v = ((k * 37) % 11) / 10; return <span key={k} style={{ background: v > 0.25 ? `color-mix(in srgb, #ff8a1f ${Math.round(20 + v * 80)}%, var(--well))` : "var(--well)" }} />; })}</div>
+            </div>
+            <div className="cell cell--wide reveal" style={{ ["--i" as string]: 5, background: "var(--iris-tint)" }}>
+              <div className="row"><span className="tile tile--sm tile--iris"><Bot /></span><b>Connect your agent</b></div>
+              <pre className="mono day-code">{`claude mcp add --transport http lumen \
+  ${typeof location !== "undefined" ? location.origin : "https://lumen.app"}/mcp \
+  --header "Authorization: Bearer lum_…"`}</pre>
+              <a className="key key--iris key--sm" href="/docs/mcp" style={{ justifySelf: "start" }}>MCP docs</a>
+            </div>
+          </div>
+        </section>
+
         {/* GLOW */}
         <section className="lp-sec" id="glow">
           <div className="lp-head reveal">
@@ -325,8 +384,8 @@ export default function Landing() {
           </div>
           <div className="price-grid">
             <Price name="Reader" amount="€0" note="For personal reading" items={["Unlimited saves and highlights", "Obsidian, Markdown and webhooks", "100 AI answers a day", "Bring your own model, unlimited", "Full export, any time"]} cta="Start free" />
-            <Price hot name="Pro" amount="€6" note="per month, billed yearly" items={["Everything in Reader", "Notion sync and scheduled pushes", "1,000 AI answers a day", "PDF highlighting (beta)", "Spark ideas every week"]} cta="Start a 14 day trial" />
-            <Price name="Team" amount="€12" note="per member, per month" items={["Shared collections", "Team reading digests", "SSO with Google Workspace", "Admin and audit log", "Priority support"]} cta="Talk to us" />
+            <Price hot name="Pro" amount="€6" note="per month, billed yearly" items={["Everything in Reader", "Notion sync and scheduled pushes", "1,000 AI answers a day", "PDF highlighting (coming soon)", "Agent access with higher limits"]} cta="Start free, upgrade later" />
+            <Price name="Team" amount="€12" note="per member, per month" items={["Shared collections", "Team reading digests", "SSO with Google Workspace", "Admin and audit log", "Priority support"]} cta="Coming soon" soon />
           </div>
           <p className="small muted" style={{ textAlign: "center", marginTop: 16 }}>Pricing shown is the plan for launch; billing is not live in this preview.</p>
         </section>
@@ -354,23 +413,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="lp-wrap lp-foot">
-        <div className="lp-foot__grid">
-          <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
-            <Logo />
-            <p className="muted" style={{ maxWidth: 260 }}>Built for people who think reading should feel light.</p>
-            <div className="row" style={{ gap: 14, color: "var(--ink-2)" }}>
-              <a href="https://github.com/brgv-code/lumen" aria-label="GitHub"><Github size={17} /></a>
-            </div>
-          </div>
-          <div><h5>Product</h5><ul><li><a href="#features">Features</a></li><li><a href="#how">How it works</a></li><li><a href="#pricing">Pricing</a></li><li><Link to="/login">Dashboard</Link></li></ul></div>
-          <div><h5>Integrations</h5><ul><li>Obsidian</li><li>Notion</li><li>Markdown</li><li>Webhooks</li></ul></div>
-          <div><h5>Developers</h5><ul><li><a href="https://github.com/brgv-code/lumen/blob/main/docs/API.md">API</a></li><li><a href="https://github.com/brgv-code/lumen/blob/main/docs/ARCHITECTURE.md">Architecture</a></li><li><a href="https://github.com/brgv-code/lumen">Source</a></li></ul></div>
-          <div><h5>Legal</h5><ul><li>Privacy</li><li>Terms</li><li>Security</li></ul></div>
-        </div>
-        <p className="small muted" style={{ textAlign: "center", marginTop: 40 }}>© 2026 Lumen</p>
-        <div className="wordmark" aria-hidden="true">lumen</div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
@@ -386,17 +429,19 @@ const FAQ: [string, string][] = [
   ["Can I choose which note my highlights go to?", "Yes. Every collection points at a destination: a note in your Obsidian vault, a Notion page, a markdown file or a webhook. You pick the collection while you read, from the extension or the dashboard."],
   ["Will clipping the same page twice duplicate my highlights?", "Never. Lumen keeps a delivery ledger per destination and only ever appends highlights that destination has not received yet."],
   ["Which AI models can I use?", "Lumen's hosted model (on Cloudflare Workers AI), Ollama on your own machine, any OpenAI compatible API, or Claude through your local Claude Code CLI via the Lumen helper."],
+  ["Can Claude or other AI agents use my library?", "Yes. Lumen is an MCP server: press Connect agent in the dashboard, paste one command into Claude Code (or a config into Claude Desktop or Cursor), and your agent can search, read, highlight, save and review your reading."],
+  ["What are readers like you?", "Links saved by at least two readers whose libraries overlap with yours. It is anonymous and aggregate: nobody sees who saved what, and highlights and notes are never shared. You can turn it off."],
   ["Is my data mine?", "Yes. Export everything as JSON or markdown at any time, and delete your account from settings. Your Obsidian API key never leaves your browser."],
   ["Does it work on PDFs?", "PDF highlighting is in progress: PDFs open in Lumen's own viewer, because no extension can reach inside Chrome's built in PDF viewer."],
 ];
 
-function Price({ name, amount, note, items, cta, hot }: { name: string; amount: string; note: string; items: string[]; cta: string; hot?: boolean }) {
+function Price({ name, amount, note, items, cta, hot, soon }: { name: string; amount: string; note: string; items: string[]; cta: string; hot?: boolean; soon?: boolean }) {
   return (
-    <div className={`surface price reveal ${hot ? "price--hot" : ""}`}>
-      <div className="row"><h3 style={{ fontSize: 18 }}>{name}</h3>{hot && <span className="chip chip--lamp" style={{ marginLeft: "auto" }}>Most loved</span>}</div>
+    <div className={`surface price reveal ${hot ? "price--hot" : ""}`} style={soon ? { opacity: 0.85 } : undefined}>
+      <div className="row"><h3 style={{ fontSize: 18 }}>{name}</h3>{hot && <span className="chip chip--lamp" style={{ marginLeft: "auto" }}>Most loved</span>}{soon && <span className="chip" style={{ marginLeft: "auto" }}>Coming soon</span>}</div>
       <div><span className="amount">{amount}</span> <span className="small">{note}</span></div>
       <ul>{items.map((i) => <li key={i}><Check size={16} style={{ color: hot ? "var(--lamp-hi)" : "var(--mint)", flex: "none", marginTop: 2 }} />{i}</li>)}</ul>
-      <Link to="/login" className={`key ${hot ? "key--lamp" : "key--ghost"}`} style={{ marginTop: "auto" }}>{cta}</Link>
+      {soon ? <span className="key key--ghost" style={{ marginTop: "auto", opacity: 0.6, cursor: "default" }}>{cta}</span> : <Link to="/login" className={`key ${hot ? "key--lamp" : "key--ghost"}`} style={{ marginTop: "auto" }}>{cta}</Link>}
     </div>
   );
 }
@@ -483,6 +528,25 @@ function FeatureCard({ tab }: { tab: Tab }) {
             <div style={{ height: 5, borderRadius: 5, background: "var(--well)", marginTop: 8 }}><div style={{ width: `${p}%`, height: "100%", borderRadius: 5, background: p === 100 ? "var(--mint)" : "var(--key-lamp)" }} /></div>
           </div>
         ))}
+      </div>
+    );
+  if (tab === "agents")
+    return (
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="row" style={{ padding: "12px 14px" }}><span className="tile tile--sm tile--iris"><Bot /></span><b style={{ color: "var(--ink)" }}>Claude Code</b><span className="spacer" /><span className="chip chip--mint">Connected</span></div>
+        <pre className="mono" style={{ margin: 0, padding: 14, background: "#121215", color: "#e8e8ea", fontSize: 11.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{`> Use Lumen to do my weekly review
+
+● lumen · get_reading_stats
+● lumen · list_highlights (40)
+● lumen · get_trending
+
+You finished 6 pieces and kept circling
+one idea: highlights rot without a home.
+"Send the highlight to the note you are
+already writing" (Why highlights rot).
+Trending in #obsidian this week: 3 posts
+on local first notes. Draft idea:
+"Where should a highlight live?"`}</pre>
       </div>
     );
   return (

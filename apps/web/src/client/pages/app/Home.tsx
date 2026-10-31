@@ -1,11 +1,12 @@
-import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, Flame, Highlighter, Sparkles, Trophy, Inbox } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, BookOpen, Bot, Clock, Flame, Highlighter, Plus, Radar, Sparkles, Trophy, Users, BellRing, ExternalLink } from "lucide-react";
 import { LEVELS } from "@lumen/core";
 import { useApp } from "./Layout";
-import { useAsync } from "../../lib/hooks";
+import { useAsync, hostOf } from "../../lib/hooks";
 import { api } from "../../lib/api";
-import { ItemCard } from "../../components/cards";
-import { Empty } from "../../components/ui";
+import { Empty, Segmented, useToast } from "../../components/ui";
+import { SiteLetter } from "../../components/cards";
 
 function greeting() {
   const h = new Date().getHours();
@@ -13,14 +14,29 @@ function greeting() {
 }
 
 export default function Home() {
-  const { user, stats, openSave } = useApp();
-  const reading = useAsync(() => api.items({ status: "reading", limit: 3 }), []);
-  const inbox = useAsync(() => api.items({ status: "inbox", limit: 3 }), []);
+  const { user, stats, openSave, openAgent, refresh } = useApp();
+  const toast = useToast();
+  const nav = useNavigate();
+  const [period, setPeriod] = useState<"daily" | "weekly">("daily");
+  const reads = useAsync(() => api.reads(period), [period]);
+  const reminders = useAsync(() => api.reminders(), []);
+  const similar = useAsync(() => api.similar(), []);
+  const radar = useAsync(() => api.radar(), []);
   const hls = useAsync(() => api.highlights({}), []);
-  const ideas = useAsync(() => api.ideas(), []);
   const first = user.name.replace(/\s*\(demo\)$/, "").split(" ")[0];
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
   const maxWeek = stats ? Math.max(10, ...stats.week.map((d) => d.glow)) : 10;
+  const isNew = stats && stats.counts.inbox + stats.counts.reading + stats.counts.done === 0;
+
+  const saveUrl = async (url: string, title: string) => {
+    try {
+      const r = await api.saveItem({ url });
+      toast(r.created ? <>Saved “{title.slice(0, 40)}” <span className="muted">+1 glow</span></> : "Already in your library", r.created ? "glow" : "ok");
+      refresh();
+      similar.reload();
+      reads.reload();
+    } catch (e) { toast((e as Error).message, "err"); }
+  };
 
   return (
     <div className="page">
@@ -34,6 +50,33 @@ export default function Home() {
         </div>
       </div>
 
+      {isNew && (
+        <section className="panel gridlines">
+          <div className="row" style={{ position: "relative", marginBottom: 14 }}><span className="tile tile--lamp"><Sparkles /></span><h2>Three steps to a lit lamp</h2></div>
+          <div className="grid-3" style={{ position: "relative" }}>
+            <button className="item-card" style={{ border: 0, textAlign: "left", font: "inherit", cursor: "pointer" }} onClick={openSave}><span className="chip">1</span><h3>Save something to read</h3><p className="excerpt">Paste a link, or use the extension on any page.</p></button>
+            <Link className="item-card" to="/app/integrations"><span className="chip">2</span><h3>Point a collection at a note</h3><p className="excerpt">Obsidian, Notion, markdown or a webhook.</p></Link>
+            <button className="item-card" style={{ border: 0, textAlign: "left", font: "inherit", cursor: "pointer" }} onClick={openAgent}><span className="chip">3</span><h3>Connect your agent</h3><p className="excerpt">Let Claude read your library with you.</p></button>
+          </div>
+        </section>
+      )}
+
+      {reminders.data && reminders.data.data.length > 0 && (
+        <section className="stack" style={{ gap: 8 }}>
+          {reminders.data.data.slice(0, 2).map((r) => (
+            <div key={r.item.id} className="card row pop" style={{ padding: "12px 14px", flexWrap: "wrap", background: "var(--lamp-tint)" }}>
+              <span className="tile tile--sm tile--lamp"><BellRing /></span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ color: "var(--ink)", fontWeight: 600, fontSize: 14.5 }}>You were {Math.round(r.item.progress * 100)}% through “{r.item.title}”</div>
+                <div className="small muted">Left {r.idleDays} {r.idleDays === 1 ? "day" : "days"} ago · about {r.minutesLeft} min to finish</div>
+              </div>
+              <button className="key key--lamp key--sm" onClick={() => nav(`/app/read/${r.item.id}`)}>Continue</button>
+              <button className="key key--quiet key--sm" onClick={async () => { await api.snooze(r.item.id, 2); reminders.reload(); toast("Snoozed for 2 days"); }}>Snooze</button>
+            </div>
+          ))}
+        </section>
+      )}
+
       <div className="grid-3">
         <div className="panel stat">
           <span className="tile tile--lg tile--lamp" style={{ animation: stats?.glowToday ? "glow 3s ease-in-out infinite" : undefined }}><Flame /></span>
@@ -43,24 +86,58 @@ export default function Home() {
           <Ring value={goal} />
           <div><div className="big">{stats?.glowToday ?? 0}<span className="muted" style={{ fontSize: 16 }}>/{stats?.dailyGoal ?? 20}</span></div><div className="small muted">glow today</div></div>
         </div>
-        <div className="panel">
+        <Link to="/app/analytics" className="panel" style={{ display: "block" }}>
           <div className="row"><span className="tile tile--iris"><Trophy /></span><div><div style={{ color: "var(--ink)", fontWeight: 600 }}>{stats?.level.name ?? "Spark"}</div><div className="small muted">{stats ? `${stats.glowTotal} glow · ${Math.max(0, stats.level.next - stats.glowTotal)} to ${LEVELS[stats.level.index + 1]?.name ?? "the top"}` : "…"}</div></div></div>
           <div className="meter" style={{ marginTop: 14 }}><span style={{ width: `${(stats?.level.progress ?? 0) * 100}%`, background: "var(--key-iris)" }} /></div>
-        </div>
+        </Link>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
-        <section className="panel">
-          <div className="row" style={{ marginBottom: 14 }}><h2>Continue reading</h2><span className="spacer" /><Link to="/app/library?status=reading" className="key key--quiet key--sm">All <ArrowRight size={14} /></Link></div>
-          {reading.data && reading.data.data.length === 0 ? (
-            <Empty icon={<BookOpen />} title="Nothing in progress" action={<button className="key key--sm" onClick={openSave}>Save something to read</button>}>Open anything from your inbox and Lumen remembers where you stopped.</Empty>
-          ) : (
-            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))" }}>
-              {(reading.data?.data ?? []).map((i) => <ItemCard key={i.id} item={i} />)}
-              {reading.loading && [0, 1].map((k) => <div key={k} className="skeleton" style={{ height: 150 }} />)}
+      <section className="panel">
+        <div className="row" style={{ marginBottom: 14, flexWrap: "wrap" }}>
+          <h2>{period === "daily" ? "Today's reads" : "This week's reads"}</h2>
+          {reads.data && <span className="chip chip--lamp"><Clock size={12} /> about {reads.data.minutes} of {reads.data.budgetMinutes} min</span>}
+          <span className="spacer" />
+          <Segmented label="Period" size="sm" value={period} onChange={setPeriod} options={[{ value: "daily", label: "Today" }, { value: "weekly", label: "This week" }]} />
+        </div>
+        {reads.data && reads.data.picks.length === 0 && reads.data.trending.length === 0 ? (
+          <Empty icon={<BookOpen />} title="Nothing planned yet" action={<button className="key key--sm" onClick={openSave}><Plus size={14} /> Save a link</button>}>Save a few articles and Lumen builds a plan that fits your daily goal.</Empty>
+        ) : (
+          <div className="grid-2" style={{ gridTemplateColumns: "1.3fr 1fr", alignItems: "start" }}>
+            <div className="stack" style={{ gap: 8 }}>
+              {(reads.data?.picks ?? []).map((i, k) => (
+                <Link key={i.id} to={`/app/read/${i.id}`} className="card-flat row pop" style={{ padding: 12, animationDelay: `${k * 40}ms` }}>
+                  <span className="mono muted" style={{ width: 18, textAlign: "center" }}>{k + 1}</span>
+                  <SiteLetter url={i.url} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</div>
+                    <div className="small muted">{i.status === "reading" ? `Continue · ${Math.round(i.progress * 100)}% read` : `${i.readingMinutes} min`} · {i.siteName ?? hostOf(i.url)}</div>
+                  </div>
+                  {i.status === "reading" && <span className="chip chip--lamp">In progress</span>}
+                </Link>
+              ))}
+              {reads.loading && [0, 1, 2].map((k) => <div key={k} className="skeleton" style={{ height: 56 }} />)}
             </div>
-          )}
-        </section>
+            <div className="stack" style={{ gap: 10 }}>
+              {(reads.data?.resurface ?? []).map((h) => (
+                <Link key={h.id} to={`/app/read/${h.itemId}#${h.id}`} className="card-flat" style={{ padding: 12, display: "grid", gap: 4 }}>
+                  <span className="eyebrow">Worth revisiting</span>
+                  <span style={{ fontFamily: "var(--font-read)", color: "var(--ink)", fontSize: 15 }}><mark className={`hl-${h.color}`}>{h.quote}</mark></span>
+                  <span className="small muted">{h.item?.title}</span>
+                </Link>
+              ))}
+              {(reads.data?.trending ?? []).slice(0, 2).map((t) => (
+                <div key={t.id} className="card-flat" style={{ padding: 12, display: "grid", gap: 6 }}>
+                  <span className="eyebrow">Trending in {t.topic}</span>
+                  <a href={t.url} target="_blank" rel="noreferrer" style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>{t.title}</a>
+                  <div className="row"><span className="small muted">{t.source === "hn" ? "Hacker News" : "dev.to"} · {t.score} points</span><span className="spacer" /><button className="key key--ghost key--sm" onClick={() => saveUrl(t.url, t.title)}><Plus size={13} /> Save</button></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="grid-2">
         <section className="panel">
           <div className="row" style={{ marginBottom: 18 }}><h2>This week</h2><span className="spacer" /><span className="chip chip--lamp"><Flame size={12} /> {stats?.week.reduce((a, d) => a + d.glow, 0) ?? 0} glow</span></div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
@@ -73,6 +150,28 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </section>
+        <section className="panel">
+          <div className="row" style={{ marginBottom: 14 }}><span className="tile tile--sm tile--mint"><Users /></span><h2>Readers like you are reading</h2></div>
+          {similar.data?.optedOut ? (
+            <p className="small muted">Anonymous signals are off. Turn them on in Settings to see what readers with similar taste save.</p>
+          ) : similar.data && similar.data.data.length === 0 ? (
+            <p className="small muted">Nothing yet. As more readers save what you save, their best finds show up here (only links saved by two or more of them, never who).</p>
+          ) : (
+            <div className="stack" style={{ gap: 8 }}>
+              {(similar.data?.data ?? []).slice(0, 4).map((s) => (
+                <div key={s.url} className="card-flat row" style={{ padding: 12 }}>
+                  <SiteLetter url={s.url} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
+                    <div className="small muted">{s.readers} readers like you saved this</div>
+                  </div>
+                  <button className="key key--ghost key--sm" onClick={() => saveUrl(s.url, s.title)}><Plus size={13} /> Save</button>
+                </div>
+              ))}
+              {user.isDemo && <p className="small muted">In the demo these come from sample readers.</p>}
+            </div>
+          )}
         </section>
       </div>
 
@@ -90,19 +189,23 @@ export default function Home() {
           </div>
         </section>
         <section className="panel">
-          <div className="row" style={{ marginBottom: 14 }}><h2>Inbox</h2><span className="chip">{stats?.counts.inbox ?? 0}</span><span className="spacer" /><Link to="/app/library?status=inbox" className="key key--quiet key--sm">Open <ArrowRight size={14} /></Link></div>
-          <div className="stack" style={{ gap: 10 }}>
-            {(inbox.data?.data ?? []).map((i) => (
-              <Link key={i.id} to={`/app/read/${i.id}`} className="row card-flat" style={{ padding: 12 }}>
-                <span className="tile tile--sm tile--sky"><Inbox /></span>
-                <div style={{ minWidth: 0 }}><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</div><div className="small muted">{i.siteName} · {i.readingMinutes} min</div></div>
-              </Link>
-            ))}
-            {inbox.data && inbox.data.data.length === 0 && <p className="muted small">Inbox zero. Lovely.</p>}
+          <div className="row" style={{ marginBottom: 14 }}><span className="tile tile--sm tile--sky"><Radar /></span><h2>On your radar</h2><span className="spacer" /><Link to="/app/radar" className="key key--quiet key--sm">Open <ArrowRight size={14} /></Link></div>
+          <div className="row" style={{ flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {(radar.data?.topics ?? []).filter((t) => !t.muted).slice(0, 8).map((t) => <span key={t.name} className="chip chip--sky">#{t.name}</span>)}
           </div>
-          <div className="card-flat" style={{ padding: 14, marginTop: 14, background: "var(--iris-tint)" }}>
-            <div className="row"><span className="tile tile--sm tile--iris"><Sparkles /></span><div style={{ minWidth: 0 }}><div className="eyebrow">Spark</div><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>{ideas.data?.data[0]?.title ?? "Ideas appear once you have a few highlights."}</div></div></div>
-            <Link to="/app/spark" className="key key--iris key--sm" style={{ marginTop: 12 }}>See ideas</Link>
+          <div className="stack" style={{ gap: 8 }}>
+            {(radar.data?.trends ?? []).slice(0, 3).map((t) => (
+              <a key={t.id} href={t.url} target="_blank" rel="noreferrer" className="card-flat" style={{ padding: 12, display: "grid", gap: 4 }}>
+                <span style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>{t.title} <ExternalLink size={12} style={{ display: "inline", verticalAlign: -1 }} /></span>
+                <span className="small muted">{t.topic} · {t.source === "hn" ? "Hacker News" : "dev.to"} · {t.score} points</span>
+              </a>
+            ))}
+            {radar.loading && <div className="skeleton" style={{ height: 70 }} />}
+          </div>
+          <div className="card-flat row" style={{ padding: 14, marginTop: 14, background: "var(--iris-tint)" }}>
+            <span className="tile tile--sm tile--iris"><Bot /></span>
+            <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>Let your agent watch this for you</div><div className="small muted">Claude can review your week and suggest what to write.</div></div>
+            <button className="key key--iris key--sm" onClick={openAgent}>Connect</button>
           </div>
         </section>
       </div>

@@ -181,6 +181,7 @@ export async function seedDemo(db: D1Database): Promise<string> {
       .bind(itemId, userId, `https://example.org/lumen-demo/${s.slug}`, s.title, "Lumen sample library", s.author, s.paragraphs[0].slice(0, 180),
         html(s), text, "article", s.status, s.progress, s.favorite ? 1 : 0, words, readingMinutes(words), cols[s.collection].id, created, created,
         s.status === "done" ? created + 3600_000 : null));
+    if (s.status === "reading") stmts.push(db.prepare("UPDATE items SET last_opened_at = ? WHERE id = ?").bind(t - 60 * 3600_000, itemId));
     for (const tag of s.tags) stmts.push(db.prepare("INSERT INTO item_tags (item_id, tag_id) VALUES (?,?)").bind(itemId, tagIds.get(tag)!));
     s.highlights.forEach((h, k) => {
       const start = text.indexOf(h.quote);
@@ -205,8 +206,10 @@ export async function seedDemo(db: D1Database): Promise<string> {
     const n = d === 0 ? 3 : 2 + ((d * 7) % 5);
     for (let k = 0; k < n; k++) {
       const [kind, glow] = kinds[(d + k) % kinds.length];
+      const hour = [7, 8, 12, 13, 21, 22, 9, 20][(d * 3 + k) % 8];
+      const at = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), hour, (k * 17) % 60);
       stmts.push(db.prepare("INSERT INTO activity (id, user_id, day, kind, item_id, glow, created_at) VALUES (?,?,?,?,?,?,?)")
-        .bind(id("act_"), userId, day, kind, null, glow, t - d * 864e5));
+        .bind(id("act_"), userId, day, kind, null, glow, Math.min(at, t)));
     }
   }
 
@@ -229,12 +232,55 @@ export async function seedDemo(db: D1Database): Promise<string> {
       .bind(id("idea_"), userId, i.title, i.angle, JSON.stringify(i.outline), JSON.stringify(i.src), "new", t - 3600_000));
   }
 
+  for (const topic of ["llm", "obsidian", "design systems"]) {
+    stmts.push(db.prepare("INSERT INTO topics (id, user_id, name, source, created_at) VALUES (?,?,?,?,?)").bind(id("top_"), userId, topic, "manual", t));
+  }
+
   await db.batch(stmts);
+  await ensureCommunity(db);
   return userId;
+}
+
+/** Sample readers for the demo only (is_demo = 2). Never shown to real accounts. */
+const PICKS: [string, string, string][] = [
+  ["the-margin-is-the-message", "The margin is the message", "Why the notes beside a text outlast the text you underlined."],
+  ["a-field-guide-to-slow-tools", "A field guide to slow tools", "Software that rewards attention instead of volume, and how to spot it."],
+  ["evals-before-features", "Evals before features", "A small team's habit of writing the test for an AI feature before building it."],
+  ["one-note-per-project", "One note per project", "The simplest knowledge system that survived three years of real use."],
+  ["reading-with-a-question", "Reading with a question", "How a single question turns skimming into reading."],
+  ["quiet-interfaces", "Quiet interfaces, loud content", "Lightness steps, glossy objects, and colour that means something."],
+];
+
+export async function ensureCommunity(db: D1Database) {
+  const has = await db.prepare("SELECT count(*) AS n FROM users WHERE is_demo = 2").first<{ n: number }>();
+  if ((has?.n ?? 0) > 0) return;
+  const t = now();
+  const stmts: D1PreparedStatement[] = [];
+  const shelves = [
+    ["reading-slowly-on-purpose", "why-highlights-rot", 0, 1, 3],
+    ["reading-slowly-on-purpose", "attention-is-a-garden", 0, 1, 4],
+    ["why-highlights-rot", "the-note-that-writes-itself", 1, 3, 5],
+    ["small-models-sharp-tools", "designing-for-calm", 2, 5, 4],
+    ["designing-for-calm", "reading-slowly-on-purpose", 5, 0, 3],
+  ] as const;
+  shelves.forEach((sh, k) => {
+    const uid = id("usr_");
+    stmts.push(db.prepare("INSERT INTO users (id, email, name, is_demo, created_at) VALUES (?,?,?,2,?)").bind(uid, null, `Sample reader ${k + 1}`, t));
+    for (const slug of [sh[0], sh[1]]) {
+      stmts.push(db.prepare("INSERT INTO items (id, user_id, url, title, kind, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)")
+        .bind(id("itm_"), uid, `https://example.org/lumen-demo/${slug}`, slug.replace(/-/g, " "), "article", "done", t, t));
+    }
+    for (const p of [PICKS[sh[2]], PICKS[sh[3]], PICKS[sh[4]]]) {
+      stmts.push(db.prepare("INSERT OR IGNORE INTO items (id, user_id, url, title, site_name, excerpt, kind, status, reading_minutes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+        .bind(id("itm_"), uid, `https://example.org/lumen-demo/community/${p[0]}`, p[1], "Lumen sample library", p[2], "article", "inbox", 5, t, t));
+    }
+  });
+  await db.batch(stmts);
 }
 
 export async function purgeDemos(db: D1Database) {
   const cutoff = now() - 3 * 864e5;
   await db.prepare("DELETE FROM users WHERE is_demo = 1 AND created_at < ?").bind(cutoff).run();
   await db.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now()).run();
+  await db.prepare("DELETE FROM demo_creations WHERE created_at < ?").bind(now() - 864e5).run();
 }

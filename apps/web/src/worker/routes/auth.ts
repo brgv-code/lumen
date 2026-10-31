@@ -3,7 +3,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { AppEnv } from "../env";
 import { authorizeUrl, configured, exchange, type Provider } from "../lib/oauth";
 import { createSession, destroySession } from "../lib/session";
-import { id, now } from "../lib/util";
+import { id, now, sha256 } from "../lib/util";
 import { seedDemo } from "../lib/seed";
 
 export const auth = new Hono<AppEnv>();
@@ -72,6 +72,12 @@ auth.post("/demo", async (c) => {
   if (c.env.DEMO_ENABLED === "false") return c.json({ error: { code: "demo_off", message: "Demo is disabled." } }, 403);
   const origin = c.req.header("origin");
   if (origin && origin !== new URL(c.req.url).origin) return c.json({ error: { code: "bad_origin", message: "No." } }, 403);
+  // abuse guard: at most 8 sandboxes per address per hour
+  const ip = c.req.header("cf-connecting-ip") ?? "local";
+  const ipHash = await sha256(ip + new Date().toISOString().slice(0, 10));
+  const recent = await c.env.DB.prepare("SELECT count(*) AS n FROM demo_creations WHERE ip_hash = ? AND created_at > ?").bind(ipHash, now() - 3600_000).first<{ n: number }>();
+  if ((recent?.n ?? 0) >= 8) return c.json({ error: { code: "demo_limit", message: "Too many demo sandboxes from here. Try again in an hour." } }, 429);
+  await c.env.DB.prepare("INSERT INTO demo_creations (ip_hash, created_at) VALUES (?,?)").bind(ipHash, now()).run();
   const userId = await seedDemo(c.env.DB);
   await createSession(c, userId, 3);
   return c.json({ ok: true, next: "/app" });

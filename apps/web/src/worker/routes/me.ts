@@ -11,13 +11,15 @@ me.get("/me", (c) => c.json({ user: toUser(c.get("user")), via: c.get("via") }))
 
 me.patch("/me", async (c) => {
   const u = c.get("user");
-  const b = await body<{ name?: string; dailyGoal?: number; timezone?: string; aiProvider?: string }>(c);
+  const b = await body<{ name?: string; dailyGoal?: number; timezone?: string; aiProvider?: string; shareSignals?: boolean; reminders?: boolean }>(c);
   const name = str(b.name, 80) ?? u.name;
   const goal = typeof b.dailyGoal === "number" ? Math.min(200, Math.max(5, Math.round(b.dailyGoal))) : u.daily_goal;
   let tz = u.timezone;
   if (b.timezone) { try { new Intl.DateTimeFormat("en", { timeZone: b.timezone }); tz = b.timezone; } catch { fail(422, "bad_tz", "Unknown time zone."); } }
   const provider = oneOf(b.aiProvider, ["lumen", "ollama", "openai", "claude"] as const) ?? u.ai_provider;
-  await c.env.DB.prepare("UPDATE users SET name = ?, daily_goal = ?, timezone = ?, ai_provider = ? WHERE id = ?").bind(name, goal, tz, provider, u.id).run();
+  const share = typeof b.shareSignals === "boolean" ? (b.shareSignals ? 1 : 0) : u.share_signals;
+  const remind = typeof b.reminders === "boolean" ? (b.reminders ? 1 : 0) : u.reminders;
+  await c.env.DB.prepare("UPDATE users SET name = ?, daily_goal = ?, timezone = ?, ai_provider = ?, share_signals = ?, reminders = ? WHERE id = ?").bind(name, goal, tz, provider, share, remind, u.id).run();
   const row = await c.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(u.id).first();
   return c.json({ user: toUser(row as never) });
 });
@@ -59,14 +61,15 @@ me.get("/tags", async (c) => {
 });
 
 me.get("/tokens", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT id, name, prefix, last_used_at AS lastUsedAt, created_at AS createdAt FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC").bind(c.get("user").id).all();
+  const { results } = await c.env.DB.prepare("SELECT id, name, prefix, kind, client, last_used_at AS lastUsedAt, created_at AS createdAt FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC").bind(c.get("user").id).all();
   return c.json({ data: results });
 });
 
 me.post("/tokens", async (c) => {
   if (c.get("via") !== "cookie") fail(403, "cookie_only", "Create tokens from the dashboard.");
-  const b = await body<{ name?: string }>(c);
-  const t = await newApiToken(c.env, c.get("user").id, str(b.name, 60) ?? "Lumen extension");
+  const b = await body<{ name?: string; kind?: string }>(c);
+  const kind = b.kind === "agent" ? "agent" : "extension";
+  const t = await newApiToken(c.env, c.get("user").id, str(b.name, 60) ?? (kind === "agent" ? "AI agent" : "Lumen extension"), kind);
   return c.json({ ...t, note: "Shown once. Paste it into the extension settings." }, 201);
 });
 
