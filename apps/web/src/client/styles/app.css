@@ -536,3 +536,5 @@
 .feed-row .icon-btn { width: 26px; height: 26px; opacity: 0.6; }
 .feed-row:hover .icon-btn { opacity: 1; }
 @media (max-width: 900px) { .grid-2[style*="300px"] { grid-template-columns: 1fr !important; } }
+.answer-md .md-quote { margin: 0 0 10px; padding: 2px 0 2px 12px; border-left: 3px solid var(--lamp); font-family: var(--font-read); }
+.answer-md .md-link, .md-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

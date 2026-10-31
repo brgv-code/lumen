@@ -99,7 +99,7 @@ export default function Panel() {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateRows: "auto auto 1fr auto", height: "100vh" }}>
+    <div className="panel-root" style={{ display: "grid", gridTemplateRows: "auto auto minmax(0, 1fr) auto", gridTemplateColumns: "minmax(0, 1fr)", height: "100vh" }}>
       <div style={{ padding: "12px 12px 8px" }}><Header /></div>
       <div style={{ padding: "0 12px 8px" }}>
         <div className="tabs" role="tablist">
@@ -107,7 +107,7 @@ export default function Panel() {
         </div>
       </div>
 
-      <div style={{ overflow: "auto", padding: "4px 12px 12px" }}>
+      <div className="panel-scroll" style={{ padding: "4px 12px 12px" }}>
         {tab === "ask" && (
           <div className="stack" style={{ gap: 10 }}>
             {msgs.length === 0 && (
@@ -126,7 +126,7 @@ export default function Panel() {
               </div>
             )}
             {msgs.map((m, k) => m.role === "user" ? (
-              <div key={k} className="bubble me">{m.content}</div>
+              <div key={k} className="bubble me"><Md text={m.content} /></div>
             ) : (
               <div key={k} className="stack" style={{ gap: 6 }}>
                 <div className="bubble ai" style={m.error ? { color: "var(--peach)" } : undefined}>
@@ -188,7 +188,7 @@ export default function Panel() {
       </div>
 
       {tab === "ask" && (
-        <form style={{ padding: 12, borderTop: "1px solid var(--hair)", display: "grid", gap: 8 }} onSubmit={(e) => { e.preventDefault(); ask(input); }}>
+        <form style={{ padding: 12, borderTop: "1px solid var(--hair)", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }} onSubmit={(e) => { e.preventDefault(); ask(input); }}>
           {usePage && ctxInfo && (
             <div className={`ctx ${ctxInfo === "none" ? "off" : ""}`}>
               <span className="dot" />
