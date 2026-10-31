@@ -41,3 +41,6 @@ apps/native-host/install.sh          # registers for Chrome, Brave, Arc and Edge
 ```
 The helper runs `claude -p --model <haiku|sonnet|opus>` and streams the answer back; page text goes
 in on stdin, never through a shell.
+
+## Chrome Web Store
+Store build, listing text, permission reasons, data usage answers and assets: [STORE.md](STORE.md).
