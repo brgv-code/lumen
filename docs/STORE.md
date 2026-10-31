@@ -8,13 +8,11 @@ open either at that viewport size and take a screenshot.
 ## Build and upload
 1. `npm run build:store -w @lumen/extension` → `apps/extension/.output-store/lumenextension-<version>-chrome.zip`
    (no manifest `key`, no localhost origins).
-2. First upload only: the store assigns the extension id. Put it in
-   - `VITE_EXTENSION_STORE_ID` for the web build (dashboard connect and ping),
-   - `STORE_ID` in `apps/native-host/install.sh` (Claude helper),
-   - and once the listing is public, `VITE_EXTENSION_STORE_URL` (the Extension page then shows
-     "Add to Chrome" instead of the zip).
-   Set `VITE_EXTENSION_STORE_ID` and redeploy the web app **before submitting for review**, so the
-   reviewer's one click Connect works.
+2. The store assigned the id `hohicfgangllelfkhnbghegnbepjfkkk` on the first upload. It is the default for
+   `STORE_EXTENSION_ID` in `apps/web/src/client/lib/extension.ts` (dashboard connect and ping;
+   `VITE_EXTENSION_STORE_ID` overrides it) and `STORE_ID` in `apps/native-host/install.sh`
+   (Claude helper). Once the listing is public, set `VITE_EXTENSION_STORE_URL` and redeploy: the
+   Extension page then shows "Add to Chrome" instead of the zip.
 3. Later updates: bump the version in `apps/extension/wxt.config.ts` and `EXTENSION_VERSION` in
    `apps/web/src/worker/index.ts`, build, upload the new zip.
 
@@ -60,6 +58,9 @@ Highlight, ask and send what you read to Obsidian, Notion or markdown.
 **Single purpose:**
 Lumen helps people read on the web: highlight and annotate passages on any page, ask about them,
 and keep them in their Lumen reading library.
+
+**Sign in for reviewers:** the demo sandbox needs no account. Google and GitHub sign in need
+`GOOGLE_CLIENT_ID`/`SECRET` and `GITHUB_CLIENT_ID`/`SECRET` as Worker secrets (see DEPLOY.md).
 
 **Homepage:** https://lumen.brgv95.workers.dev (change when the domain is live)
 **Support:** https://github.com/brgv-code/lumen/issues

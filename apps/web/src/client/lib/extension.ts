@@ -2,8 +2,8 @@
 
 /** The unpacked build pins this id with a manifest key. */
 export const DEV_EXTENSION_ID = "ffjconacpmnbadoeegamifkellcddfja";
-/** Set after the first Chrome Web Store upload (the store assigns the id): VITE_EXTENSION_STORE_ID. */
-export const STORE_EXTENSION_ID: string = import.meta.env.VITE_EXTENSION_STORE_ID ?? "";
+/** The Chrome Web Store build's id (assigned by the store). VITE_EXTENSION_STORE_ID overrides it. */
+export const STORE_EXTENSION_ID: string = import.meta.env.VITE_EXTENSION_STORE_ID || "hohicfgangllelfkhnbghegnbepjfkkk";
 /** The listing, once published: VITE_EXTENSION_STORE_URL. Until then the dashboard offers the zip. */
 export const STORE_URL: string = import.meta.env.VITE_EXTENSION_STORE_URL ?? "";
 const IDS = [STORE_EXTENSION_ID, DEV_EXTENSION_ID].filter(Boolean);

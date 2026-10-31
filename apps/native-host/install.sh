@@ -4,7 +4,7 @@
 # With no ids it allows both the unpacked build and the Chrome Web Store build.
 set -euo pipefail
 DEV_ID="ffjconacpmnbadoeegamifkellcddfja"   # unpacked build (fixed manifest key)
-STORE_ID=""                                 # Chrome Web Store build: fill in after the first upload
+STORE_ID="hohicfgangllelfkhnbghegnbepjfkkk"   # Chrome Web Store build
 if [[ $# -gt 0 ]]; then IDS=("$@"); else IDS=("$DEV_ID"); [[ -n "$STORE_ID" ]] && IDS+=("$STORE_ID"); fi
 ORIGINS=""
 for ID in "${IDS[@]}"; do ORIGINS+="${ORIGINS:+, }\"chrome-extension://$ID/\""; done
