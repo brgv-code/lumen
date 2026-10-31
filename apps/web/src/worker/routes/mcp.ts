@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import type { AppEnv, SelfFetch } from "../env";
 import { userForBearer } from "../lib/session";
 import { entitlement } from "../lib/plan";
+import { track } from "../lib/analytics";
 
 const SERVER = { name: "lumen", title: "Lumen reading library", version: "2.1.0" };
 const VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -223,7 +224,7 @@ export function mcpApp(fetchApp: (req: Request) => Promise<Response>) {
     }
     const origin = new URL(c.req.url).origin;
     const call: SelfFetch = (path, init) =>
-      fetchApp(new Request(origin + path, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...(init?.headers ?? {}) } }));
+      fetchApp(new Request(origin + path, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-lumen-via": "mcp", ...(init?.headers ?? {}) } }));
 
     let payload: unknown;
     try { payload = await c.req.json(); } catch { return c.json(rpcError(null, -32700, "Parse error"), 400); }
@@ -267,6 +268,7 @@ export function mcpApp(fetchApp: (req: Request) => Promise<Response>) {
               break;
             }
             c.executionCtx.waitUntil(c.env.DB.prepare("UPDATE api_tokens SET calls = calls + 1, last_tool = ?, kind = 'agent' WHERE id = ?").bind(tool.name, user.token_id).run());
+            track(c.env, c.executionCtx, user.id, "agent_call", { tool: tool.name, client: String(user.token_client ?? "unknown"), is_demo: user.is_demo === 1, plan: user.plan });
             try {
               const data = await tool.run((params.arguments ?? {}) as Json, call);
               out.push(rpcResult(m.id, {

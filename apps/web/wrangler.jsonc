@@ -22,6 +22,6 @@
   "ai": { "binding": "AI", "remote": true },
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "triggers": { "crons": ["17 */6 * * *"] },
-  "vars": { "DEMO_ENABLED": "true" },
+  "vars": { "DEMO_ENABLED": "true", "OWNER_EMAILS": "hello@bhargav.dev", "AI_SOFT_CAP": "60" },
   "observability": { "enabled": true }
 }

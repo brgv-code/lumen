@@ -36,8 +36,9 @@ export function entitlement(u: SessionUser & { trial_ends_at?: number | null }) 
 }
 
 export function aiDailyCap(u: SessionUser & { trial_ends_at?: number | null }) {
-  if (u.is_demo === 1) return 40;
-  return entitlement(u).pro ? 500 : 15;
+  if (u.is_demo === 1) return 30;
+  if (u.plan === "pro") return 500;
+  return entitlement(u).pro ? 100 : 15; // trial, then free
 }
 
 /** Throws 402 with a code the client turns into the paywall. */

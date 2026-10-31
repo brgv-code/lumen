@@ -9,6 +9,8 @@ export interface Profile {
   emailVerified: boolean;
   name: string;
   avatarUrl: string | null;
+  /** GitHub only: when the GitHub account was created (ms). */
+  accountCreatedAt?: number | null;
 }
 
 export function configured(env: Env): Record<Provider, boolean> {
@@ -94,7 +96,7 @@ export async function exchange(env: Env, provider: Provider, code: string, verif
   if (!tok.access_token) throw new Error(`github token: ${tok.error ?? "no token"}`);
   const h = { authorization: `Bearer ${tok.access_token}`, "user-agent": "lumen", accept: "application/vnd.github+json" };
   const u = await fetch("https://api.github.com/user", { headers: h }).then((r) =>
-    r.json<{ id: number; login: string; name?: string; avatar_url?: string }>(),
+    r.json<{ id: number; login: string; name?: string; avatar_url?: string; created_at?: string }>(),
   );
   const emails = await fetch("https://api.github.com/user/emails", { headers: h })
     .then((r) => (r.ok ? r.json<{ email: string; primary: boolean; verified: boolean }[]>() : []))
@@ -106,5 +108,6 @@ export async function exchange(env: Env, provider: Provider, code: string, verif
     emailVerified: Boolean(primary),
     name: u.name || u.login,
     avatarUrl: u.avatar_url ?? null,
+    accountCreatedAt: u.created_at ? Date.parse(u.created_at) : null,
   };
 }

@@ -3,11 +3,12 @@ import { addDays, levelFor, streaks } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, dayIn, fail, now, oneOf, str } from "../lib/util";
 import { toUser } from "../lib/map";
+import { isOwner } from "./owner";
 import { newApiToken, destroySession } from "../lib/session";
 
 export const me = new Hono<AppEnv>();
 
-me.get("/me", (c) => c.json({ user: toUser(c.get("user")), via: c.get("via") }));
+me.get("/me", (c) => c.json({ user: { ...toUser(c.get("user")), owner: isOwner(c.env, c.get("user")) }, via: c.get("via") }));
 
 me.patch("/me", async (c) => {
   const u = c.get("user");

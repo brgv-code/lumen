@@ -5,19 +5,22 @@ import { authorizeUrl, configured, exchange, type Provider } from "../lib/oauth"
 import { createSession, destroySession } from "../lib/session";
 import { id, now, sha256 } from "../lib/util";
 import { seedDemo } from "../lib/seed";
+import { SIGNUPS_PER_IP_PER_DAY, canonicalEmail, claimTrial, ensureDevice, ipHash, signupsFromIp, trialDecision } from "../lib/abuse";
+import { analyticsHost, analyticsKey, track } from "../lib/analytics";
 
 export const auth = new Hono<AppEnv>();
 
 const safeNext = (n?: string | null) => (n && n.startsWith("/") && !n.startsWith("//") ? n : "/app");
 
 auth.get("/providers", (c) =>
-  c.json({ ...configured(c.env), demo: c.env.DEMO_ENABLED !== "false" }),
+  c.json({ ...configured(c.env), demo: c.env.DEMO_ENABLED !== "false", analytics: analyticsKey(c.env) ? { key: analyticsKey(c.env), host: analyticsHost(c.env) } : null }),
 );
 
 auth.get("/:provider/start", async (c) => {
   const provider = c.req.param("provider") as Provider;
   if (!["google", "github"].includes(provider)) return c.notFound();
   if (!configured(c.env)[provider]) return c.redirect(`/login?error=${provider}_not_configured`);
+  ensureDevice(c);
   const origin = new URL(c.req.url).origin;
   const { url, state, verifier } = await authorizeUrl(c.env, provider, `${origin}/auth/${provider}/callback`);
   const opts = { httpOnly: true, secure: origin.startsWith("https"), sameSite: "Lax" as const, path: "/auth", maxAge: 600 };
@@ -53,18 +56,29 @@ auth.get("/:provider/callback", async (c) => {
     const byEmail = await db.prepare("SELECT id FROM users WHERE email = ? AND is_demo = 0").bind(profile.email).first<{ id: string }>();
     userId = byEmail?.id;
   }
+  const isNew = !userId;
   if (!userId) {
+    // abuse guards: a cap on new accounts per network, and one trial per person
+    const ip = await ipHash(c);
+    if ((await signupsFromIp(db, ip)) >= SIGNUPS_PER_IP_PER_DAY) return c.redirect("/login?error=signup_limit");
+    const input = { email: profile.email, emailVerified: profile.emailVerified, deviceId: ensureDevice(c), ip, githubCreatedAt: profile.accountCreatedAt };
+    const decision = await trialDecision(db, input);
     userId = id("usr_");
-    await db.prepare("INSERT INTO users (id, email, name, avatar_url, created_at) VALUES (?,?,?,?,?)")
-      .bind(userId, profile.emailVerified ? profile.email : null, profile.name, profile.avatarUrl, now()).run();
+    const t = now();
+    const email = profile.emailVerified ? profile.email : null;
+    await db.prepare("INSERT INTO users (id, email, name, avatar_url, created_at, email_canonical, signup_ip_hash, trial_ends_at, trial_note) VALUES (?,?,?,?,?,?,?,?,?)")
+      .bind(userId, email, profile.name, profile.avatarUrl, t, email ? canonicalEmail(email) : null, ip, decision.trial ? null : t, decision.note).run();
     await db.prepare("INSERT INTO collections (id, user_id, name, emoji, color, description, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)")
       .bind(id("col_"), userId, "Reading list", "📚", "sun", "Everything worth a second look.", now(), now()).run();
+    if (decision.trial) await claimTrial(db, userId, input);
+    track(c.env, c.executionCtx, userId, "user_signed_up", { provider, trial: decision.trial, trial_note: decision.note, $set: { plan: "free", signup_provider: provider, is_demo: false }, $set_once: { signed_up_at: new Date(t).toISOString() } });
   }
   if (!linked) {
     await db.prepare("INSERT OR IGNORE INTO accounts (provider, provider_account_id, user_id, created_at) VALUES (?,?,?,?)")
       .bind(provider, profile.providerAccountId, userId, now()).run();
   }
   await createSession(c, userId);
+  if (!isNew) track(c.env, c.executionCtx, userId, "user_logged_in", { provider });
   return c.redirect(saved.next);
 });
 
@@ -80,6 +94,7 @@ auth.post("/demo", async (c) => {
   await c.env.DB.prepare("INSERT INTO demo_creations (ip_hash, created_at) VALUES (?,?)").bind(ipHash, now()).run();
   const userId = await seedDemo(c.env.DB);
   await createSession(c, userId, 3);
+  track(c.env, c.executionCtx, userId, "demo_started", { $set: { is_demo: true, plan: "free" } });
   return c.json({ ok: true, next: "/app" });
 });
 

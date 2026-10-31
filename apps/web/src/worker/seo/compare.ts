@@ -17,7 +17,7 @@ export interface Compare {
   faq: [string, string][];
 }
 
-export const UPDATED = "2026-10-31";
+export const UPDATED = "2026-11-01";
 
 export const COMPARES: Compare[] = [
   {

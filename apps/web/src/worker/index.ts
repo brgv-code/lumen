@@ -20,6 +20,8 @@ import { seo, notFound } from "./seo/routes";
 import { requireUser } from "./lib/session";
 import { purgeDemos } from "./lib/seed";
 import { refreshActiveRadars } from "./lib/radar";
+import { eventFor, personProps, track } from "./lib/analytics";
+import { owner } from "./routes/owner";
 
 const app = new Hono<AppEnv>();
 let ctxRef: ExecutionContext | undefined;
@@ -50,7 +52,7 @@ const EXTENSION_VERSION = "2.6.1";
 app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", extension: EXTENSION_VERSION, time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*" }));
 
 app.route("/auth", auth);
-app.post("/billing/webhook", (c) => stripeWebhook(c.req.raw, c.env));
+app.post("/billing/webhook", (c) => stripeWebhook(c.req.raw, c.env, c.executionCtx));
 app.route("/mcp", mcpApp(internal));
 
 // The extension calls the API with a Bearer token from its own origin.
@@ -62,13 +64,20 @@ app.use("/api/v1/*", cors({
 }));
 app.use("/api/v1/*", requireUser);
 app.use("/api/v1/*", async (c, next) => {
-  const forward: Record<string, string> = { "content-type": "application/json", "x-lumen": "1" };
+  const forward: Record<string, string> = { "content-type": "application/json", "x-lumen": "1", "x-lumen-internal": "1" };
   const a = c.req.header("authorization");
   const ck = c.req.header("cookie");
   if (a) forward.authorization = a;
   else if (ck) forward.cookie = ck;
   c.set("selfFetch", (path, init) => internal(new Request(new URL(path, c.req.url), { ...init, headers: { ...forward, ...(init?.headers ?? {}) } })));
   await next();
+  // product events for successful writes; calls made inside another request are not counted twice
+  if (c.req.header("x-lumen-internal") === "1" || c.res.status >= 400) return;
+  const name = eventFor(c.req.method, new URL(c.req.url).pathname);
+  if (!name) return;
+  const u = c.get("user");
+  const source = c.req.header("x-lumen-via") === "mcp" ? "agent" : c.get("via") === "token" ? "extension" : "web";
+  track(c.env, c.executionCtx, u.id, name, { source, ...personProps(u) });
 });
 app.route("/api/v1", me);
 app.route("/api/v1", discover);
@@ -81,6 +90,7 @@ app.route("/api/v1/ideas", ideas);
 app.route("/api/v1/billing", billing);
 app.route("/api/v1/following", following);
 app.route("/api/v1/shares", shares);
+app.route("/api/v1/owner", owner);
 
 app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 

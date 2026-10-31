@@ -38,16 +38,16 @@ async function userFromCookie(env: Env, token: string): Promise<SessionUser | nu
 
 async function userFromToken(env: Env, token: string): Promise<SessionUser | null> {
   const hash = await sha256(token);
-  const row = await env.DB.prepare("SELECT u.*, t.id AS token_id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?")
+  const row = await env.DB.prepare("SELECT u.*, t.id AS token_id, t.client AS token_client FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?")
     .bind(hash)
-    .first<SessionUser & { token_id: string }>();
+    .first<SessionUser & { token_id: string; token_client: string | null }>();
   if (!row) return null;
   await env.DB.prepare("UPDATE api_tokens SET last_used_at = ? WHERE id = ?").bind(now(), row.token_id).run();
   return row;
 }
 
 export async function userForBearer(env: Env, token: string) {
-  return userFromToken(env, token) as Promise<(SessionUser & { token_id: string }) | null>;
+  return userFromToken(env, token) as Promise<(SessionUser & { token_id: string; token_client: string | null }) | null>;
 }
 
 /** Resolve the caller from a Bearer token (extension) or the session cookie (web). */

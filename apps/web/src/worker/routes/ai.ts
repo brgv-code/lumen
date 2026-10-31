@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { personProps, track } from "../lib/analytics";
 import { AI_ACTIONS } from "@lumen/core";
 import type { AppEnv, SessionUser } from "../env";
 import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
@@ -11,12 +12,30 @@ import { glowStmt } from "../lib/glow";
 
 export const ai = new Hono<AppEnv>();
 
-async function spend(db: D1Database, user: SessionUser) {
+/** Count a hosted answer against the reader's daily cap and the site wide budget, and pick the
+ *  model: past AI_SOFT_CAP answers a day across everyone, answers move to the small model so the
+ *  free Workers AI allowance lasts the whole day. */
+async function spend(c: Context<AppEnv>, feature: string, preferred: string): Promise<string> {
+  const user = c.get("user");
+  const db = c.env.DB;
   const day = dayIn(user.timezone);
-  const row = await db.prepare(`INSERT INTO ai_usage (user_id, day, count) VALUES (?,?,1)
-    ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 RETURNING count`).bind(user.id, day).first<{ count: number }>();
+  const [row, global] = await db.batch<{ count: number }>([
+    db.prepare(`INSERT INTO ai_usage (user_id, day, count) VALUES (?,?,1)
+      ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 RETURNING count`).bind(user.id, day),
+    db.prepare(`INSERT INTO ai_global (day, count) VALUES (?,1)
+      ON CONFLICT(day) DO UPDATE SET count = count + 1 RETURNING count`).bind(new Date().toISOString().slice(0, 10)),
+  ]);
+  const used = row.results[0]?.count ?? 0;
   const cap = aiDailyCap(user);
-  if ((row?.count ?? 0) > cap) fail(entitlement(user).pro ? 429 : 402, entitlement(user).pro ? "ai_quota" : "upgrade_required", `Daily limit of ${cap} hosted answers reached. Pro raises it to 500, or use Ollama or Claude on your machine for unlimited answers.`);
+  const source = c.req.header("x-lumen-via") === "mcp" ? "agent" : c.get("via") === "token" ? "extension" : "web";
+  if (used > cap) {
+    track(c.env, c.executionCtx, user.id, "ai_limit_hit", { feature, cap, source, ...personProps(user) });
+    fail(entitlement(user).pro ? 429 : 402, entitlement(user).pro ? "ai_quota" : "upgrade_required", `Daily limit of ${cap} hosted answers reached. Pro raises it to 500, or use Ollama or Claude on your machine for unlimited answers.`);
+  }
+  const soft = Number(c.env.AI_SOFT_CAP || 60);
+  const model = (global.results[0]?.count ?? 0) > soft ? DEFAULT_MODEL : preferred;
+  track(c.env, c.executionCtx, user.id, "ai_answer", { feature, model, small_model: model !== preferred, used_today: used, source, ...personProps(user) });
+  return model;
 }
 
 /** Streams Server Sent Events: data: {"response":"..."} ... data: [DONE] */
@@ -26,10 +45,10 @@ ai.post("/run", async (c) => {
   const action = oneOf(b.action, AI_ACTIONS);
   const text = str(b.text, 8000);
   if (!action || !text) fail(422, "bad_request", "Pass an action and the selected text.");
-  await spend(c.env.DB, u);
+  const model = await spend(c, action, c.env.AI_MODEL || CHAT_MODEL);
   let stream: ReadableStream;
   try {
-    stream = (await c.env.AI.run((c.env.AI_MODEL || CHAT_MODEL) as Parameters<Ai["run"]>[0], {
+    stream = (await c.env.AI.run(model as Parameters<Ai["run"]>[0], {
       messages: promptFor(action, text, { question: b.question, title: b.title, context: b.context }),
       stream: true,
       max_tokens: 400,
@@ -48,7 +67,7 @@ ai.post("/chat", async (c) => {
   const b = await body<{ question?: string; page?: { title?: string; url?: string; text?: string }; selection?: string; history?: { role: string; content: string }[] }>(c);
   const question = str(b.question, 1500);
   if (!question) fail(422, "bad_request", "Ask a question.");
-  await spend(c.env.DB, u);
+  const chatModel = await spend(c, b.page?.text ? "ask_page" : "ask_library", CHAT_MODEL);
   const sources = await retrieve(c.env.DB, u.id, `${question} ${b.selection ?? ""} ${b.page?.title ?? ""}`, 5);
   const pageText = (b.page?.text ?? "").replace(/\s+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
   const page = pageText ? `PAGE: "${b.page?.title ?? "Untitled"}" (${b.page?.url ?? ""})\n"""${pageText.slice(0, 12000)}"""` : "";
@@ -56,7 +75,7 @@ ai.post("/chat", async (c) => {
   const history = (b.history ?? []).slice(-6).filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
   let stream: ReadableStream;
   try {
-    stream = (await c.env.AI.run(CHAT_MODEL as Parameters<Ai["run"]>[0], {
+    stream = (await c.env.AI.run(chatModel as Parameters<Ai["run"]>[0], {
       messages: [
         { role: "system", content: LIBRARY_SYSTEM },
         ...history,
@@ -89,11 +108,11 @@ ai.post("/spark", async (c) => {
   const { results } = await db.prepare(`SELECT h.quote, h.note, i.id AS item_id, i.title FROM highlights h JOIN items i ON i.id = h.item_id
     WHERE h.user_id = ? ORDER BY h.created_at DESC LIMIT 30`).bind(u.id).all<{ quote: string; note: string | null; item_id: string; title: string }>();
   if (results.length < 3) fail(422, "not_enough", "Highlight at least 3 passages first: Spark needs something to notice.");
-  await spend(db, u);
+  const sparkModel = await spend(c, "spark", SPARK_MODEL);
   const list = results.map((r, k) => `${k + 1}. "${r.quote.slice(0, 300)}"${r.note ? ` (my note: ${r.note.slice(0, 200)})` : ""} [from: ${r.title}]`).join("\n");
   let out: { response?: unknown };
   try {
-    out = (await c.env.AI.run(SPARK_MODEL as Parameters<Ai["run"]>[0], {
+    out = (await c.env.AI.run(sparkModel as Parameters<Ai["run"]>[0], {
       messages: [{ role: "system", content: SPARK_SYSTEM }, { role: "user", content: list }],
       max_tokens: 900,
     } as never)) as { response?: unknown };

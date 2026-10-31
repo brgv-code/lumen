@@ -33,6 +33,8 @@ export interface User {
   shareSignals: boolean;
   reminders: boolean;
   createdAt: number;
+  /** Only on GET /me: the account can open the owner page. */
+  owner?: boolean;
 }
 
 export interface Item {

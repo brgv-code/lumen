@@ -2,6 +2,17 @@ import type { AIAction, Collection, Destination, Highlight, Idea, Item, ItemWith
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
+export interface OwnerSignup { id: string; name: string; email: string | null; plan: string; status: "trial" | "pro" | "free"; createdAt: number; trialNote: string | null; providers: string | null; items: number; highlights: number; ai: number; extension: number; agents: number; lastActive: number }
+export interface OwnerStats {
+  totals: { users: number; today: number; week: number; month: number; paying: number; trialing: number; demos_week: number };
+  active: { day: number; week: number };
+  funnel: { signedUp: number; saved: number; highlighted: number; extension: number; returned: number };
+  ai: { day: string; count: number }[];
+  aiSoftCap: number;
+  trialNotes: { note: string; n: number }[];
+  posthog: boolean;
+  signups: OwnerSignup[];
+}
 export interface Token { id: string; name: string; prefix: string; kind: string; client: string | null; calls?: number; lastTool?: string | null; lastUsedAt: number | null; createdAt: number }
 export interface Trend { id: string; topic: string; url: string; title: string; source: string; score: number; comments?: number; publishedAt?: number | null; saved?: boolean }
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
@@ -47,7 +58,8 @@ const qs = (o: Record<string, string | number | undefined | null | boolean>) => 
 };
 
 export const api = {
-  providers: () => req<{ google: boolean; github: boolean; demo: boolean }>("GET", "/auth/providers"),
+  providers: () => req<{ google: boolean; github: boolean; demo: boolean; analytics: { key: string; host: string } | null }>("GET", "/auth/providers"),
+  ownerStats: () => req<OwnerStats>("GET", "/api/v1/owner/stats"),
   demo: () => req<{ ok: true; next: string }>("POST", "/auth/demo", {}),
   logout: () => req<{ ok: true }>("POST", "/auth/logout", {}),
 
