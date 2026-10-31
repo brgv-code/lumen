@@ -62,9 +62,9 @@ and keep them in their Lumen reading library.
 **Sign in for reviewers:** the demo sandbox needs no account. Google and GitHub sign in need
 `GOOGLE_CLIENT_ID`/`SECRET` and `GITHUB_CLIENT_ID`/`SECRET` as Worker secrets (see DEPLOY.md).
 
-**Homepage:** https://lumen.brgv95.workers.dev (change when the domain is live)
+**Homepage:** https://readwithlumen.app
 **Support:** https://github.com/brgv-code/lumen/issues
-**Privacy policy:** https://lumen.brgv95.workers.dev/privacy
+**Privacy policy:** https://readwithlumen.app/privacy
 
 ## Permission justifications
 
@@ -107,7 +107,7 @@ the single purpose; not used to determine creditworthiness or for lending.
 > The extension works without an account: select text on any article and pick a colour in the
 > toolbar; highlights are kept in the browser and come back on reload.
 >
-> To test syncing: open https://lumen.brgv95.workers.dev/login, choose "Explore the demo
+> To test syncing: open https://readwithlumen.app/login, choose "Explore the demo
 > sandbox", go to Integrations, Extension tab, and press "Connect this browser's extension".
 > Highlights, saves and Ask then use the demo library. If the button does not appear, press
 > "Or create a token to paste" on the same tab and paste the token into the extension's settings

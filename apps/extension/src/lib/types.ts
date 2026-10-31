@@ -3,7 +3,7 @@ import type { AIAction, Collection, Highlight, Item, TextQuote } from "@lumen/co
 export type Provider = "lumen" | "ollama" | "openai" | "claude";
 
 export interface Settings {
-  apiBase: string;          // e.g. https://lumen.brgv95.workers.dev
+  apiBase: string;          // e.g. https://readwithlumen.app
   token: string;            // personal access token from the dashboard
   provider: Provider;
   ollamaBaseUrl: string;
@@ -42,7 +42,7 @@ export interface HelperSettings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  apiBase: "https://lumen.brgv95.workers.dev",
+  apiBase: "https://readwithlumen.app",
   token: "",
   provider: "lumen",
   ollamaBaseUrl: "http://localhost:11434",

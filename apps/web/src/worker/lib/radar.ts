@@ -4,7 +4,7 @@ import type { SessionUser } from "../env";
 import { id, now } from "./util";
 
 const STALE_MS = 6 * 3600_000;
-const UA = { "user-agent": "LumenRadar/1.0 (+https://lumen.brgv95.workers.dev)" };
+const UA = { "user-agent": "LumenRadar/1.0 (+https://readwithlumen.app)" };
 
 export interface TrendHit { url: string; title: string; source: "hn" | "devto"; score: number; comments: number; publishedAt: number | null }
 

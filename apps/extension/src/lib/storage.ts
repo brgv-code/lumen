@@ -7,6 +7,8 @@ const LOCAL = "lumen_local_highlights"; // offline mode: { [url]: Highlight[] }
 export async function getSettings(): Promise<Settings> {
   const r = await chrome.storage.local.get(SETTINGS);
   const saved = r[SETTINGS] ?? {};
+  // the old default address moved to readwithlumen.app; both serve the same accounts
+  if (saved.apiBase === "https://lumen.brgv95.workers.dev") saved.apiBase = DEFAULT_SETTINGS.apiBase;
   return {
     ...DEFAULT_SETTINGS,
     ...saved,

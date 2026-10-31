@@ -114,10 +114,7 @@ function footer(c: CanvasRenderingContext2D, p: Palette, x: number, y: number, w
   lampTile(c, x, y - s * 0.78, s * 0.9);
   c.fillStyle = p.ink; c.font = `600 ${s * 0.62}px Geist, system-ui`; c.fillText("lumen", x + s * 1.15, y - s * 0.12);
   c.fillStyle = p.ink3; c.font = `500 ${s * 0.4}px Geist, system-ui`; c.textAlign = "right";
-  // keep clear of the wordmark: drop the tagline when the card is narrow
-  const room = w - s * 4.2;
-  const full = "Read with Lumen  ·  lumen.brgv95.workers.dev";
-  c.fillText(c.measureText(full).width <= room ? full : "lumen.brgv95.workers.dev", x + w, y - s * 0.2); c.textAlign = "left";
+  c.fillText("readwithlumen.app", x + w, y - s * 0.2); c.textAlign = "left";
 }
 
 export async function ensureFonts() {

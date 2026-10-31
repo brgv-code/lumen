@@ -27,6 +27,18 @@ let envRef: Env | undefined;
 /** Call our own routes in process (used by MCP tools and a few compound endpoints). */
 const internal = (req: Request) => Promise.resolve(app.fetch(req, envRef!, ctxRef));
 
+// readwithlumen.app is the home. www and the old workers.dev address send public pages there with a
+// 301; the API, sign in, MCP and billing still answer on the old address for installs that use it.
+const HOME = "https://readwithlumen.app";
+app.use("*", async (c, next) => {
+  const u = new URL(c.req.url);
+  const old = u.hostname === "www.readwithlumen.app" || u.hostname === "lumen.brgv95.workers.dev";
+  if (old && (c.req.method === "GET" || c.req.method === "HEAD") && !/^\/(api|auth|mcp|billing)(\/|$)/.test(u.pathname)) {
+    return c.redirect(HOME + u.pathname + u.search, 301);
+  }
+  await next();
+});
+
 app.onError((err, c) => {
   if (err instanceof HTTPException) return err.getResponse();
   console.error(err);
@@ -34,7 +46,7 @@ app.onError((err, c) => {
 });
 
 /** Latest extension version, so older installs can say "update available". Bump with each release. */
-const EXTENSION_VERSION = "2.6.0";
+const EXTENSION_VERSION = "2.6.1";
 app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", extension: EXTENSION_VERSION, time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*" }));
 
 app.route("/auth", auth);

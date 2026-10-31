@@ -2,7 +2,7 @@
 // it small and tolerant of the many ways feeds are written.
 import { id, now } from "./util";
 
-const UA = { "user-agent": "LumenFollow/1.0 (+https://lumen.brgv95.workers.dev)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8" };
+const UA = { "user-agent": "LumenFollow/1.0 (+https://readwithlumen.app)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8" };
 const COMMON = ["/feed", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/rss", "/feed/", "/blog/rss.xml", "/blog/feed", "/blog/atom.xml"];
 
 const decode = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").trim();

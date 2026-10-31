@@ -1,6 +1,6 @@
 # API
 
-Base URL: `https://lumen.brgv95.workers.dev`. JSON in, JSON out. Errors are always
+Base URL: `https://readwithlumen.app`. JSON in, JSON out. Errors are always
 `{ "error": { "code": "snake_case", "message": "Human sentence." } }`.
 
 ## Authentication

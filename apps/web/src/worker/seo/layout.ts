@@ -2,7 +2,7 @@
 
 export const SITE = {
   name: "Lumen",
-  url: "https://lumen.brgv95.workers.dev",
+  url: "https://readwithlumen.app",
   tagline: "Read slowly. Keep what glows.",
   description: "Lumen is a reading companion: save articles, highlight and annotate them, ask a model, and send what matters to Obsidian, Notion or markdown. Free and open source.",
   github: "https://github.com/brgv-code/lumen",

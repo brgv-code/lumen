@@ -5,14 +5,14 @@ Claude Desktop, Cursor, your own agent) can search your library, read articles t
 your highlights, see what is trending in your topics, save links, highlight passages and suggest
 what to write next.
 
-- **Endpoint:** `https://lumen.brgv95.workers.dev/mcp`
+- **Endpoint:** `https://readwithlumen.app/mcp`
 - **Transport:** Streamable HTTP (JSON responses), protocol versions `2025-06-18`, `2025-03-26`, `2024-11-05`
 - **Auth:** `Authorization: Bearer <key>`. Create a key with **Connect agent** in the dashboard
   (or Integrations). Revoke it in Settings at any time. OAuth discovery is planned.
 
 ## Claude Code
 ```bash
-claude mcp add --transport http lumen https://lumen.brgv95.workers.dev/mcp \
+claude mcp add --transport http lumen https://readwithlumen.app/mcp \
   --header "Authorization: Bearer lum_your_key"
 ```
 Then ask: *"Use Lumen to do my weekly reading review."*
@@ -25,7 +25,7 @@ Claude Desktop connects to remote servers with a header through `mcp-remote`. Ad
   "mcpServers": {
     "lumen": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://lumen.brgv95.workers.dev/mcp", "--header", "Authorization:Bearer lum_your_key"]
+      "args": ["-y", "mcp-remote", "https://readwithlumen.app/mcp", "--header", "Authorization:Bearer lum_your_key"]
     }
   }
 }
@@ -36,7 +36,7 @@ Claude Desktop connects to remote servers with a header through `mcp-remote`. Ad
 ```json
 {
   "mcpServers": {
-    "lumen": { "url": "https://lumen.brgv95.workers.dev/mcp", "headers": { "Authorization": "Bearer lum_your_key" } }
+    "lumen": { "url": "https://readwithlumen.app/mcp", "headers": { "Authorization": "Bearer lum_your_key" } }
   }
 }
 ```
@@ -65,7 +65,7 @@ Claude Desktop connects to remote servers with a header through `mcp-remote`. Ad
 
 ## Raw protocol
 ```bash
-curl -s https://lumen.brgv95.workers.dev/mcp \
+curl -s https://readwithlumen.app/mcp \
   -H "Authorization: Bearer lum_your_key" -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```

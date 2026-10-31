@@ -6,7 +6,7 @@ Lumen is a reading companion for the web. Save what you want to read, highlight 
 colours, leave margin notes, ask a model about any passage, and send what matters to the notes
 app you already use: Obsidian, Notion, a markdown file or a webhook.
 
-**Live preview:** https://lumen.brgv95.workers.dev (press "Explore the demo" for a sandbox account)
+**Live preview:** https://readwithlumen.app (press "Explore the demo" for a sandbox account)
 
 Free plan forever for reading, highlighting and syncing; every new account gets 7 days of Pro
 (Spark, Radar, agents over MCP, analytics, Notion and webhooks).

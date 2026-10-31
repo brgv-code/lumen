@@ -22,6 +22,12 @@ npm run deploy -w @lumen/web                          # vite build + wrangler de
 npm run preview -w @lumen/web                         # versions upload: a preview URL, production untouched
 ```
 
+**Domain.** Production is `https://readwithlumen.app`, a Workers custom domain (`routes` in
+`wrangler.jsonc`; Cloudflare creates the DNS records and certificate on deploy). `www` and the old
+`lumen.brgv95.workers.dev` send public pages there with a 301. The API, `/auth`, `/mcp`, `/billing`
+and the app itself still answer on the old address, so older extension installs and saved MCP
+configs keep working. Extension 2.6.1 moves a stored old address to the new one.
+
 ## SSO
 Create the OAuth apps, then set secrets:
 
