@@ -47,6 +47,7 @@ class Lumen {
   aiText = "";
 
   start() {
+    document.querySelectorAll("style[data-lumen-ui]").forEach((n) => n.remove());
     const style = document.createElement("style");
     style.textContent = MARK_CSS;
     style.setAttribute("data-lumen-ui", "");
@@ -114,6 +115,9 @@ class Lumen {
 
   applySettings() {
     this.host.classList.toggle("dark", resolveTheme(this.settings.theme ?? "system") === "dark");
+    const [a, da] = ({ soft: [".26", ".15"], medium: [".38", ".24"], strong: [".55", ".34"] } as const)[this.settings.markStrength ?? "soft"];
+    document.documentElement.style.setProperty("--lumen-a", a);
+    document.documentElement.style.setProperty("--lumen-da", da);
     this.renderHelper();
     this.adaptMarks();
   }

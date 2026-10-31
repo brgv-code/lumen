@@ -100,7 +100,7 @@ export default function Panel() {
 
   return (
     <div className="panel-root" style={{ display: "grid", gridTemplateRows: "auto auto minmax(0, 1fr) auto", gridTemplateColumns: "minmax(0, 1fr)", height: "100vh" }}>
-      <div style={{ padding: "12px 12px 8px" }}><Header /></div>
+      <div style={{ padding: "12px 12px 8px", display: "grid", gap: 8 }}><Header /><UpdateNote /></div>
       <div style={{ padding: "0 12px 8px" }}>
         <div className="tabs" role="tablist">
           {([["ask", "Ask"], ["page", "This page"], ["you", "For you"]] as [Tab, string][]).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>)}
@@ -211,11 +211,23 @@ export default function Panel() {
   );
 }
 
+function UpdateNote() {
+  const [latest, setLatest] = useState<string | null>(null);
+  useEffect(() => {
+    send<{ settings: Settings }>({ type: "GET_SETTINGS" }).then((r) => fetch(`${r.settings.apiBase}/api/health`)).then((r) => r.json()).then((j: { extension?: string }) => setLatest(j.extension ?? null)).catch(() => {});
+  }, []);
+  const mine = chrome.runtime.getManifest().version;
+  const older = latest && latest.split(".").map(Number).some((n, i, a) => { const m = mine.split(".").map(Number); for (let k = 0; k < a.length; k++) { if ((m[k] ?? 0) !== a[k]) return (m[k] ?? 0) < a[k]; } return false; });
+  if (!older) return null;
+  return <div className="update-note" title="brave://extensions or chrome://extensions → reload Lumen, from apps/extension/.output/chrome-mv3">⬆ You are on v{mine}; v{latest} is out. Reload Lumen in your extensions page.</div>;
+}
+
 function Header() {
   return (
     <div className="row">
       <img src="/icons/icon48.png" width={24} height={24} alt="" style={{ borderRadius: 7 }} />
       <b style={{ color: "var(--ink)", fontSize: 16, letterSpacing: "-0.03em" }}>lumen</b>
+      <span className="mono muted" style={{ fontSize: 10.5 }}>v{chrome.runtime.getManifest().version}</span>
       <span className="sp" />
       <button className="icon-btn" title="Settings" onClick={() => chrome.runtime.openOptionsPage()}>⚙</button>
       {FLOAT && <button className="icon-btn" title="Close (Esc)" onClick={closeFloat}>✕</button>}

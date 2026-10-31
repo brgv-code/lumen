@@ -74,7 +74,9 @@ export default function Options() {
             <div className="surface stack">
               <span style={{ fontSize: 13, fontWeight: 500 }}>Highlights</span>
               <div className="seg">{([["auto", "Adapt to the page"], ["fill", "Marker fill"], ["underline", "Underline"]] as const).map(([v, l]) => <button key={v} aria-pressed={(s.markStyle ?? "auto") === v} onClick={() => { const n = { ...s, markStyle: v }; setS(n); save(n); }}>{l}</button>)}</div>
-              <div className="grid2">
+              <span style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>Strength</span>
+              <div className="seg">{([["soft", "Soft"], ["medium", "Medium"], ["strong", "Strong"]] as const).map(([v, l]) => <button key={v} aria-pressed={(s.markStrength ?? "soft") === v} onClick={() => { const n = { ...s, markStrength: v }; setS(n); save(n); }}>{l}</button>)}</div>
+              <div className="grid2" style={{ ["--lumen-a" as string]: ({ soft: ".26", medium: ".38", strong: ".55" })[s.markStrength ?? "soft"], ["--lumen-da" as string]: ({ soft: ".15", medium: ".24", strong: ".34" })[s.markStrength ?? "soft"] }}>
                 <div className="mark-demo light"><span className="eyebrow">Light page</span><p>Most reading is sorting. <mark className={`m-${s.markStyle === "underline" ? "ul" : "fill"} m-iris`}>A margin note is a conversation</mark> with yourself.</p></div>
                 <div className="mark-demo dark"><span className="eyebrow" style={{ color: "#8b8b93" }}>Dark page</span><p>Most reading is sorting. <mark className={`m-${s.markStyle === "underline" ? "ul" : s.markStyle === "fill" ? "fill" : "tint"} m-iris`}>A margin note is a conversation</mark> with yourself.</p></div>
               </div>

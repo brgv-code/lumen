@@ -31,7 +31,9 @@ app.onError((err, c) => {
   return c.json({ error: { code: "internal", message: "Something went wrong on our side." } }, 500);
 });
 
-app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", time: new Date().toISOString() }));
+/** Latest extension version, so older installs can say "update available". Bump with each release. */
+export const EXTENSION_VERSION = "2.5.3";
+app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", extension: EXTENSION_VERSION, time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*" }));
 
 app.route("/auth", auth);
 app.post("/billing/webhook", (c) => stripeWebhook(c.req.raw, c.env));

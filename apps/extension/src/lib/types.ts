@@ -20,6 +20,7 @@ export interface Settings {
   theme: "system" | "light" | "dark";   // drives every Lumen surface
   panel: "floating" | "docked";         // floating over the page, or Chrome's side panel
   markStyle: "auto" | "fill" | "underline"; // auto adapts to dark pages
+  markStrength: "soft" | "medium" | "strong";
 }
 
 export const TOOLBAR_ACTIONS = ["highlight", "note", "explain", "expand", "summarize", "define", "ask", "save", "copy"] as const;
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
   panel: "floating",
   markStyle: "auto",
+  markStrength: "soft",
 };
 
 export interface PageState {

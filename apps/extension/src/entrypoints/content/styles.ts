@@ -128,22 +128,19 @@ textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px r
 
 // In the page itself: only the marks, nothing else.
 export const MARK_CSS = `
+/* Translucent on every page, so the text underneath always stays readable.
+   --lumen-a (light pages) and --lumen-da (dark pages) come from the Strength setting. */
 mark.lumen-mark { color: inherit !important; border-radius: 3px; padding: 0 1px; cursor: pointer;
-  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: filter 150ms ease, background-color 150ms ease; }
-mark.lumen-mark:hover { filter: saturate(1.4) brightness(1.05); }
-/* light pages: soft marker fills */
-mark.lumen-sun { background: #ffe58a !important; } mark.lumen-mint { background: #bdefd5 !important; }
-mark.lumen-iris { background: #dcd6ff !important; } mark.lumen-peach { background: #ffd5c6 !important; }
-mark.lumen-sky { background: #cfe2ff !important; }
-/* dark pages (light text): translucent tint plus a coloured underline, so the text stays readable */
-mark.lumen-mark.lumen-dark { box-shadow: inset 0 -2px 0 var(--lm) !important; }
-mark.lumen-dark.lumen-sun { --lm: #ffd34d; background: rgba(255, 211, 77, .22) !important; }
-mark.lumen-dark.lumen-mint { --lm: #3fd39a; background: rgba(63, 211, 154, .2) !important; }
-mark.lumen-dark.lumen-iris { --lm: #a99cff; background: rgba(138, 123, 255, .26) !important; }
-mark.lumen-dark.lumen-peach { --lm: #ff8a6b; background: rgba(255, 138, 107, .22) !important; }
-mark.lumen-dark.lumen-sky { --lm: #6fa8ff; background: rgba(91, 155, 255, .24) !important; }
+  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-color 150ms ease; }
+mark.lumen-sun   { --lc: 255 196 0;   background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
+mark.lumen-mint  { --lc: 30 200 130;  background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
+mark.lumen-iris  { --lc: 125 105 255; background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
+mark.lumen-peach { --lc: 255 110 80;  background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
+mark.lumen-sky   { --lc: 60 135 255;  background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
+mark.lumen-mark:hover { background: rgb(var(--lc) / calc(var(--lumen-a, .28) + .12)) !important; }
+/* dark pages: a fainter tint plus a thin coloured underline */
+mark.lumen-mark.lumen-dark { background: rgb(var(--lc) / var(--lumen-da, .16)) !important; box-shadow: inset 0 -2px 0 rgb(var(--lc) / .85) !important; }
+mark.lumen-mark.lumen-dark:hover { background: rgb(var(--lc) / calc(var(--lumen-da, .16) + .1)) !important; }
 /* underline style (any page) */
-mark.lumen-mark.lumen-ul { background: transparent !important; border-radius: 0; padding: 0; box-shadow: inset 0 -3px 0 var(--lm) !important; }
-mark.lumen-ul.lumen-sun { --lm: #ffc61a; } mark.lumen-ul.lumen-mint { --lm: #2fc489; } mark.lumen-ul.lumen-iris { --lm: #8a7bff; }
-mark.lumen-ul.lumen-peach { --lm: #ff7a57; } mark.lumen-ul.lumen-sky { --lm: #4d90ff; }
+mark.lumen-mark.lumen-ul { background: transparent !important; border-radius: 0; padding: 0; box-shadow: inset 0 -2px 0 rgb(var(--lc) / .9) !important; }
 `;
