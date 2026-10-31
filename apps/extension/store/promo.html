@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- 440x280 small promo tile -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Newsreader:opsz,wght@6..72,400&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;width:440px;height:280px;overflow:hidden}
+body{font-family:Geist,system-ui,sans-serif;position:relative;
+  background:radial-gradient(360px 240px at 100% 100%,#ff7a3d 0%,rgba(255,122,61,0) 70%),radial-gradient(300px 200px at 0% 0%,#ffd36b 0%,rgba(255,211,107,0) 70%),#fff0df}
+body::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(140,70,0,.16) 1px,transparent 1.2px);background-size:14px 14px}
+.brand{position:absolute;left:30px;top:30px;display:flex;align-items:center;gap:12px}
+.brand img{width:46px;height:46px;filter:drop-shadow(0 8px 14px rgba(255,106,26,.5))}
+.brand b{font-size:30px;font-weight:600;letter-spacing:-.03em;color:#141416}
+h1{position:absolute;left:30px;top:96px;margin:0;font-size:25px;line-height:1.18;font-weight:600;letter-spacing:-.02em;color:#141416;width:250px}
+.pill{position:absolute;padding:7px 12px;border-radius:12px;background:#fff;font:400 15px Newsreader,Georgia,serif;color:#141416;white-space:nowrap;
+  box-shadow:0 14px 26px -14px rgba(90,40,0,.45)}
+.pill mark{border-radius:3px;padding:0 2px;color:inherit}
+.a{left:30px;top:200px;transform:rotate(-2deg)} .a mark{background:rgba(255,196,0,.4)}
+.b{left:236px;top:160px;transform:rotate(3deg)} .b mark{background:rgba(180,90,255,.3)}
+.c{left:250px;top:216px;transform:rotate(-1.5deg)} .c mark{background:rgba(0,185,200,.3)}
+.wheel{position:absolute;right:30px;top:32px;width:40px;height:40px;border-radius:99px;background:conic-gradient(#ff4d4d,#ffd34d,#3fd39a,#2cc6d4,#5b9bff,#bb7bff,#ff6fa5,#ff4d4d);box-shadow:0 8px 16px -8px rgba(0,0,0,.4)}
+.wheel::after{content:"";position:absolute;inset:11px;border-radius:99px;background:#fff0df}
+</style></head><body>
+<div class="brand"><img src="icon-128.png" alt=""><b>lumen</b></div>
+<div class="wheel"></div>
+<h1>Highlight anything. Ask what it means.</h1>
+<div class="pill a"><mark>Slow reading compounds.</mark></div>
+<div class="pill b"><mark>a note to yourself</mark></div>
+<div class="pill c"><mark>one page, one pen</mark></div>
+</body></html>

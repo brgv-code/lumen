@@ -1,0 +1,130 @@
+/* Lumen design tokens. Components read only these. */
+:root {
+  /* canvas → surface → raised: three steps of one neutral, no borders between them */
+  --canvas: #ededec;
+  --well: #e3e3e1;
+  --surface: #f6f6f5;
+  --raised: #ffffff;
+  --hairline: rgba(14, 14, 16, 0.07);
+  --hairline-strong: rgba(14, 14, 16, 0.12);
+
+  --ink: #0e0e10;
+  --ink-2: #3a3a3f;
+  --ink-3: #8c8c92;
+  --ink-4: #b9b9be;
+  --on-ink: #ffffff;
+
+  /* meaning colours: solid / tint / marker */
+  --lamp: #ff8a1f;
+  --lamp-hi: #ffb53d;
+  --lamp-lo: #ff6a1a;
+  --lamp-tint: #fff3dd;
+  --sun-mark: #ffe58a;
+  --hl-a: 0.42;
+
+  --iris: #6d5bff;
+  --iris-tint: #f1efff;
+  --iris-mark: #dcd6ff;
+
+  --mint: #14a86f;
+  --mint-tint: #e2f7ec;
+  --mint-mark: #bdefd5;
+
+  --sky: #2f7bff;
+  --sky-tint: #e7f0ff;
+  --sky-mark: #cfe2ff;
+
+  --peach: #f2603d;
+  --peach-tint: #ffede6;
+  --peach-mark: #ffd5c6;
+
+  --danger: #e5484d;
+
+  /* type */
+  --font-ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-read: "Newsreader", "Iowan Old Style", Georgia, serif;
+
+  /* shape */
+  --r-section: 28px;
+  --r-card: 18px;
+  --r-inner: 12px;
+  --r-control: 10px;
+  --r-chip: 999px;
+
+  /* depth */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 18px 40px -16px rgba(0, 0, 0, 0.18);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 16px -8px rgba(0, 0, 0, 0.12);
+  --shadow-pill: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
+  --shadow-tile: 0 10px 18px -6px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  --key-ink: linear-gradient(180deg, #2b2b30 0%, #0e0e10 100%);
+  --key-lamp: linear-gradient(180deg, var(--lamp-hi) 0%, var(--lamp-lo) 100%);
+  --key-iris: linear-gradient(180deg, #8a7bff 0%, #5b48f5 100%);
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #111113;
+    --well: #1b1b1f;
+    --surface: #18181b;
+    --raised: #222226;
+    --hairline: rgba(255, 255, 255, 0.07);
+    --hairline-strong: rgba(255, 255, 255, 0.12);
+    --ink: #f4f4f5;
+    --ink-2: #c9c9ce;
+    --ink-3: #8b8b93;
+    --ink-4: #5c5c63;
+    --on-ink: #0e0e10;
+    --lamp-tint: #3a2a12;
+    --sun-mark: rgba(255, 213, 74, 0.38);
+    --hl-a: 0.36;
+    --iris-tint: #25213f;
+    --iris-mark: rgba(140, 125, 255, 0.4);
+    --mint-tint: #12291f;
+    --mint-mark: rgba(46, 204, 142, 0.34);
+    --sky-tint: #142238;
+    --sky-mark: rgba(80, 150, 255, 0.36);
+    --peach-tint: #34201a;
+    --peach-mark: rgba(255, 130, 100, 0.36);
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -16px rgba(0, 0, 0, 0.7);
+    --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+    --shadow-pill: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    --key-ink: linear-gradient(180deg, #ffffff 0%, #e4e4e7 100%);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas: #111113;
+  --well: #1b1b1f;
+  --surface: #18181b;
+  --raised: #222226;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --hairline-strong: rgba(255, 255, 255, 0.12);
+  --ink: #f4f4f5;
+  --ink-2: #c9c9ce;
+  --ink-3: #8b8b93;
+  --ink-4: #5c5c63;
+  --on-ink: #0e0e10;
+  --lamp-tint: #3a2a12;
+  --hl-a: 0.36;
+  --sun-mark: rgba(255, 213, 74, 0.38);
+  --iris-tint: #25213f;
+  --iris-mark: rgba(140, 125, 255, 0.4);
+  --mint-tint: #12291f;
+  --mint-mark: rgba(46, 204, 142, 0.34);
+  --sky-tint: #142238;
+  --sky-mark: rgba(80, 150, 255, 0.36);
+  --peach-tint: #34201a;
+  --peach-mark: rgba(255, 130, 100, 0.36);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -16px rgba(0, 0, 0, 0.7);
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+  --shadow-pill: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --key-ink: linear-gradient(180deg, #ffffff 0%, #e4e4e7 100%);
+  color-scheme: dark;
+}

@@ -28,3 +28,9 @@ npm-debug.log*
 
 # Type coverage
 coverage/
+
+# Web build and local Cloudflare state
+apps/web/dist/
+.wrangler/
+.dev.vars
+.output-store

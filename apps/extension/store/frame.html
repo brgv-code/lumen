@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- 1280x800 store screenshot: ?img=raw.png&h=Headline&s=Subline -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;width:1280px;height:800px;overflow:hidden}
+body{font-family:Geist,system-ui,sans-serif;position:relative;
+  background:radial-gradient(900px 500px at 85% 110%,#ff8a4c 0%,rgba(255,138,76,0) 60%),radial-gradient(700px 420px at 0% -10%,#ffd36b 0%,rgba(255,211,107,0) 60%),#fff1e2}
+body::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(140,70,0,.16) 1px,transparent 1.2px);background-size:18px 18px;mask:linear-gradient(180deg,#000,transparent 70%)}
+.cap{position:absolute;left:64px;top:38px;right:64px;display:flex;align-items:center;gap:18px}
+.cap img{width:52px;height:52px;filter:drop-shadow(0 10px 16px rgba(255,106,26,.45))}
+.cap h1{margin:0;font-size:34px;font-weight:600;letter-spacing:-.02em;color:#141416}
+.cap p{margin:4px 0 0;font-size:17px;color:#6b5a4b}
+.win{position:absolute;left:50%;top:132px;transform:translateX(-50%);width:1140px;border-radius:18px;overflow:hidden;background:#fff;
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 40px 80px -30px rgba(90,40,0,.45),0 0 0 1px rgba(0,0,0,.06)}
+.bar{height:34px;display:flex;align-items:center;gap:7px;padding:0 14px;background:#f3f1ee;border-bottom:1px solid #e7e3dd}
+.bar i{width:11px;height:11px;border-radius:99px;background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
+.bar span{margin-left:14px;flex:1;max-width:520px;height:20px;border-radius:7px;background:#fff;font-size:12px;color:#888;display:flex;align-items:center;padding-left:10px}
+.win img{display:block;width:1140px}
+</style></head><body>
+<div class="cap"><img src="icon-128.png" alt=""><div><h1 id="h"></h1><p id="s"></p></div></div>
+<div class="win"><div class="bar"><i></i><i></i><i></i><span id="u"></span></div><img id="img" alt=""></div>
+<script>
+const q=new URLSearchParams(location.search);
+h.textContent=q.get('h');s.textContent=q.get('s');u.textContent=q.get('u')||'';img.src=q.get('img');
+</script></body></html>
