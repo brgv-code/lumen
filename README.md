@@ -1,141 +1,54 @@
 # Lumen
 
-A minimal Chrome extension thats a reading assistant. Highlight text to explain, summarize, or define it, powered by a local Ollama model or any OpenAI-compatible API. Results can be saved to a local library, no account or backend required.
+**Read slowly. Keep what glows.**
 
-Lumen tooltip appearing over selected text
+Lumen is a reading companion for the web. Save what you want to read, highlight it in five
+colours, leave margin notes, ask a model about any passage, and send what matters to the notes
+app you already use: Obsidian, Notion, a markdown file or a webhook.
 
-![Lumen](extension/public/lumen.gif)   
-## Features
+**Live preview:** https://lumen.brgv95.workers.dev (press "Try the live demo" for a sandbox account)
 
-- **Text selection toolbar**: highlight any text and a floating toolbar appears with Explain, Summarize, and Define actions
-- **Streaming responses**: results appear progressively as the model generates them
-- **Save to library**: save any result (text snippet + AI response) with its source page and timestamp
-- **Bookmarks**: save pages with one click from the selection toolbar, without triggering any AI call
-- **Library popup**: click the toolbar icon to browse saved items and bookmarks in reverse-chronological order
-- **Settings page**: toggle between Ollama and OpenAI-compatible APIs, set model name, base URL, and API key
-- **Shadow DOM isolation**: the floating UI is injected into a shadow root so it never conflicts with page styles
-- **Fully local**: no auth, no backend, no telemetry; all data stays in `chrome.storage.local`
+## Why
+
+Web clippers make highlighting a mode (so you cannot copy while highlighting), drop every clip
+into a new note, duplicate highlights when you clip a page twice, and cannot touch PDFs. Lumen:
+
+- **never takes over your selection.** A toolbar appears next to it; Ctrl+C always works.
+- **sends highlights to the note you choose.** Each collection points at one destination.
+- **writes each highlight once.** A delivery ledger remembers what every destination received.
+- **works with any notes app.** Markdown is the format; integrations are just places it goes.
+- **lets you pick the model.** Lumen's hosted model, Ollama, any OpenAI compatible API, or Claude via your local CLI.
+
+## What is in the box
+
+| Part | What it does |
+|---|---|
+| Web app | Landing page, SSO (Google, GitHub), dashboard, library, reader view with highlights and notes, collections, Spark writing ideas, integrations, settings, export |
+| API | Cloudflare Worker (Hono) on D1, Workers AI for margin answers; see [docs/API.md](docs/API.md) |
+| Extension | Selection toolbar on any page, persistent highlights, target collection picker, auto send to Obsidian, four AI providers |
+| Claude helper | Native messaging host that runs `claude -p --model <haiku/sonnet/opus>` |
+| Core | Shared anchoring, citation links, markdown formats and glow rules, with tests |
+
+## Quick start
+```bash
+npm install
+npm run db:migrate:local -w @lumen/web
+npm run build -w @lumen/web && npm run dev:api -w @lumen/web   # http://localhost:8787
+npm run build -w @lumen/extension                               # load apps/extension/.output/chrome-mv3
+```
+Node 22+ required. Full instructions, SSO setup and deployment: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## Docs
+- [Plan](docs/PLAN.md): problem, principles, scope, roadmap
+- [Architecture](docs/ARCHITECTURE.md): system diagram, decisions, request flows, security
+- [State diagrams](docs/STATES.md): item lifecycle, delivery ledger, sessions, toolbar, AI, glow
+- [API](docs/API.md): every endpoint, payload and error code
+- [Data model](docs/DATA_MODEL.md): tables and relations
+- [Deploy](docs/DEPLOY.md): local, Cloudflare, SSO, extension, Claude helper
 
 ## Stack
+Cloudflare Workers + D1 + Workers AI · Hono · React 18 + Vite · WXT (Manifest V3) · TypeScript.
 
-- [WXT](https://wxt.dev) — Web Extension framework (Manifest V3)
-- React 18 + TypeScript
-- Tailwind CSS (injected into shadow DOM, no page style leakage)
-
-## Getting started
-
-### Prerequisites
-
-- Node.js 18+
-- Chrome 114+
-- [Ollama](https://ollama.com) running locally **or** an OpenAI-compatible API key
-
-### Install and build
-
-```bash
-npm install --ignore-scripts
-npx wxt prepare
-npm run build
-```
-
-The built extension is output to `.output/chrome-mv3/`.
-
-### Load in Chrome
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked**
-4. Select the `.output/chrome-mv3/` folder
-
-### Dev mode (auto-rebuild on save)
-
-```bash
-npm run dev
-```
-
-Then load `.output/chrome-mv3/` as above. WXT will rebuild on file changes; reload the extension in `chrome://extensions` to pick up updates, then refresh the tab.
-
-## Ollama setup
-
-Ollama blocks requests from `chrome-extension://` origins by default. You need to allow them:
-
-```bash
-OLLAMA_ORIGINS='chrome-extension://*' ollama serve
-```
-
-To make this permanent on macOS, add it to your shell profile:
-
-```bash
-# ~/.zshrc
-export OLLAMA_ORIGINS='chrome-extension://*'
-```
-
-Then pull a model if you haven't already:
-
-```bash
-ollama pull llama3
-```
-
-The default model is `llama3`. You can change it in the Lumen settings page.
-
-## OpenAI-compatible APIs
-
-In the Lumen settings page, switch the provider to **OpenAI-compatible**, set the base URL and API key, and enter the model name. Works with OpenAI, Groq, Together, Mistral, LM Studio, and any other API that follows the `/v1/chat/completions` streaming spec.
-
-## Project structure
-
-```
-extension/
-├── entrypoints/
-│   ├── content/          # Content script — selection detection, tooltip, result panel
-│   ├── background/       # Service worker — API calls, storage operations
-│   ├── popup/            # Toolbar popup — saved items library
-│   └── options/          # Settings page
-├── lib/
-│   ├── ai.ts             # Ollama + OpenAI streaming clients
-│   ├── storage.ts        # chrome.storage.local helpers
-│   └── types.ts          # Shared types and message union
-└── public/
-    └── icons/
-```
-
-## How it works
-
-- The **content script** detects text selections and renders the floating toolbar and result panel inside a Shadow DOM (so page CSS can't interfere).
-- Action buttons send an `AI_REQUEST` message to the **background service worker**, which owns all `fetch` calls to the AI provider (avoids CORS issues from content scripts).
-- The background streams response chunks back to the content script via `chrome.tabs.sendMessage`, which updates the result panel progressively.
-- Save/bookmark operations also go through the background worker to `chrome.storage.local`.
-
-## Roadmap
-
-**Reading**
-
-- Summarize the full page with one click (extract visible text or `document.body.innerText`)
-- Ask a custom question about the selected text: free-form input in the tooltip
-- "Chat with page" sidebar: ongoing conversation about the current page's content
-- Reading mode that strips away navigation and ads before summarizing
-
-**Library**
-
-- Search and filter saved items by keyword, action type, or domain
-- Tag items manually and filter by tag
-- Export library to JSON or Markdown
-- Sync library across devices via a self-hosted endpoint (keep it optional, no cloud dependency)
-
-**AI**
-
-- Per-action system prompts: let the user customize the prompt for Explain, Summarize, and Define separately
-- Multiple model profiles: switch between models quickly without going into settings
-- Response length control (short / detailed)
-- Translate selection to a target language
-
-**UX**
-
-- Keyboard shortcut to trigger the last-used action on current selection
-- Pin the result panel so it stays open while scrolling
-- Right-click context menu as an alternative to the floating toolbar
-- Dark/light theme toggle independent of system preference
-
-## License
-
-MIT
+## Version 1
+The original Lumen was a small extension for explaining selected text with Ollama. Its demo is
+kept at [docs/media/lumen-v1-demo.gif](docs/media/lumen-v1-demo.gif).

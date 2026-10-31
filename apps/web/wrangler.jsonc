@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lumen",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "lumen-db", "database_id": "47eaaa2b-a68e-47ad-92a7-98cc662c2b48", "migrations_dir": "migrations" }
+  ],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["17 3 * * *"] },
+  "vars": { "DEMO_ENABLED": "true" },
+  "observability": { "enabled": true }
+}
