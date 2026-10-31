@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import { ExternalLink, Plus, Radar as RadarIcon, RefreshCw, X, Check, MessageSquare } from "lucide-react";
-import { api, type Trend } from "../../lib/api";
+import { api, type Trend, agentLabel } from "../../lib/api";
 import { useAsync, timeAgo, hostOf } from "../../lib/hooks";
 import { Empty, useToast } from "../../components/ui";
 import { useApp } from "./Layout";
 
 export default function Radar() {
   const radar = useAsync(() => api.radar(), []);
-  const { refresh, openAgent } = useApp();
+  const { refresh, agents, agentAction } = useApp();
   const toast = useToast();
   const [topic, setTopic] = useState("");
   const [filter, setFilter] = useState<string | null>(null);
@@ -85,8 +85,10 @@ export default function Radar() {
 
       <section className="panel row" style={{ flexWrap: "wrap", background: "var(--iris-tint)" }}>
         <span className="tile tile--iris"><RadarIcon /></span>
-        <div style={{ flex: 1, minWidth: 220 }}><h2>Let an agent watch this for you</h2><p className="small muted">Connect Claude and ask: “What is trending in my topics this week that connects to what I have been highlighting? Suggest two posts.”</p></div>
-        <button className="key key--iris" onClick={openAgent}>Connect agent</button>
+        <div style={{ flex: 1, minWidth: 220 }}><h2>{agents.length ? `Ask ${agentLabel(agents[0])} about this` : "Let an agent watch this for you"}</h2><p className="small muted">{agents.length ? "Copy the prompt and paste it into your agent:" : "Connect Claude and ask:"} “What is trending in my topics this week that connects to what I have been highlighting? Suggest two posts.”</p></div>
+        {agents.length
+          ? <button className="key key--iris" onClick={async () => { await navigator.clipboard.writeText("Use Lumen: what is trending in my topics this week that connects to what I have been highlighting? Suggest two posts."); toast("Prompt copied"); }}>Copy prompt</button>
+          : <button className="key key--iris" onClick={agentAction}>Connect agent</button>}
       </section>
     </div>
   );

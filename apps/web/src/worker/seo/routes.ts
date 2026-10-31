@@ -210,6 +210,7 @@ const LEGAL: Record<string, { title: string; body: string }> = {
   changelog: {
     title: "Changelog",
     body: `<h1>Changelog</h1>
+<h2>2.4 · ${UPDATED}</h2><ul><li><b>Share cards:</b> turn a highlight, your reading streak or a collection into a clean card sized for X, LinkedIn, Threads, Bluesky, WhatsApp and stories, with a public link that unfurls into the same card and a small “Read with Lumen” pill.</li><li><b>Your agents:</b> a page for every connected MCP agent with its last activity, tool calls and the last tool it used; the dashboard now says when an agent is connected instead of asking you to connect one.</li><li><b>Extension page</b> with a one click download, status and shortcuts. Integrations is split into tabs.</li><li>Edit a collection's name, icon, colour and description.</li></ul>
 <h2>2.3 · ${UPDATED}</h2><ul><li><b>Following:</b> follow any blog and hear when it publishes, in the dashboard and as extension notifications.</li><li><b>Ask</b> answers from the page you are on first, then your library, with sources.</li><li>The extension panel floats over the page; one theme setting drives every surface; highlights stay readable on dark sites.</li></ul>
 <h2>2.2 · ${UPDATED}</h2><ul><li>Freemium: the free plan keeps reading, highlighting and syncing; every new account gets 7 days of Pro.</li><li>A guided tour for first time readers.</li><li>Extension: dark mode, create collections and notes from the popup, ask about the page, Summarize is back in the toolbar.</li><li>Licensed AGPL-3.0.</li></ul>
 <h2>2.1 · ${UPDATED}</h2><ul><li><b>Connect your agent:</b> Lumen is now an MCP server. Claude Code, Claude Desktop, Cursor and other clients can search your library, read with your highlights, save links and suggest content.</li><li><b>Radar:</b> trending stories this week in the topics you read about (Hacker News, dev.to).</li><li><b>Daily and weekly reads:</b> a plan that fits your time, plus highlights worth revisiting.</li><li><b>Reminders</b> for articles you started, with snooze, in the dashboard and the extension.</li><li><b>Readers like you:</b> anonymous, aggregate suggestions from people whose libraries overlap with yours.</li><li><b>Analytics:</b> 12 week heatmap, minutes and words read, topics, sources, highlight colours, reading hours.</li><li>Docs, comparisons and answers pages; sitemap, robots and llms.txt.</li></ul>
@@ -237,7 +238,7 @@ seo.get("/sitemap.xml", () => new Response(
 ));
 
 seo.get("/robots.txt", () => new Response(
-  `User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /api/\nDisallow: /auth/\nDisallow: /mcp\n\nSitemap: ${SITE.url}/sitemap.xml\n`,
+  `User-agent: *\nAllow: /\nAllow: /s/\nDisallow: /app\nDisallow: /api/\nDisallow: /auth/\nDisallow: /mcp\n\nSitemap: ${SITE.url}/sitemap.xml\n`,
   { headers: { "content-type": "text/plain; charset=utf-8" } },
 ));
 

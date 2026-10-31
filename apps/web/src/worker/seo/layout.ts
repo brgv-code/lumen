@@ -64,6 +64,8 @@ export interface PageOpts {
   jsonLd?: object[];
   nav?: "compare" | "answers" | "docs" | "";
   extraHead?: string;
+  /** absolute URL of the link preview image; defaults to the site card */
+  ogImage?: string;
   noindex?: boolean;
 }
 
@@ -89,7 +91,7 @@ ${o.noindex ? '<meta name="robots" content="noindex">' : ""}
 <meta property="og:title" content="${esc(o.title)}">
 <meta property="og:description" content="${esc(o.description)}">
 <meta property="og:url" content="${url}">
-<meta property="og:image" content="${SITE.url}/og.png">
+<meta property="og:image" content="${o.ogImage ?? `${SITE.url}/og.png`}"><meta name="twitter:image" content="${o.ogImage ?? `${SITE.url}/og.png`}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#EDEDEC">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">

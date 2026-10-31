@@ -6,8 +6,11 @@ import { ConnectAgent } from "../../components/ConnectAgent";
 import { PaywallModal, ProChip } from "../../components/Pro";
 import { Tour, APP_TOUR, tourDone, markTour } from "../../components/Tour";
 import { Crown, MessageCircle, Heart } from "lucide-react";
+import { ShareModal } from "../../components/ShareModal";
+import type { CardData } from "../../lib/cards";
+import type { Token } from "../../lib/api";
 import { Logo, Modal, useToast } from "../../components/ui";
-import { api } from "../../lib/api";
+import { api, agentLabel } from "../../lib/api";
 import "../../styles/app.css";
 
 interface Ctx {
@@ -19,6 +22,10 @@ interface Ctx {
   openAgent: () => void;
   setUser: (u: User) => void;
   startTour: () => void;
+  agents: Token[];
+  /** Opens the agents page when one is connected, otherwise the connect flow. */
+  agentAction: () => void;
+  share: (s: { data: CardData; refId?: string; title: string }) => void;
 }
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
@@ -32,6 +39,8 @@ export default function Layout() {
   const [paywall, setPaywall] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [follows, setFollows] = useState(0);
+  const [agents, setAgents] = useState<Token[]>([]);
+  const [shareState, setShareState] = useState<{ data: CardData; refId?: string; title: string } | null>(null);
   const nav = useNavigate();
   const toast = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -39,6 +48,7 @@ export default function Layout() {
   const refresh = () => {
     api.stats().then(setStats).catch(() => {});
     api.following().then((r) => setFollows(r.unseenTotal)).catch(() => {});
+    api.tokens().then((r) => setAgents(r.data.filter((t) => t.kind === "agent"))).catch(() => {});
     api.collections().then((r) => setCollections(r.data)).catch(() => {});
   };
 
@@ -62,7 +72,8 @@ export default function Layout() {
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
 
   return (
-    <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true), setUser, startTour: () => setTourOpen(true) }}>
+    <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true), setUser, startTour: () => setTourOpen(true),
+      agents, agentAction: () => (agents.length ? nav("/app/agents") : setAgentOpen(true)), share: setShareState }}>
       <div className="shell">
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
@@ -135,8 +146,15 @@ export default function Layout() {
             <span className="spacer" />
             {user.isDemo && <span className="chip chip--iris hide-sm">Demo sandbox</span>}
             <button className="icon-btn hide-sm" title="Take the tour" aria-label="Take the tour" onClick={() => setTourOpen(true)}>?</button>
-            <a className="key key--ghost key--sm hide-sm" data-tour="extension" href="/app/integrations"><Puzzle size={15} /> Extension</a>
-            <button className="key key--iris key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
+            <NavLink className="key key--ghost key--sm hide-sm" data-tour="extension" to="/app/extension"><Puzzle size={15} /> Extension</NavLink>
+            {agents.length ? (
+              <button className="key key--ghost key--sm" data-tour="agent" onClick={() => nav("/app/agents")} title="Your connected agents">
+                <span className="dot" style={{ color: agents.some((a) => a.lastUsedAt && Date.now() - a.lastUsedAt < 864e5) ? "var(--mint)" : "var(--ink-4)" }} />
+                <Bot size={15} /> <span className="hide-sm">{agents.length === 1 ? agentLabel(agents[0]) : `${agents.length} agents`}</span>
+              </button>
+            ) : (
+              <button className="key key--iris key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
+            )}
             <button className="key key--sm" data-tour="save" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
           </div>
           <Outlet />
@@ -150,7 +168,8 @@ export default function Layout() {
           <NavLink to="/app/settings"><Settings size={19} />More</NavLink>
         </nav>
       </div>
-      <ConnectAgent open={agentOpen} pro={user.pro} onClose={() => setAgentOpen(false)} />
+      <ConnectAgent open={agentOpen} pro={user.pro} onClose={() => { setAgentOpen(false); refresh(); }} />
+      {shareState && <ShareModal data={shareState.data} refId={shareState.refId} title={shareState.title} onClose={() => setShareState(null)} />}
       <PaywallModal message={paywall} onClose={() => setPaywall(null)} />
       <Tour open={tourOpen} steps={APP_TOUR} name={user.name.replace(/\s*\((demo|test)\)$/, "").split(" ")[0]} onClose={() => { setTourOpen(false); markTour(user.id); }} />
       <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast(<>Saved. <span className="muted">+1 glow</span></>, "glow"); nav(`/app/read/${id}`); }} />

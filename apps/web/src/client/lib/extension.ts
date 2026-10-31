@@ -18,4 +18,5 @@ function send<T>(msg: unknown, timeout = 1500): Promise<T | null> {
 export const extension = {
   ping: () => send<{ ok: boolean; version: string; connected: boolean; apiBase: string }>({ type: "LUMEN_PING" }),
   connect: (token: string) => send<{ ok: boolean }>({ type: "LUMEN_CONNECT", token }),
+  openOptions: () => send<{ ok: boolean }>({ type: "LUMEN_OPEN_OPTIONS" }),
 };

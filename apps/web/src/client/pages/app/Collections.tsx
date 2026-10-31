@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import { Link } from "react-router-dom";
-import type { Destination } from "@lumen/core";
-import { FolderHeart, Plus, Send, Trash2 } from "lucide-react";
+import type { Collection, Destination } from "@lumen/core";
+import { FolderHeart, Plus, Send, Trash2, Pencil, Share2 } from "lucide-react";
+import { CollectionEditor } from "../../components/CollectionEditor";
 import { api } from "../../lib/api";
 import { Empty, Modal, useToast } from "../../components/ui";
 import { useApp } from "./Layout";
@@ -11,7 +12,8 @@ const EMOJI = ["📚", "✍️", "🎨", "🧠", "🌱", "🔬", "💡", "🧭",
 const COLORS = ["sun", "mint", "iris", "peach", "sky"];
 
 export default function Collections() {
-  const { collections, refresh } = useApp();
+  const { collections, refresh, share, user } = useApp();
+  const [editing, setEditing] = useState<Collection | null>(null);
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [dests, setDests] = useState<Destination[]>([]);
@@ -46,8 +48,10 @@ export default function Collections() {
             return (
               <div key={c.id} className="item-card pop" style={{ animationDelay: `${k * 40}ms`, padding: 20 }}>
                 <div className="row">
-                  <span className={`tile tile--lg tile--${c.color}`} style={{ fontSize: 24 }}><span style={{ position: "relative", zIndex: 1 }}>{c.emoji}</span></span>
+                  <button className={`tile tile--lg tile--${c.color}`} style={{ fontSize: 24, border: 0, cursor: "pointer" }} title="Change icon" onClick={() => setEditing(c)}><span style={{ position: "relative", zIndex: 1 }}>{c.emoji}</span></button>
                   <span className="spacer" />
+                  <button className="icon-btn" aria-label="Edit collection" title="Edit name, icon, colour" onClick={() => setEditing(c)}><Pencil size={15} /></button>
+                  <button className="icon-btn" aria-label="Share collection" title="Share as a card" onClick={async () => { const r = await api.items({ collection: c.id, limit: 30 }); share({ title: `${c.emoji} ${c.name}`, refId: c.id, data: { kind: "collection", owner: user.name.replace(/\s*\((demo|test)\)$/, ""), name: c.name, emoji: c.emoji, description: c.description, total: c.itemCount, items: r.data.map((i) => ({ title: i.title, site: i.siteName, url: i.url })) } as never }); }}><Share2 size={15} /></button>
                   <button className="icon-btn" aria-label="Delete collection" onClick={async () => { if (confirmDelete(c.name)) { await api.deleteCollection(c.id); refresh(); toast("Collection deleted"); } }}><Trash2 size={15} /></button>
                 </div>
                 <Link to={`/app/collections/${c.id}`} style={{ display: "grid", gap: 4 }}>
@@ -71,6 +75,7 @@ export default function Collections() {
           })}
         </div>
       )}
+      <CollectionEditor collection={editing} onClose={() => setEditing(null)} onSaved={refresh} />
       <Modal open={open} onClose={() => setOpen(false)} title="New collection">
         <form className="stack" onSubmit={create}>
           <label className="field"><span>Name</span><input className="input" required autoFocus placeholder="Essay: reading should feel joyful" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>

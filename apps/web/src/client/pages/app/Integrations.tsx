@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import type { Destination } from "@lumen/core";
-import { Check, Cpu, Download, FileText, KeyRound, NotebookPen, Plus, Puzzle, RefreshCw, Send, Trash2, Webhook, Copy } from "lucide-react";
+import { Check, Cpu, Download, FileText, KeyRound, NotebookPen, Plus, Puzzle, RefreshCw, Send, Trash2, Webhook, Copy, Bot } from "lucide-react";
 import { api } from "../../lib/api";
 import { Modal, useToast } from "../../components/ui";
 import { timeAgo } from "../../lib/hooks";
 import { useApp } from "./Layout";
+import { useSearchParams } from "react-router-dom";
+import { Segmented } from "../../components/ui";
 import { extension } from "../../lib/extension";
 import { ProChip } from "../../components/Pro";
 
@@ -22,7 +24,10 @@ const getKey = (id: string) => { try { return localStorage.getItem(keyFor(id)) ?
 
 export default function Integrations() {
   const toast = useToast();
-  const { openAgent, user } = useApp();
+  const { agentAction, agents, user } = useApp();
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get("tab") as "notes" | "agents" | "extension" | "models") || "notes";
+  const setTab = (t: string) => setParams(t === "notes" ? {} : { tab: t }, { replace: true });
   const [dests, setDests] = useState<Destination[] | null>(null);
   const [adding, setAdding] = useState<Kind | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,13 +72,22 @@ export default function Integrations() {
     <div className="page">
       <PageHero
         pill={<><Send size={13} /> Integrations</>}
-        lead="Send highlights"
-        pay="where you think."
-        sub="A destination is a note. Point collections at it and Lumen appends only highlights it has not received yet. Clip a page ten times; each passage lands once."
+        lead="Everything Lumen"
+        pay="connects to."
+        sub="Notes apps receive your highlights, agents read your library, the extension brings Lumen to every page, and models answer your questions."
         mesh="mesh-mint"
-        tiles={[["tile--iris", <NotebookPen />], ["tile--ink", <FileText />], ["tile--sky", <Download />], ["tile--mint", <Webhook />]]}
-        actions={<button className="key key--iris key--sm" onClick={openAgent}>Connect agent</button>}
+        tiles={[["tile--iris", <NotebookPen />], ["tile--ink", <Bot />], ["tile--sky", <Puzzle />], ["tile--lamp", <Cpu />]]}
       />
+
+      <Segmented label="Integrations" value={tab} onChange={setTab} options={[
+        { value: "notes", label: <span className="row" style={{ gap: 6 }}><NotebookPen size={14} /> Notes apps {dests?.length ? <span className="chip" style={{ height: 18 }}>{dests.length}</span> : null}</span> },
+        { value: "agents", label: <span className="row" style={{ gap: 6 }}><Bot size={14} /> Agents {agents.length ? <span className="chip chip--mint" style={{ height: 18 }}>{agents.length}</span> : null}</span> },
+        { value: "extension", label: <span className="row" style={{ gap: 6 }}><Puzzle size={14} /> Extension</span> },
+        { value: "models", label: <span className="row" style={{ gap: 6 }}><Cpu size={14} /> Models</span> },
+      ]} />
+
+      {tab === "notes" && (<>
+      <p className="muted" style={{ marginTop: -6 }}>A destination is a note. Point a collection at it and new highlights are appended once each, never duplicated.</p>
 
       <section className="grid-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
         {(Object.keys(KINDS) as Kind[]).map((k) => (
@@ -114,19 +128,33 @@ export default function Integrations() {
         </div>
       </section>
 
-      <div className="grid-2">
-        <ExtensionPanel />
+      </>)}
+
+      {tab === "agents" && (
+        <section className="panel row" style={{ flexWrap: "wrap", gap: 16 }}>
+          <span className="tile tile--lg tile--iris"><Bot /></span>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <h2>{agents.length ? `${agents.length} agent${agents.length === 1 ? "" : "s"} connected` : "No agents yet"}</h2>
+            <p className="small muted" style={{ marginTop: 4 }}>{agents.length ? agents.map((a) => a.client ?? a.name).join(", ") : "Give Claude Code, Claude Desktop, Cursor or any MCP client your library."}</p>
+          </div>
+          <button className="key key--iris" onClick={agentAction}>{agents.length ? "Manage agents" : "Connect an agent"}</button>
+        </section>
+      )}
+
+      {tab === "extension" && <ExtensionPanel />}
+
+      {tab === "models" && (
         <section className="panel">
-          <div className="row" style={{ marginBottom: 12 }}><span className="tile tile--lamp"><Cpu /></span><h2>Models and agents</h2><span className="spacer" /><button className="key key--iris key--sm" onClick={openAgent}>Connect agent</button></div>
+          <div className="row" style={{ marginBottom: 12 }}><span className="tile tile--lamp"><Cpu /></span><h2>Models</h2></div>
+          <p className="small muted" style={{ marginBottom: 12 }}>Which model answers Explain, Expand and Define is set in the extension's settings. Ask always uses Lumen, because your library lives here.</p>
           <div className="stack small">
             <Model name="Lumen (Workers AI)" chip="default" text="Hosted on Cloudflare. 100 answers a day on Reader, more on Pro." />
             <Model name="Ollama" chip="local" text="Runs on your machine. Set it in the extension; start Ollama with OLLAMA_ORIGINS='chrome-extension://*'." />
             <Model name="OpenAI compatible" chip="your key" text="OpenAI, Groq, Mistral, LM Studio: any /v1/chat/completions endpoint." />
             <Model name="Claude (local CLI)" chip="claude -p" text="The Lumen helper runs claude -p with the model you pick, through Chrome native messaging." />
-            <Model name="Your agent (MCP)" chip="/mcp" text="Claude Code, Claude Desktop, Cursor or any MCP client can search, read, save and analyse your library." />
           </div>
         </section>
-      </div>
+      )}
 
       <AddDestination kind={adding} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); load(); toast("Destination added"); }} />
     </div>
@@ -150,7 +178,7 @@ function ObsidianKey({ id }: { id: string }) {
   );
 }
 
-function ExtensionPanel() {
+export function ExtensionPanel() {
   const toast = useToast();
   const [token, setToken] = useState<string | null>(null);
   const [ext, setExt] = useState<{ ok: boolean; version: string; connected: boolean; apiBase: string } | null | undefined>(undefined);
@@ -186,7 +214,7 @@ function ExtensionPanel() {
              : <button className="key key--lamp key--sm" disabled={busy} onClick={connect}><Puzzle size={14} /> {busy ? "Connecting…" : "Connect this browser's extension"}</button>
       ) : (
         <ol className="small" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-          <li>Build it: <code className="mono">npm run build -w @lumen/extension</code>, open <code className="mono">chrome://extensions</code> (or brave://extensions), turn on Developer mode, Load unpacked: <code className="mono">apps/extension/.output/chrome-mv3</code>.</li>
+          <li><a href="/downloads/lumen-extension.zip" download>Download the extension</a> and unzip it. Open <code className="mono">chrome://extensions</code> (or brave://extensions, arc://extensions), turn on Developer mode, choose Load unpacked and pick the unzipped folder.</li>
           <li>Reload this page: a Connect button appears and links it in one click.</li>
           <li>Select text on any page: highlight, note, ask, copy. Pick the collection from the popup.</li>
         </ol>

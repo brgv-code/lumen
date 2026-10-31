@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import type { Highlight, Item } from "@lumen/core";
 import { citeForClipboard } from "@lumen/core";
-import { Copy, ExternalLink, Heart, Trash2, Highlighter } from "lucide-react";
+import { Copy, ExternalLink, Heart, Trash2, Highlighter, Share2 } from "lucide-react";
+import { useApp } from "../pages/app/Layout";
 import { hostOf, timeAgo } from "../lib/hooks";
 import { useToast } from "./ui";
 
@@ -60,6 +61,8 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
   onDelete?: () => void; onNote?: (note: string | null) => void; onColor?: (c: string) => void;
 }) {
   const toast = useToast();
+  const { share, user } = useApp();
+  const shareIt = () => share({ title: `“${h.quote.slice(0, 80)}”`, refId: h.id, data: { kind: "highlight", quote: h.quote, note: h.note, title, url, site: h.item?.siteName ?? null, color: h.color, owner: user.name.replace(/\s*\((demo|test)\)$/, "") } });
   const copy = async () => {
     await navigator.clipboard.writeText(citeForClipboard({ quote: h.quote, note: h.note, title, url }));
     toast("Copied with citation");
@@ -79,6 +82,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
             {["sun", "mint", "iris", "peach", "sky"].map((c) => <button key={c} className={`swatch-${c}`} aria-label={`Colour ${c}`} aria-pressed={h.color === c} onClick={() => onColor(c)} />)}
           </div>
         )}
+        <button className="icon-btn" onClick={shareIt} aria-label="Share as a card" title="Share as a card"><Share2 size={15} /></button>
         <button className="icon-btn" onClick={copy} aria-label="Copy with citation" title="Copy with citation"><Copy size={15} /></button>
         <a className="icon-btn" href={url} target="_blank" rel="noreferrer" aria-label="Open source"><ExternalLink size={15} /></a>
         {onDelete && <button className="icon-btn" onClick={onDelete} aria-label="Delete highlight"><Trash2 size={15} /></button>}

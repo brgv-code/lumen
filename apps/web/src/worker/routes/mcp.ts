@@ -266,6 +266,7 @@ export function mcpApp(fetchApp: (req: Request) => Promise<Response>) {
               out.push(rpcResult(m.id, { content: [{ type: "text", text: `Agent access is part of Lumen Pro and the 7 day trial has ended. Upgrade at ${origin}/app/upgrade to keep using Lumen from your agent.` }], isError: true }));
               break;
             }
+            c.executionCtx.waitUntil(c.env.DB.prepare("UPDATE api_tokens SET calls = calls + 1, last_tool = ?, kind = 'agent' WHERE id = ?").bind(tool.name, user.token_id).run());
             try {
               const data = await tool.run((params.arguments ?? {}) as Json, call);
               out.push(rpcResult(m.id, {

@@ -15,7 +15,7 @@ export const APP_TOUR: TourStep[] = [
   { target: "nav-following", title: "Blogs you follow", body: "Follow your favourite blogs. Lumen checks them every few hours and tells you when they publish something new.", place: "right" },
   { target: "nav-ask", title: "Ask your library", body: "Ask anything about what you have read. Answers quote your own highlights and notes, with sources.", place: "right" },
   { target: "nav-radar", title: "Radar and Spark", body: "Radar watches trending stories in your topics; Spark turns your highlights into writing ideas.", place: "right" },
-  { target: "agent", title: "Connect your agent", body: "Give Claude, Cursor or any MCP agent your library: it can review your week and suggest what to write.", place: "bottom" },
+  { target: "agent", title: "Your agents", body: "Connect Claude, Cursor or any MCP agent to your library, or see the ones already connected and what they have used.", place: "bottom" },
   { target: "extension", title: "Stay on the page", body: "The extension adds a tiny toolbar when you select text (Explain, Expand, Summary, Note, Save), a side panel to ask your library, and an optional page helper.", place: "bottom" },
   { target: "trial", title: "Your 7 days of Pro", body: "Every feature is unlocked for your first week. After that your library and highlights stay free.", place: "right" },
 ];

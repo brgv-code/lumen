@@ -18,6 +18,7 @@ export default defineBackground(() => {
         const s = await getSettings();
         return reply({ ok: true, version: chrome.runtime.getManifest().version, connected: Boolean(s.token), apiBase: s.apiBase });
       }
+      if (msg?.type === "LUMEN_OPEN_OPTIONS") { await chrome.runtime.openOptionsPage(); return reply({ ok: true }); }
       if (msg?.type === "LUMEN_CONNECT" && typeof msg.token === "string" && msg.token.startsWith("lum_") && origin) {
         await saveSettings({ token: msg.token, apiBase: origin });
         buildMenus();

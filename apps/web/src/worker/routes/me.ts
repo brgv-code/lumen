@@ -61,7 +61,7 @@ me.get("/tags", async (c) => {
 });
 
 me.get("/tokens", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT id, name, prefix, kind, client, last_used_at AS lastUsedAt, created_at AS createdAt FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC").bind(c.get("user").id).all();
+  const { results } = await c.env.DB.prepare("SELECT id, name, prefix, kind, client, calls, last_tool AS lastTool, last_used_at AS lastUsedAt, created_at AS createdAt FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC").bind(c.get("user").id).all();
   return c.json({ data: results });
 });
 

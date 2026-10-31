@@ -11,6 +11,8 @@ import { ai, ideas } from "./routes/ai";
 import { me } from "./routes/me";
 import { discover } from "./routes/discover";
 import { following } from "./routes/following";
+import { shares } from "./routes/shares";
+import { sharePage, shareImage } from "./seo/share-page";
 import { refreshDueFeeds } from "./lib/feeds";
 import { mcpApp } from "./routes/mcp";
 import { billing, stripeWebhook } from "./routes/billing";
@@ -32,7 +34,7 @@ app.onError((err, c) => {
 });
 
 /** Latest extension version, so older installs can say "update available". Bump with each release. */
-export const EXTENSION_VERSION = "2.5.3";
+const EXTENSION_VERSION = "2.5.4";
 app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", extension: EXTENSION_VERSION, time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*" }));
 
 app.route("/auth", auth);
@@ -66,8 +68,13 @@ app.route("/api/v1/ai", ai);
 app.route("/api/v1/ideas", ideas);
 app.route("/api/v1/billing", billing);
 app.route("/api/v1/following", following);
+app.route("/api/v1/shares", shares);
 
 app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
+
+// Public share pages.
+app.get("/s/:id/og.jpg", (c) => shareImage(c.env, c.req.param("id")));
+app.get("/s/:id", (c) => sharePage(c.env, c.req.param("id"), c.executionCtx));
 
 // Crawlable pages (compare, answers, docs, legal, sitemap, robots, llms.txt).
 app.route("/", seo);

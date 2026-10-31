@@ -538,3 +538,23 @@
 @media (max-width: 900px) { .grid-2[style*="300px"] { grid-template-columns: 1fr !important; } }
 .answer-md .md-quote { margin: 0 0 10px; padding: 2px 0 2px 12px; border-left: 3px solid var(--lamp); font-family: var(--font-read); }
 .answer-md .md-link, .md-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* share */
+.modal:has(.share) { width: min(980px, 100%); }
+.share { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.share__preview { position: relative; width: 100%; max-height: 62vh; border-radius: 16px; overflow: hidden; background: var(--well); box-shadow: var(--shadow-card); justify-self: center; }
+.share__preview canvas { width: 100%; height: 100%; display: block; object-fit: contain; }
+.share__platforms { display: flex; flex-wrap: wrap; gap: 6px; }
+.share__platforms button { height: 32px; padding: 0 12px; border-radius: 99px; border: 0; cursor: pointer; font: 500 13px var(--font-ui); background: var(--well); color: var(--ink-2); }
+.share__platforms button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.theme-dot { width: 28px; height: 28px; border-radius: 9px; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px var(--hairline-strong); transition: transform 160ms var(--ease-spring); }
+.theme-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--lamp); transform: scale(1.06); }
+.theme-dot--lamp { background: linear-gradient(135deg, #ffd27a, #ff8f5a); }
+.theme-dot--iris { background: linear-gradient(135deg, #e3dcff, #7d6bff); }
+.theme-dot--light { background: #ededec; }
+.theme-dot--dark { background: #111113; }
+@media (max-width: 860px) { .share { grid-template-columns: 1fr; } .share__preview { max-height: 46vh; } }
+.emoji-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.emoji-grid button { aspect-ratio: 1; border: 0; border-radius: 9px; background: var(--well); font-size: 18px; cursor: pointer; transition: transform 140ms var(--ease-spring); }
+.emoji-grid button:hover { transform: scale(1.12); }
+.emoji-grid button[aria-pressed="true"] { background: var(--raised); box-shadow: 0 0 0 2px var(--lamp); }

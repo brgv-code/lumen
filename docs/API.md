@@ -26,7 +26,7 @@ Base URL: `https://lumen.brgv95.workers.dev`. JSON in, JSON out. Errors are alwa
 | DELETE | `/api/v1/me` | cookie only | deletes everything |
 | GET | `/api/v1/stats` | | streak, best streak, glow today, goal, total, 7 day series, counts, level |
 | GET | `/api/v1/tags` | | `[{ name, count }]` |
-| GET | `/api/v1/tokens` | | token metadata (never the secret) |
+| GET | `/api/v1/tokens` | | token metadata (never the secret), with `client`, `calls` and `lastTool` for agents |
 | POST | `/api/v1/tokens` | `{ name }`, cookie only | `{ id, token }` shown once |
 | DELETE | `/api/v1/tokens/:id` | | |
 | GET | `/api/v1/export` | | everything as a JSON download |
@@ -117,6 +117,15 @@ Webhook payload:
 | POST | `/api/v1/following/notify` | | new posts not announced yet, marked announced (used by extension notifications) |
 
 Feeds are checked by Cron every 6 hours (oldest first) and whenever Following is opened.
+
+## Shares
+| Method | Path | Body / query | Notes |
+|---|---|---|---|
+| GET | `/api/v1/shares` | | your public share links |
+| POST | `/api/v1/shares` | `{ kind: highlight\|progress\|collection, refId, title, payload, image? }` | snapshot of what you chose to share plus a 1200x630 JPEG or PNG data URL (900 KB max); reuses the link for the same kind and refId |
+| DELETE | `/api/v1/shares/:id` | | the public page stops working |
+
+Public: `GET /s/:id` (page with Open Graph tags and a "Read with Lumen" pill) and `GET /s/:id/og.jpg` (the preview image). Cards are drawn in the browser on a canvas; only the snapshot and the link image are stored.
 
 ## MCP
 `POST /mcp` speaks MCP over Streamable HTTP with a Bearer key. See [MCP.md](MCP.md).

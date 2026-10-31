@@ -22,6 +22,8 @@ import NotFound from "./pages/NotFound";
 const Upgrade = lazy(() => import("./pages/app/Upgrade"));
 const Ask = lazy(() => import("./pages/app/Ask"));
 const Following = lazy(() => import("./pages/app/Following"));
+const Agents = lazy(() => import("./pages/app/Agents"));
+const ExtensionPage = lazy(() => import("./pages/app/ExtensionPage"));
 import { ProGate } from "./pages/app/ProGate";
 
 createRoot(document.getElementById("root")!).render(
@@ -47,6 +49,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="upgrade" element={<Upgrade />} />
               <Route path="ask" element={<Ask />} />
               <Route path="following" element={<Following />} />
+              <Route path="agents" element={<Agents />} />
+              <Route path="extension" element={<ExtensionPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

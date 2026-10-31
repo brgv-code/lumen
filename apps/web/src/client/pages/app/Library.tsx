@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { Item } from "@lumen/core";
-import { Download, Library as LibIcon, Plus, Send } from "lucide-react";
+import { Download, Library as LibIcon, Plus, Send, Pencil, Share2 } from "lucide-react";
+import { CollectionEditor } from "../../components/CollectionEditor";
 import { Empty, Segmented, useToast } from "../../components/ui";
 import { ItemCard } from "../../components/cards";
 import { api } from "../../lib/api";
@@ -13,7 +14,8 @@ type Status = "active" | "inbox" | "reading" | "done" | "favorites" | "archived"
 export default function LibraryPage() {
   const { id: collectionId } = useParams();
   const [params, setParams] = useSearchParams();
-  const { collections, refresh, openSave } = useApp();
+  const { collections, refresh, openSave, share, user } = useApp();
+  const [editing, setEditing] = useState(false);
   const toast = useToast();
   const status = (params.get("status") as Status) || "active";
   const q = params.get("q") || "";
@@ -60,6 +62,8 @@ export default function LibraryPage() {
           <button className="key key--lamp key--sm" onClick={openSave}><Plus size={15} /> Save a link</button>
           {collection && <a className="key key--ghost key--sm" href={`/api/v1/collections/${collection.id}/export.md?format=house`}><Download size={15} /> Export .md</a>}
           {collection && <Link className="key key--ghost key--sm" to="/app/integrations"><Send size={15} /> {collection.destinationId ? "Destination set" : "Send to a note"}</Link>}
+          {collection && <button className="key key--ghost key--sm" onClick={() => setEditing(true)}><Pencil size={14} /> Edit</button>}
+          {collection && <button className="key key--ghost key--sm" onClick={() => share({ title: `${collection.emoji} ${collection.name}`, refId: collection.id, data: { kind: "collection", owner: user.name.replace(/\s*\((demo|test)\)$/, ""), name: collection.name, emoji: collection.emoji, description: collection.description, total: items?.length ?? collection.itemCount, items: (items ?? []).map((i) => ({ title: i.title, site: i.siteName, url: i.url })) } as never })}><Share2 size={14} /> Share list</button>}
         </>}
       />
 
@@ -72,6 +76,7 @@ export default function LibraryPage() {
         {tag && <button className="chip chip--iris" onClick={() => set("tag", "")}>#{tag} ✕</button>}
       </div>
 
+      {editing && <CollectionEditor collection={collection ?? null} onClose={() => setEditing(false)} onSaved={refresh} />}
       {items === null ? (
         <div className="cards">{[0, 1, 2, 3, 4, 5].map((k) => <div key={k} className="skeleton" style={{ height: 170 }} />)}</div>
       ) : items.length === 0 ? (

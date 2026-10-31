@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Bot, Clock, Flame, Highlighter, Plus, Radar, Sparkles, Trophy, Users, BellRing, ExternalLink, Heart } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Clock, Flame, Highlighter, Plus, Radar, Sparkles, Trophy, Users, BellRing, ExternalLink, Heart, Share2 } from "lucide-react";
 import { LEVELS } from "@lumen/core";
 import { useApp } from "./Layout";
 import { useAsync, hostOf } from "../../lib/hooks";
-import { api } from "../../lib/api";
+import { api, agentLabel } from "../../lib/api";
 import { Empty, Segmented, useToast } from "../../components/ui";
 import { SiteLetter } from "../../components/cards";
 
@@ -15,7 +15,9 @@ function greeting() {
 }
 
 export default function Home() {
-  const { user, stats, openSave, openAgent, refresh } = useApp();
+  const { user, stats, openSave, refresh, agents, agentAction, share } = useApp();
+  const agentName = agents[0] ? agentLabel(agents[0]) : "your agent";
+  const shareProgress = () => stats && share({ title: `${stats.streak} day reading streak`, refId: "progress", data: { kind: "progress", owner: user.name.replace(/\s*\((demo|test)\)$/, ""), streak: stats.streak, best: stats.bestStreak, glowTotal: stats.glowTotal, level: stats.level.name, done: stats.counts.done, highlights: stats.counts.highlights, week: stats.week } });
   const toast = useToast();
   const nav = useNavigate();
   const [period, setPeriod] = useState<"daily" | "weekly">("daily");
@@ -49,7 +51,7 @@ export default function Home() {
         sub={<>{stats ? <>{stats.streak} day streak · {stats.glowToday} of {stats.dailyGoal} glow today · {stats.counts.inbox} waiting in your inbox</> : "\u00a0"}</>}
         mesh="mesh-lamp"
         tiles={[["tile--lamp", <Flame />], ["tile--iris", <Sparkles />], ["tile--mint", <BookOpen />], ["tile--sky", <Highlighter />]]}
-        actions={<><button className="key key--lamp key--sm" onClick={openSave}><Plus size={14} /> Save a link</button><button className="key key--ghost key--sm" onClick={openAgent}><Bot size={14} /> Connect agent</button></>}
+        actions={<><button className="key key--lamp key--sm" onClick={openSave}><Plus size={14} /> Save a link</button><button className="key key--ghost key--sm" onClick={agentAction}><Bot size={14} /> {agents.length ? "Your agents" : "Connect agent"}</button><button className="key key--ghost key--sm" onClick={shareProgress}><Share2 size={14} /> Share progress</button></>}
       >
         <div className="eyebrow">Today</div>
         <div className="row" style={{ marginTop: 6 }}><Ring value={goal} /><div><div style={{ color: "var(--ink)", fontWeight: 600, fontSize: 22, letterSpacing: "-0.03em" }}>{stats?.glowToday ?? 0}<span className="muted" style={{ fontSize: 14 }}>/{stats?.dailyGoal ?? 20}</span></div><div className="small muted">glow</div></div></div>
@@ -61,7 +63,7 @@ export default function Home() {
           <div className="grid-3" style={{ position: "relative" }}>
             <button className="item-card" style={{ border: 0, textAlign: "left", font: "inherit", cursor: "pointer" }} onClick={openSave}><span className="chip">1</span><h3>Save something to read</h3><p className="excerpt">Paste a link, or use the extension on any page.</p></button>
             <Link className="item-card" to="/app/integrations"><span className="chip">2</span><h3>Point a collection at a note</h3><p className="excerpt">Obsidian, Notion, markdown or a webhook.</p></Link>
-            <button className="item-card" style={{ border: 0, textAlign: "left", font: "inherit", cursor: "pointer" }} onClick={openAgent}><span className="chip">3</span><h3>Connect your agent</h3><p className="excerpt">Let Claude read your library with you.</p></button>
+            <button className="item-card" style={{ border: 0, textAlign: "left", font: "inherit", cursor: "pointer" }} onClick={agentAction}><span className={`chip ${agents.length ? "chip--mint" : ""}`}>{agents.length ? "✓" : "3"}</span><h3>{agents.length ? "Agent connected" : "Connect your agent"}</h3><p className="excerpt">{agents.length ? `${agentName} can read your library.` : "Let Claude read your library with you."}</p></button>
           </div>
         </section>
       )}
@@ -231,8 +233,13 @@ export default function Home() {
           </>)}
           <div className="card-flat row" style={{ padding: 14, marginTop: 14, background: "var(--iris-tint)" }}>
             <span className="tile tile--sm tile--iris"><Bot /></span>
-            <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>Let your agent watch this for you</div><div className="small muted">Claude can review your week and suggest what to write.</div></div>
-            <button className="key key--iris key--sm" onClick={openAgent}>Connect</button>
+            {agents.length ? (<>
+              <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>Ask {agentName} about this</div><div className="small muted">“What is trending in my topics that connects to my highlights?”</div></div>
+              <button className="key key--iris key--sm" onClick={async () => { await navigator.clipboard.writeText("Use Lumen: what is trending in my topics this week that connects to what I have been highlighting? Suggest two posts."); }}>Copy prompt</button>
+            </>) : (<>
+              <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: "var(--ink)", fontWeight: 500, fontSize: 14 }}>Let your agent watch this for you</div><div className="small muted">Claude can review your week and suggest what to write.</div></div>
+              <button className="key key--iris key--sm" onClick={agentAction}>Connect</button>
+            </>)}
           </div>
         </section>
       </div>
