@@ -69,7 +69,12 @@ app.all("*", async (c) => {
   const p = new URL(c.req.url).pathname;
   const isApp = p === "/" || p === "/login" || p.startsWith("/app") || p.startsWith("/assets/") || /\.[a-z0-9]+$/i.test(p);
   if (!isApp) return notFound();
-  return c.env.ASSETS.fetch(c.req.raw);
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const token = c.env.GOOGLE_SITE_VERIFICATION;
+  if (p === "/" && token && (res.headers.get("content-type") ?? "").includes("text/html")) {
+    return new HTMLRewriter().on("head", { element(el) { el.append(`<meta name="google-site-verification" content="${token.replace(/"/g, "")}">`, { html: true }); } }).transform(res);
+  }
+  return res;
 });
 
 export default {

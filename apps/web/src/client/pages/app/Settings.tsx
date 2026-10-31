@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import { useNavigate } from "react-router-dom";
 import { Download, KeyRound, LogOut, Moon, Trash2 } from "lucide-react";
 import { api, type Token } from "../../lib/api";
@@ -27,7 +28,14 @@ export default function Settings() {
 
   return (
     <div className="page" style={{ maxWidth: 820 }}>
-      <div className="page-head"><div><span className="eyebrow">Settings</span><h1 style={{ marginTop: 8 }}><span className="lead-in">Make it</span> <span className="payoff">yours.</span></h1></div></div>
+      <PageHero
+        pill="Settings"
+        lead="Make it"
+        pay="yours."
+        sub="Profile, reminders, privacy, theme, tokens and your data."
+        mesh="mesh-lamp"
+        tiles={[["tile--ink", <Moon />], ["tile--lamp", <KeyRound />], ["tile--mint", <Download />], ["tile--iris", <LogOut />]]}
+      />
 
       <form className="panel stack" onSubmit={save}>
         <h2>Profile</h2>

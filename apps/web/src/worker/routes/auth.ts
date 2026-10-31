@@ -83,6 +83,18 @@ auth.post("/demo", async (c) => {
   return c.json({ ok: true, next: "/app" });
 });
 
+/** Persistent test account for building and testing (extension included).
+ *  GET /auth/dev?key=<DEV_LOGIN_KEY>. Off unless the secret is set. */
+auth.get("/dev", async (c) => {
+  const secret = c.env.DEV_LOGIN_KEY;
+  const key = c.req.query("key") ?? "";
+  if (!secret || (await sha256(key)) !== (await sha256(secret))) return c.redirect("/login?error=dev_login");
+  let u = await c.env.DB.prepare("SELECT id FROM users WHERE is_demo = 3 ORDER BY created_at LIMIT 1").first<{ id: string }>();
+  if (!u) u = { id: await seedDemo(c.env.DB, { isDemo: 3, name: "Bhargav (test)" }) };
+  await createSession(c, u.id, 30);
+  return c.redirect(safeNext(c.req.query("next")));
+});
+
 auth.post("/logout", async (c) => {
   await destroySession(c);
   return c.json({ ok: true });

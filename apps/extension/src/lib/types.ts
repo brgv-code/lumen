@@ -51,6 +51,7 @@ export type Msg =
   | { type: "SAVE_SETTINGS"; settings: Partial<Settings> }
   | { type: "TEST_CONNECTION" }
   | { type: "SYNC_TARGET" }
-  | { type: "OPEN_DASHBOARD"; path?: string };
+  | { type: "OPEN_DASHBOARD"; path?: string }
+  | { type: "GET_HOME" };
 
 export type { Collection, Highlight, Item };

@@ -138,15 +138,16 @@ function html(s: Sample) {
   return s.paragraphs.map((p) => `<p>${p}</p>`).join("\n");
 }
 
-export async function seedDemo(db: D1Database): Promise<string> {
+/** isDemo: 1 = sandbox (purged after 3 days), 3 = persistent test account. */
+export async function seedDemo(db: D1Database, opts: { isDemo?: number; name?: string } = {}): Promise<string> {
   const t = now();
   const userId = id("usr_");
   const stmts: D1PreparedStatement[] = [];
   const names = ["Wren", "Juniper", "Ollie", "Sage", "Robin", "Indigo"];
   const name = names[Math.floor(Math.random() * names.length)];
 
-  stmts.push(db.prepare("INSERT INTO users (id, email, name, avatar_url, is_demo, daily_goal, created_at) VALUES (?,?,?,?,1,20,?)")
-    .bind(userId, null, `${name} (demo)`, null, t));
+  stmts.push(db.prepare("INSERT INTO users (id, email, name, avatar_url, is_demo, daily_goal, created_at) VALUES (?,?,?,?,?,20,?)")
+    .bind(userId, null, opts.name ?? `${name} (demo)`, null, opts.isDemo ?? 1, t));
 
   const obsidian = id("dst_");
   const markdown = id("dst_");

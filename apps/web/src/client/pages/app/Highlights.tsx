@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import type { Highlight } from "@lumen/core";
 import { citeForClipboard } from "@lumen/core";
 import { Copy, Highlighter, Search } from "lucide-react";
@@ -34,14 +35,15 @@ export default function Highlights() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">Highlights</span>
-          <h1 style={{ marginTop: 8 }}><span className="lead-in">Every passage</span> <span className="payoff">that mattered.</span></h1>
-        </div>
-        <span className="spacer" />
-        <button className="key key--ghost key--sm" onClick={copyAll}><Copy size={15} /> Copy all shown</button>
-      </div>
+      <PageHero
+        pill={<><Highlighter size={13} /> Highlights</>}
+        lead="Every passage"
+        pay="that mattered."
+        sub="Filter by colour or notes, copy with a link back to the exact sentence, or hand them to your agent."
+        mesh="mesh-lamp"
+        tiles={[["tile--sun", <Highlighter />], ["tile--iris", <Copy />], ["tile--mint", <Highlighter />], ["tile--peach", <Search />]]}
+        actions={<button className="key key--ghost key--sm" onClick={copyAll}><Copy size={15} /> Copy all shown</button>}
+      />
       <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
         <Segmented label="Colour" size="sm" value={color} onChange={setColor} options={[
           { value: "all", label: "All" },

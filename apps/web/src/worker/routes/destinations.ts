@@ -121,7 +121,7 @@ destinations.post("/:id/push", async (c) => {
   const u = c.get("user");
   const d = await own(c.env.DB, u.id, c.req.param("id"));
   if (d.kind !== "notion" && d.kind !== "webhook") fail(422, "client_delivered", `${d.kind} is delivered by the extension or the browser. Use /pending and /ack.`);
-  if (u.is_demo) fail(403, "demo", "Pushing to external services is off in the demo.");
+  if (u.is_demo === 1) fail(403, "demo", "Pushing to external services is off in the demo.");
   const pending = await pendingFor(c.env.DB, d.id);
   if (!pending.length) return c.json({ delivered: 0 });
   const cfg = safeJson<Record<string, string>>(d.config, {});

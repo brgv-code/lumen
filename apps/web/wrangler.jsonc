@@ -10,7 +10,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/auth/*", "/mcp", "/mcp/*", "/compare", "/compare/*", "/answers", "/answers/*", "/docs", "/docs/*", "/privacy", "/terms", "/changelog", "/sitemap.xml", "/robots.txt", "/llms.txt"]
+    "run_worker_first": ["/", "/pricing", "/api/*", "/auth/*", "/mcp", "/mcp/*", "/compare", "/compare/*", "/answers", "/answers/*", "/docs", "/docs/*", "/privacy", "/terms", "/changelog", "/sitemap.xml", "/robots.txt", "/llms.txt"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "lumen-db", "database_id": "47eaaa2b-a68e-47ad-92a7-98cc662c2b48", "migrations_dir": "migrations" }

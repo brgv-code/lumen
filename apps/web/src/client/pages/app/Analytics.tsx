@@ -1,4 +1,5 @@
 import { BarChart3, BookOpen, CheckCircle2, Clock, Type } from "lucide-react";
+import { PageHero } from "../../components/PageHero";
 import { api } from "../../lib/api";
 import { useAsync } from "../../lib/hooks";
 import { useApp } from "./Layout";
@@ -18,7 +19,14 @@ export default function Analytics() {
 
   return (
     <div className="page">
-      <div className="page-head"><div><span className="eyebrow">Analytics</span><h1 style={{ marginTop: 8 }}><span className="lead-in">Your reading,</span> <span className="payoff">at a glance.</span></h1></div></div>
+      <PageHero
+        pill={<><BarChart3 size={13} /> Analytics</>}
+        lead="Your reading,"
+        pay="at a glance."
+        sub="Twelve weeks of attention: what you finish, what you read about, and when."
+        mesh="mesh-iris"
+        tiles={[["tile--iris", <BarChart3 />], ["tile--lamp", <Clock />], ["tile--mint", <CheckCircle2 />], ["tile--sky", <BookOpen />]]}
+      />
 
       <div className="grid-3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
         <Stat icon={<BookOpen />} tile="tile--lamp" big={d?.totals.saved ?? "–"} label="saved" />

@@ -3,11 +3,15 @@ import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
 
+type Home = { ok: boolean; stats: { streak: number; glowToday: number; dailyGoal: number; level: { name: string } } | null; picks: { id: string; title: string; readingMinutes: number; status: string; progress: number }[] };
+const SWATCH: Record<string, string> = { sun: "#ffe58a", mint: "#bdefd5", iris: "#dcd6ff", peach: "#ffd5c6", sky: "#cfe2ff" };
+
 export default function Popup() {
   const [s, setS] = useState<Settings | null>(null);
   const [tab, setTab] = useState<chrome.tabs.Tab | null>(null);
   const [page, setPage] = useState<PageState | null>(null);
   const [cols, setCols] = useState<Collection[]>([]);
+  const [home, setHome] = useState<Home | null>(null);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -17,19 +21,26 @@ export default function Popup() {
       const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
       setTab(t ?? null);
       if (t?.url?.startsWith("http")) setPage(await send<PageState>({ type: "PAGE_STATE", url: t.url }));
-      if (r.settings.token) send<{ collections: Collection[] }>({ type: "GET_COLLECTIONS" }).then((c) => setCols(c.collections ?? [])).catch(() => {});
+      if (r.settings.token) {
+        send<{ collections: Collection[] }>({ type: "GET_COLLECTIONS" }).then((c) => setCols(c.collections ?? [])).catch(() => {});
+        send<Home>({ type: "GET_HOME" }).then(setHome).catch(() => {});
+      }
     })();
   }, []);
 
   if (!s) return null;
   const connected = Boolean(s.token);
   const target = cols.find((c) => c.id === s.targetCollectionId);
+  const st = home?.stats;
+  const goal = st ? Math.min(1, st.glowToday / Math.max(1, st.dailyGoal)) : 0;
+  const onPage = Boolean(tab?.url?.startsWith("http"));
+  const host = onPage ? new URL(tab!.url!).hostname.replace(/^www\./, "") : "";
 
   const save = async () => {
     if (!tab?.id) return;
     setStatus("Saving…");
     await chrome.tabs.sendMessage(tab.id, { type: "CMD", cmd: "save" }).catch(() => setStatus("Reload the page first, then try again."));
-    setTimeout(async () => { if (tab.url) setPage(await send<PageState>({ type: "PAGE_STATE", url: tab.url })); setStatus("Saved"); }, 900);
+    setTimeout(async () => { if (tab.url) setPage(await send<PageState>({ type: "PAGE_STATE", url: tab.url })); setStatus("Saved · +1 glow"); }, 900);
   };
   const sync = async () => {
     setStatus("Sending…");
@@ -38,53 +49,82 @@ export default function Popup() {
   };
 
   return (
-    <div className="stack" style={{ padding: 14 }}>
+    <div className="stack" style={{ padding: 12, gap: 10 }}>
       <div className="row">
-        <img src="/icons/icon48.png" width={28} height={28} alt="" style={{ borderRadius: 8 }} />
-        <h2 style={{ fontSize: 17 }}>lumen</h2>
+        <img src="/icons/icon48.png" width={28} height={28} alt="" style={{ borderRadius: 8, filter: "drop-shadow(0 4px 8px rgba(255,106,26,.35))" }} />
+        <h2 style={{ fontSize: 18, letterSpacing: "-0.04em" }}>lumen</h2>
         <span className="sp" />
-        <span className={`chip ${connected ? "mint" : "lamp"}`}>{connected ? "Synced" : "Local only"}</span>
+        {connected ? (st ? <span className="chip lamp">🔥 {st.streak} day streak</span> : <span className="chip mint">Synced</span>) : <span className="chip lamp">Local only</span>}
       </div>
 
-      <div className="surface stack">
-        <div className="eyebrow">This page</div>
-        <div style={{ color: "var(--ink)", fontWeight: 600, lineHeight: 1.3 }}>{tab?.title ?? "No page"}</div>
-        <div className="row small muted">
-          <span>{page?.highlights.length ?? 0} highlights</span>
-          <span>·</span>
-          <span>{page?.item ? (page.item.status === "done" ? "Finished" : "In your library") : "Not saved yet"}</span>
+      {connected && st && (
+        <div className="mesh pop" style={{ padding: 14, minHeight: 92 }}>
+          <span className="float tile" style={{ right: 16, top: 12, ["--r" as string]: "8deg" }}>✦</span>
+          <span className="float tile iris sm" style={{ right: 58, top: 50, animationDelay: "-2s", ["--r" as string]: "-6deg" }}>✎</span>
+          <div className="raised" style={{ width: 190, padding: 10 }}>
+            <div className="row" style={{ gap: 8 }}><span className="eyebrow">Today</span><span className="sp" /><b style={{ color: "var(--ink)" }}>{st.glowToday}<span className="muted small">/{st.dailyGoal}</span></b></div>
+            <div className="meter" style={{ marginTop: 8 }}><span style={{ width: `${goal * 100}%` }} /></div>
+            <div className="small muted" style={{ marginTop: 6 }}>{st.level.name} · {goal >= 1 ? "lamp glowing" : "keep reading"}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="surface stack" style={{ gap: 8, padding: 12 }}>
+        <div className="row" style={{ gap: 8 }}>
+          <span className="tile sm" style={{ background: "linear-gradient(180deg,#5b9bff,#2563eb)" }}>{(host[0] ?? "·").toUpperCase()}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ color: "var(--ink)", fontWeight: 600, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tab?.title ?? "No page"}</div>
+            <div className="small muted">{host || "Open an article to save and highlight it"}</div>
+          </div>
+        </div>
+        <div className="row small muted" style={{ gap: 6 }}>
+          <span className="chip">{page?.highlights.length ?? 0} highlights</span>
+          <span className={`chip ${page?.item ? "mint" : ""}`}>{page?.item ? (page.item.status === "done" ? "Finished" : "In your library") : "Not saved"}</span>
         </div>
         <div className="row">
-          <button className="key lamp" onClick={save} disabled={!connected || !tab?.url?.startsWith("http")}>{page?.item ? "Saved ✓" : "Save page"}</button>
+          <button className="key lamp" onClick={save} disabled={!connected || !onPage || Boolean(page?.item)}>{page?.item ? "Saved ✓" : "Save page"}</button>
           {connected && <button className="key ghost" onClick={() => send({ type: "OPEN_DASHBOARD", path: page?.item ? `/app/read/${page.item.id}` : "/app" })}>Open in Lumen</button>}
         </div>
+        {page && page.highlights.length > 0 && (
+          <div className="stack" style={{ gap: 6 }}>
+            {page.highlights.slice(-2).reverse().map((h: Highlight) => (
+              <div key={h.id} className="raised small" style={{ padding: 8, fontFamily: "Newsreader, Georgia, serif", fontSize: 13.5, color: "var(--ink)" }}>
+                <span style={{ background: SWATCH[h.color], borderRadius: 3, padding: "0 2px" }}>{h.quote.slice(0, 110)}{h.quote.length > 110 ? "…" : ""}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {connected ? (
-        <div className="surface stack">
+        <div className="surface stack" style={{ gap: 8, padding: 12 }}>
           <div className="eyebrow">Sending highlights to</div>
           <select value={s.targetCollectionId} onChange={async (e) => { await send({ type: "SET_TARGET", collectionId: e.target.value }); setS({ ...s, targetCollectionId: e.target.value }); setStatus(""); }}>
             <option value="">No collection (library only)</option>
             {cols.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
           </select>
-          <div className="row small muted">
-            <span>{target ? (target.destinationId ? "New highlights flow to its destination, once each." : "This collection has no destination yet.") : "Pick the piece you are working on."}</span>
-          </div>
+          <div className="small muted">{target ? (target.destinationId ? "New highlights flow to its note, once each." : "This collection has no destination yet.") : "Pick the piece you are working on."}</div>
           {target?.destinationId && <button className="key ghost" onClick={sync}>Send new highlights now</button>}
         </div>
       ) : (
-        <div className="surface stack">
+        <div className="surface stack" style={{ padding: 12 }}>
           <div style={{ color: "var(--ink)", fontWeight: 600 }}>Highlights stay in this browser.</div>
-          <div className="small muted">Connect a Lumen account to sync, pick a target note, and send to Obsidian or Notion.</div>
-          <button className="key" onClick={() => chrome.runtime.openOptionsPage()}>Connect Lumen</button>
+          <div className="small muted">Connect Lumen to sync, pick a target note, and send to Obsidian or Notion.</div>
+          <button className="key lamp" onClick={() => chrome.runtime.openOptionsPage()}>Connect Lumen</button>
         </div>
       )}
 
-      {page && page.highlights.length > 0 && (
-        <div className="stack">
-          <div className="eyebrow">Recent on this page</div>
-          {page.highlights.slice(-3).reverse().map((h: Highlight) => (
-            <div key={h.id} className="raised small" style={{ fontFamily: "Newsreader, Georgia, serif", fontSize: 14, color: "var(--ink)" }}>{h.quote.slice(0, 140)}{h.quote.length > 140 ? "…" : ""}</div>
+      {connected && home && home.picks.length > 0 && (
+        <div className="stack" style={{ gap: 6 }}>
+          <div className="eyebrow">Up next</div>
+          {home.picks.map((p) => (
+            <button key={p.id} className="pick" onClick={() => send({ type: "OPEN_DASHBOARD", path: `/app/read/${p.id}` })}>
+              <span className="tile sm mint">{p.status === "reading" ? "▶" : "☾"}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: "block", color: "var(--ink)", fontWeight: 500, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</span>
+                <span className="small muted">{p.status === "reading" ? `${Math.round(p.progress * 100)}% read` : `${p.readingMinutes} min`}</span>
+              </span>
+            </button>
           ))}
         </div>
       )}

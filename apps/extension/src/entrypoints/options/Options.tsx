@@ -26,7 +26,11 @@ export default function Options() {
 
       <section className="surface stack" style={{ padding: 22 }}>
         <h2 style={{ fontSize: 17 }}>Account</h2>
-        <p className="small muted" style={{ margin: 0 }}>Create a token in the dashboard under Integrations, then paste it here. Without it, highlights stay in this browser.</p>
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          <button className="key lamp" onClick={async () => { await save(); chrome.tabs.create({ url: `${s.apiBase.replace(/\/$/, "")}/app/integrations?connect=extension` }); }}>Connect with Lumen</button>
+          <span className="small muted">Opens the dashboard and connects in one click. Or paste a token below.</span>
+        </div>
+        {s.token && <span className="chip mint" style={{ justifySelf: "start" }}>Connected · {s.apiBase.replace(/^https?:\/\//, "")}</span>}
         <label>Lumen address<input value={s.apiBase} onChange={(e) => set("apiBase", e.target.value)} placeholder="https://lumen.brgv95.workers.dev" /></label>
         <label>Access token<input type="password" value={s.token} onChange={(e) => set("token", e.target.value)} placeholder="lum_…" /></label>
         <label className="row" style={{ display: "flex", gap: 10 }}>

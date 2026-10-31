@@ -8,6 +8,9 @@ export const SITE = {
   github: "https://github.com/brgv-code/lumen",
 };
 
+/** Per request settings (set by the seo router from env). */
+export const META = { verify: "" };
+
 export const esc = (s: string) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -40,7 +43,7 @@ export function footerHtml() {
   <div class="foot__grid">
     <div style="display:grid;gap:14px;align-content:start"><a class="s-logo" href="/">${ICON}lumen</a><p class="muted" style="max-width:260px">Built for people who think reading should feel light.</p>
       <a href="${SITE.github}" aria-label="GitHub" style="color:var(--ink-2)">${svg('<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.1-1.3-.3-2.5-1-3.5.3-1.2.3-2.4 0-3.5 0 0-1 0-3 1.5a10.3 10.3 0 0 0-6 0C8 2 7 2 7 2c-.3 1.1-.3 2.3 0 3.5a5.4 5.4 0 0 0-1 3.5c0 3.5 3 5.5 6 5.5-.4.4-.7 1-.8 1.6-.2.6-.2 1.2-.2 1.9v4"/><path d="M9 18c-4.5 2-5-2-7-2"/>').replace("<svg", '<svg width="18" height="18"')}</a></div>
-    <div><h5>Product</h5><ul><li><a href="/#features">Features</a></li><li><a href="/#pricing">Pricing</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/login">Dashboard</a></li></ul></div>
+    <div><h5>Product</h5><ul><li><a href="/#features">Features</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/login">Dashboard</a></li></ul></div>
     <div><h5>Compare</h5><ul><li><a href="/compare/lumen-vs-readwise-reader">vs Readwise Reader</a></li><li><a href="/compare/lumen-vs-obsidian-web-clipper">vs Obsidian Web Clipper</a></li><li><a href="/compare/pocket-alternative">Pocket alternative</a></li><li><a href="/compare">All comparisons</a></li></ul></div>
     <div><h5>Developers</h5><ul><li><a href="/docs/api">API</a></li><li><a href="/docs/mcp">MCP for agents</a></li><li><a href="/docs/architecture">Architecture</a></li><li><a href="${SITE.github}">Source</a></li></ul></div>
     <div><h5>Resources</h5><ul><li><a href="/answers">Answers</a></li><li><a href="/docs">Docs</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li></ul></div>
@@ -79,6 +82,7 @@ export function page(o: PageOpts) {
 <title>${esc(o.title)}</title>
 <meta name="description" content="${esc(o.description)}">
 <link rel="canonical" href="${url}">
+${META.verify ? `<meta name="google-site-verification" content="${esc(META.verify)}">` : ""}
 ${o.noindex ? '<meta name="robots" content="noindex">' : ""}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Lumen">
@@ -100,7 +104,7 @@ ${o.extraHead ?? ""}
 <body>
 <nav class="s-nav"><div class="s-wrap s-nav__in">
   <a class="s-logo" href="/" aria-label="Lumen home">${ICON}lumen</a>
-  <div class="s-nav__links"><a href="/#features">Features</a><a href="/compare"${cur("compare")}>Compare</a><a href="/answers"${cur("answers")}>Answers</a><a href="/docs"${cur("docs")}>Docs</a><a href="/#pricing">Pricing</a></div>
+  <div class="s-nav__links"><a href="/#features">Features</a><a href="/compare"${cur("compare")}>Compare</a><a href="/answers"${cur("answers")}>Answers</a><a href="/docs"${cur("docs")}>Docs</a><a href="/pricing">Pricing</a></div>
   <div class="row"><a class="key key--quiet key--sm" href="/login">Log in</a><a class="key key--ghost key--sm" href="/login">Get Lumen</a></div>
 </div></nav>
 <main class="s-wrap">${o.body}</main>

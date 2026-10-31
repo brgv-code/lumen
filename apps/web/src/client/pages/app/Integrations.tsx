@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import type { Destination } from "@lumen/core";
 import { Check, Cpu, Download, FileText, KeyRound, NotebookPen, Plus, Puzzle, RefreshCw, Send, Trash2, Webhook, Copy } from "lucide-react";
 import { api } from "../../lib/api";
 import { Modal, useToast } from "../../components/ui";
 import { timeAgo } from "../../lib/hooks";
 import { useApp } from "./Layout";
+import { extension } from "../../lib/extension";
 
 const KINDS = {
   obsidian: { label: "Obsidian", tile: "tile--iris", icon: <NotebookPen />, blurb: "Append to a note in your vault through the Local REST API plugin. Runs in your browser; the key never leaves it." },
@@ -62,13 +64,15 @@ export default function Integrations() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">Integrations</span>
-          <h1 style={{ marginTop: 8 }}><span className="lead-in">Send highlights</span> <span className="payoff">where you think.</span></h1>
-          <p className="muted" style={{ marginTop: 6, maxWidth: 600 }}>A destination is a note. Point collections at it, and Lumen appends only highlights that destination has not received yet. Clip a page ten times; each passage lands once.</p>
-        </div>
-      </div>
+      <PageHero
+        pill={<><Send size={13} /> Integrations</>}
+        lead="Send highlights"
+        pay="where you think."
+        sub="A destination is a note. Point collections at it and Lumen appends only highlights it has not received yet. Clip a page ten times; each passage lands once."
+        mesh="mesh-mint"
+        tiles={[["tile--iris", <NotebookPen />], ["tile--ink", <FileText />], ["tile--sky", <Download />], ["tile--mint", <Webhook />]]}
+        actions={<button className="key key--iris key--sm" onClick={openAgent}>Connect agent</button>}
+      />
 
       <section className="grid-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
         {(Object.keys(KINDS) as Kind[]).map((k) => (
@@ -148,17 +152,44 @@ function ObsidianKey({ id }: { id: string }) {
 function ExtensionPanel() {
   const toast = useToast();
   const [token, setToken] = useState<string | null>(null);
-  const create = async () => {
-    try { const r = await api.createToken("Lumen extension"); setToken(r.token); } catch (e) { toast((e as Error).message, "err"); }
+  const [ext, setExt] = useState<{ ok: boolean; version: string; connected: boolean; apiBase: string } | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const ping = () => extension.ping().then(setExt);
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const r = await api.createToken("Lumen extension");
+      const ok = await extension.connect(r.token);
+      if (ok?.ok) { toast("Extension connected"); await ping(); }
+      else { setToken(r.token); toast("Could not reach the extension; paste the token instead", "err"); }
+    } catch (e) { toast((e as Error).message, "err"); } finally { setBusy(false); }
   };
+  useEffect(() => {
+    ping().then(() => {
+      if (new URLSearchParams(location.search).get("connect") === "extension") {
+        history.replaceState(null, "", location.pathname);
+        connect();
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const here = ext?.connected && ext.apiBase === location.origin;
   return (
     <section className="panel">
-      <div className="row" style={{ marginBottom: 12 }}><span className="tile tile--ink"><Puzzle /></span><h2>Browser extension</h2></div>
-      <ol className="small" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-        <li>Build it: <code className="mono">npm run build -w @lumen/extension</code>, then load <code className="mono">apps/extension/.output/chrome-mv3</code> unpacked.</li>
-        <li>Create a token below and paste it into the extension settings with this site's address.</li>
-        <li>Select text on any page: highlight, note, ask, copy. Pick the collection from the popup.</li>
-      </ol>
+      <div className="row" style={{ marginBottom: 12, flexWrap: "wrap" }}>
+        <span className="tile tile--ink"><Puzzle /></span><h2>Browser extension</h2><span className="spacer" />
+        {ext === undefined ? null : ext ? <span className={`chip ${here ? "chip--mint" : "chip--lamp"}`}>{here ? <><Check size={11} /> Connected · v{ext.version}</> : `Installed · v${ext.version}`}</span> : <span className="chip">Not detected</span>}
+      </div>
+      {ext ? (
+        here ? <p className="small muted">This browser's extension syncs with your account. Select text on any page to start.</p>
+             : <button className="key key--lamp key--sm" disabled={busy} onClick={connect}><Puzzle size={14} /> {busy ? "Connecting…" : "Connect this browser's extension"}</button>
+      ) : (
+        <ol className="small" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
+          <li>Build it: <code className="mono">npm run build -w @lumen/extension</code>, open <code className="mono">chrome://extensions</code> (or brave://extensions), turn on Developer mode, Load unpacked: <code className="mono">apps/extension/.output/chrome-mv3</code>.</li>
+          <li>Reload this page: a Connect button appears and links it in one click.</li>
+          <li>Select text on any page: highlight, note, ask, copy. Pick the collection from the popup.</li>
+        </ol>
+      )}
       {token ? (
         <div className="card-flat" style={{ padding: 12, marginTop: 14 }}>
           <div className="eyebrow">Your token (shown once)</div>
@@ -169,7 +200,7 @@ function ExtensionPanel() {
           </div>
         </div>
       ) : (
-        <button className="key key--sm" style={{ marginTop: 14 }} onClick={create}><KeyRound size={14} /> Create extension token</button>
+        <button className="key key--quiet key--sm" style={{ marginTop: 10, marginLeft: -8 }} onClick={async () => { try { const r = await api.createToken("Lumen extension"); setToken(r.token); } catch (e) { toast((e as Error).message, "err"); } }}><KeyRound size={14} /> Or create a token to paste</button>
       )}
     </section>
   );

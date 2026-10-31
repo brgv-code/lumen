@@ -52,3 +52,23 @@ Integrations, and set the Lumen address.
 apps/native-host/install.sh <extension-id>
 ```
 Then choose "Claude (local CLI)" in the extension settings and press Test connection.
+
+## Test account (persistent)
+A seeded account that is not purged like demo sandboxes, for building and testing the extension.
+```bash
+cd apps/web && npx wrangler secret put DEV_LOGIN_KEY     # type any long random string
+```
+Then open `https://<host>/auth/dev?key=<that string>`. The first visit creates the account with
+sample reading; later visits sign in to the same account. Without the secret the route is off.
+
+## Google Search Console
+1. Add a **URL prefix** property for `https://<host>/` and choose the **HTML tag** method.
+2. Copy only the `content` value and set it: `npx wrangler secret put GOOGLE_SITE_VERIFICATION`.
+3. Press Verify (the tag is injected into `/` and every server rendered page), then submit
+   `https://<host>/sitemap.xml` under Sitemaps.
+
+## Extension connect
+The unpacked build has a fixed id (`ffjconacpmnbadoeegamifkellcddfja`, from the `key` in
+`wxt.config.ts`), so the dashboard can talk to it: Integrations shows Installed or Connected and
+**Connect this browser's extension** stores a token in it with one click. The extension's
+settings page has **Connect with Lumen**, which opens that flow.

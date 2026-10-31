@@ -10,6 +10,23 @@ export default defineBackground(() => {
     return true;
   });
 
+  // One click connect from the Lumen dashboard (only the origins in externally_connectable can call this).
+  chrome.runtime.onMessageExternal.addListener((msg: { type?: string; token?: string }, sender, reply) => {
+    (async () => {
+      const origin = sender.origin ?? (sender.url ? new URL(sender.url).origin : "");
+      if (msg?.type === "LUMEN_PING") {
+        const s = await getSettings();
+        return reply({ ok: true, version: chrome.runtime.getManifest().version, connected: Boolean(s.token), apiBase: s.apiBase });
+      }
+      if (msg?.type === "LUMEN_CONNECT" && typeof msg.token === "string" && msg.token.startsWith("lum_") && origin) {
+        await saveSettings({ token: msg.token, apiBase: origin });
+        return reply({ ok: true });
+      }
+      reply({ ok: false });
+    })();
+    return true;
+  });
+
   chrome.runtime.onInstalled.addListener((d) => {
     chrome.contextMenus.create({ id: "lumen-highlight", title: "Highlight with Lumen", contexts: ["selection"] });
     chrome.contextMenus.create({ id: "lumen-explain", title: "Explain with Lumen", contexts: ["selection"] });
@@ -147,6 +164,15 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
 
     case "SYNC_TARGET":
       return { ok: true, ...(await syncTarget()) };
+
+    case "GET_HOME": {
+      if (!(await connected())) return { ok: false };
+      const [stats, reads] = await Promise.all([
+        cloud<{ streak: number; glowToday: number; dailyGoal: number; level: { name: string } }>("GET", "/stats").catch(() => null),
+        cloud<{ picks: { id: string; title: string; readingMinutes: number; status: string; progress: number }[] }>("GET", "/reads?period=daily").catch(() => null),
+      ]);
+      return { ok: true, stats, picks: reads?.picks.slice(0, 3) ?? [] };
+    }
 
     case "OPEN_DASHBOARD": {
       const s = await getSettings();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import { Link } from "react-router-dom";
 import type { Destination } from "@lumen/core";
 import { FolderHeart, Plus, Send, Trash2 } from "lucide-react";
@@ -27,15 +28,15 @@ export default function Collections() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">Collections</span>
-          <h1 style={{ marginTop: 8 }}><span className="lead-in">Shelves for</span> <span className="payoff">what you are working on.</span></h1>
-          <p className="muted" style={{ marginTop: 6, maxWidth: 560 }}>Point a collection at a note and every new highlight in it flows there. One collection per piece you are writing works beautifully.</p>
-        </div>
-        <span className="spacer" />
-        <button className="key key--lamp key--sm" onClick={() => setOpen(true)}><Plus size={15} /> New collection</button>
-      </div>
+      <PageHero
+        pill={<><FolderHeart size={13} /> Collections</>}
+        lead="Shelves for"
+        pay="what you are working on."
+        sub="Point a collection at a note and every new highlight in it flows there, once each. One collection per piece you are writing works beautifully."
+        mesh="mesh-peach"
+        tiles={[["tile--peach", <FolderHeart />], ["tile--lamp", <Send />], ["tile--iris", <Plus />], ["tile--mint", <FolderHeart />]]}
+        actions={<button className="key key--lamp key--sm" onClick={() => setOpen(true)}><Plus size={15} /> New collection</button>}
+      />
       {collections.length === 0 ? (
         <Empty icon={<FolderHeart />} title="No collections yet" action={<button className="key" onClick={() => setOpen(true)}>Create one</button>}>A collection groups reading for one project and decides where its highlights go.</Empty>
       ) : (

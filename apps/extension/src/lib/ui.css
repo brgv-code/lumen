@@ -34,3 +34,21 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 500; color: var(-
 .seg { display: inline-flex; padding: 4px; gap: 2px; background: var(--well); border-radius: 13px; flex-wrap: wrap; }
 .seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 10px; font: 500 13px "Geist", system-ui, sans-serif; color: var(--ink-3); cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 14px -8px rgba(0,0,0,.2); }
+
+/* popup hero */
+.mesh { position: relative; overflow: hidden; border-radius: 16px; isolation: isolate; }
+.mesh::before { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(80% 90% at 15% 20%, #ffd27a, transparent 60%), radial-gradient(70% 80% at 85% 85%, #ff8f5a, transparent 60%), linear-gradient(135deg, #ffe7b8, #ffb38a); }
+.mesh::after { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(circle, rgba(255,255,255,.75) 1px, transparent 1.6px); background-size: 8px 8px;
+  -webkit-mask-image: linear-gradient(135deg, #000, transparent 85%); mask-image: linear-gradient(135deg, #000, transparent 85%); }
+.float { position: absolute; animation: bob 6s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-4px) rotate(var(--r, 0deg)); } }
+@keyframes pop { 0% { transform: scale(.92); opacity: 0 } 60% { transform: scale(1.03); opacity: 1 } 100% { transform: scale(1) } }
+.pop { animation: pop 380ms cubic-bezier(.34,1.56,.64,1) both; }
+.tile.iris { background: linear-gradient(180deg,#8a7bff,#5b48f5); box-shadow: 0 8px 14px -6px rgba(91,72,245,.6), inset 0 1px 0 rgba(255,255,255,.3); }
+.tile.mint { background: linear-gradient(180deg,#3fd39a,#0f9a63); box-shadow: 0 8px 14px -6px rgba(15,154,99,.5), inset 0 1px 0 rgba(255,255,255,.3); }
+.tile.sm { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; }
+.meter { height: 6px; border-radius: 6px; background: var(--well); overflow: hidden; }
+.meter > span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(180deg,#ffb53d,#ff6a1a); }
+.pick { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; background: var(--raised); box-shadow: 0 1px 2px rgba(0,0,0,.04); cursor: pointer; border: 0; width: 100%; text-align: left; font: inherit; }
+.pick:hover { box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 18px -12px rgba(0,0,0,.3); }

@@ -14,7 +14,7 @@ async function spend(db: D1Database, user: { id: string; is_demo: number; plan: 
   const day = dayIn(user.timezone);
   const row = await db.prepare(`INSERT INTO ai_usage (user_id, day, count) VALUES (?,?,1)
     ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 RETURNING count`).bind(user.id, day).first<{ count: number }>();
-  const cap = user.is_demo ? LIMITS.demo : user.plan === "pro" ? LIMITS.pro : LIMITS.free;
+  const cap = user.is_demo === 1 ? LIMITS.demo : user.plan === "pro" ? LIMITS.pro : LIMITS.free;
   if ((row?.count ?? 0) > cap) fail(429, "ai_quota", `Daily AI limit of ${cap} reached. Switch the provider to Ollama or Claude on your machine for unlimited use.`);
 }
 

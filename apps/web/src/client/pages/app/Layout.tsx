@@ -56,16 +56,16 @@ export default function Layout() {
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
           <nav className="side__nav">
-            <NavLink end to="/app" className="side__link"><Home /> Home</NavLink>
-            <NavLink to="/app/library" className="side__link"><Library /> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
-            <NavLink to="/app/highlights" className="side__link"><Highlighter /> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
-            <NavLink to="/app/collections" className="side__link"><FolderHeart /> Collections</NavLink>
-            <NavLink to="/app/radar" className="side__link"><Radar /> Radar</NavLink>
-            <NavLink to="/app/spark" className="side__link"><Sparkles /> Spark</NavLink>
-            <NavLink to="/app/analytics" className="side__link"><BarChart3 /> Analytics</NavLink>
+            <NavLink end to="/app" className="side__link"><span className="ico"><Home /></span> Home</NavLink>
+            <NavLink to="/app/library" className="side__link"><span className="ico"><Library /></span> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
+            <NavLink to="/app/highlights" className="side__link"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
+            <NavLink to="/app/collections" className="side__link"><span className="ico"><FolderHeart /></span> Collections</NavLink>
+            <NavLink to="/app/radar" className="side__link"><span className="ico"><Radar /></span> Radar</NavLink>
+            <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark</NavLink>
+            <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics</NavLink>
             <div className="side__section">Connect</div>
-            <NavLink to="/app/integrations" className="side__link"><Plug /> Integrations</NavLink>
-            <NavLink to="/app/settings" className="side__link"><Settings /> Settings</NavLink>
+            <NavLink to="/app/integrations" className="side__link"><span className="ico"><Plug /></span> Integrations</NavLink>
+            <NavLink to="/app/settings" className="side__link"><span className="ico"><Settings /></span> Settings</NavLink>
           </nav>
           {collections.length > 0 && (
             <nav className="side__nav">

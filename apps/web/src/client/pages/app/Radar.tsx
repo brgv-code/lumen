@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import { ExternalLink, Plus, Radar as RadarIcon, RefreshCw, X, Check, MessageSquare } from "lucide-react";
 import { api, type Trend } from "../../lib/api";
 import { useAsync, timeAgo, hostOf } from "../../lib/hooks";
@@ -27,17 +28,15 @@ export default function Radar() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">Radar</span>
-          <h1 style={{ marginTop: 8 }}><span className="lead-in">What is moving</span> <span className="payoff">in what you read.</span></h1>
-          <p className="muted" style={{ marginTop: 6, maxWidth: 620 }}>Lumen watches your topics (your tags plus anything you follow) on Hacker News and dev.to and keeps this week's best stories here. It refreshes every six hours.</p>
-        </div>
-        <span className="spacer" />
-        <button className="key key--ghost key--sm" disabled={busy} onClick={async () => { setBusy(true); await api.refreshRadar().catch(() => {}); await radar.reload(); setBusy(false); toast("Radar refreshed"); }}>
-          <RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh
-        </button>
-      </div>
+      <PageHero
+        pill={<><RadarIcon size={13} /> Radar</>}
+        lead="What is moving"
+        pay="in what you read."
+        sub="Your topics (tags plus anything you follow), watched on Hacker News and dev.to. Refreshed every six hours."
+        mesh="mesh-sky"
+        tiles={[["tile--sky", <RadarIcon />], ["tile--peach", <MessageSquare />], ["tile--mint", <Plus />], ["tile--iris", <ExternalLink />]]}
+        actions={<button className="key key--ghost key--sm" disabled={busy} onClick={async () => { setBusy(true); await api.refreshRadar().catch(() => {}); await radar.reload(); setBusy(false); toast("Radar refreshed"); }}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>}
+      />
 
       <section className="panel">
         <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>

@@ -465,3 +465,46 @@
   .topbar { gap: 8px; }
   .reader .article { border-radius: 20px; }
 }
+
+/* ---------- page hero (landing language inside the app) ---------- */
+.page-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  min-height: 210px;
+  align-items: stretch;
+  position: relative;
+}
+.page-hero__copy { padding: 14px 10px 10px 14px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.page-hero h1 { font-size: clamp(28px, 3.3vw, 42px); letter-spacing: -0.04em; line-height: 1.05; margin-top: 14px; }
+.page-hero__sub { margin-top: 10px; color: var(--ink-2); font-size: 15px; max-width: 560px; }
+.page-hero__art { position: relative; border-radius: 22px; min-height: 180px; overflow: hidden; }
+.page-hero__float { position: absolute; transform: rotate(var(--r, 0deg)); z-index: 1; }
+.page-hero__card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  background: var(--raised); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow-card);
+  min-width: 190px; max-width: 78%; animation: pop 520ms var(--ease-spring) both;
+}
+@media (max-width: 900px) {
+  .page-hero { grid-template-columns: 1fr; }
+  .page-hero__art { min-height: 150px; }
+}
+
+/* sidebar: icons become glossy tiles */
+.side__link .ico {
+  width: 26px; height: 26px; border-radius: 8px; flex: none; display: grid; place-items: center;
+  color: var(--ink-3); transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease, transform 200ms var(--ease-spring);
+}
+.side__link .ico svg { width: 15px; height: 15px; color: inherit; }
+.side__link:hover .ico { transform: scale(1.06); }
+.side__link.active .ico { color: #fff; background: radial-gradient(120% 70% at 50% 0%, rgba(255,255,255,.35), transparent 60%), var(--key-lamp); box-shadow: 0 6px 12px -5px rgba(255,106,26,.6); }
+.side__link.active svg { color: #fff; }
+.side { background: transparent; }
+.side::before {
+  content: ""; position: absolute; inset: 10px 0 10px 10px; border-radius: 26px; background: var(--surface); z-index: -1;
+}
+.side { isolation: isolate; }
+/* panels get a soft lift on hover like landing cards */
+.panel { transition: box-shadow 240ms var(--ease-out); }
+.panel h2 { display: flex; align-items: center; gap: 8px; }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import { Link } from "react-router-dom";
 import { Copy, Sparkles, Bookmark, X } from "lucide-react";
 import { api } from "../../lib/api";
@@ -25,15 +26,15 @@ export default function Spark() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">Spark</span>
-          <h1 style={{ marginTop: 8 }}><span className="lead-in">What your reading</span> <span className="payoff">keeps circling.</span></h1>
-          <p className="muted" style={{ marginTop: 6, maxWidth: 560 }}>Spark reads only your own highlights and notes, then suggests the posts, threads and talks they point at.</p>
-        </div>
-        <span className="spacer" />
-        <button className="key key--iris" onClick={run} disabled={busy}><Sparkles size={16} /> {busy ? "Noticing…" : "Find new ideas"}</button>
-      </div>
+      <PageHero
+        pill={<><Sparkles size={13} /> Spark</>}
+        lead="What your reading"
+        pay="keeps circling."
+        sub="Spark reads only your own highlights and notes, then suggests the posts, threads and talks they point at."
+        mesh="mesh-peach"
+        tiles={[["tile--peach", <Sparkles />], ["tile--iris", <Sparkles />], ["tile--lamp", <Bookmark />], ["tile--sun", <Copy />]]}
+        actions={<button className="key key--iris key--sm" onClick={run} disabled={busy}><Sparkles size={15} /> {busy ? "Noticing…" : "Find new ideas"}</button>}
+      />
       {ideas.data && ideas.data.data.length === 0 ? (
         <Empty icon={<Sparkles />} title="No sparks yet">{(stats?.counts.highlights ?? 0) < 3 ? "Highlight at least three passages, then come back." : "Press Find new ideas."}</Empty>
       ) : (

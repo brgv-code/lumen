@@ -8,7 +8,7 @@ export const toUser = (u: SessionUser): User => ({
   email: u.email,
   name: u.name,
   avatarUrl: u.avatar_url,
-  isDemo: Boolean(u.is_demo),
+  isDemo: u.is_demo === 1,
   plan: u.plan === "pro" ? "pro" : "free",
   dailyGoal: u.daily_goal,
   shareSignals: Boolean(u.share_signals),

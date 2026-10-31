@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, BookOpen, Bot, Clock, Flame, Highlighter, Plus, Radar, Sparkles, Trophy, Users, BellRing, ExternalLink } from "lucide-react";
 import { LEVELS } from "@lumen/core";
@@ -40,15 +41,18 @@ export default function Home() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
-          <h1 style={{ marginTop: 8 }}>
-            <span className="lead-in">{greeting()}, {first}.</span>{" "}
-            <span className="payoff">{goal >= 1 ? "Your lamp is glowing." : stats && stats.streak > 0 ? "Keep the lamp lit." : "Light the lamp today."}</span>
-          </h1>
-        </div>
-      </div>
+      <PageHero
+        pill={<><Flame size={13} style={{ color: "var(--lamp)" }} /> {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</>}
+        lead={`${greeting()}, ${first}.`}
+        pay={goal >= 1 ? "Your lamp is glowing." : stats && stats.streak > 0 ? "Keep the lamp lit." : "Light the lamp today."}
+        sub={<>{stats ? <>{stats.streak} day streak · {stats.glowToday} of {stats.dailyGoal} glow today · {stats.counts.inbox} waiting in your inbox</> : "\u00a0"}</>}
+        mesh="mesh-lamp"
+        tiles={[["tile--lamp", <Flame />], ["tile--iris", <Sparkles />], ["tile--mint", <BookOpen />], ["tile--sky", <Highlighter />]]}
+        actions={<><button className="key key--lamp key--sm" onClick={openSave}><Plus size={14} /> Save a link</button><button className="key key--ghost key--sm" onClick={openAgent}><Bot size={14} /> Connect agent</button></>}
+      >
+        <div className="eyebrow">Today</div>
+        <div className="row" style={{ marginTop: 6 }}><Ring value={goal} /><div><div style={{ color: "var(--ink)", fontWeight: 600, fontSize: 22, letterSpacing: "-0.03em" }}>{stats?.glowToday ?? 0}<span className="muted" style={{ fontSize: 14 }}>/{stats?.dailyGoal ?? 20}</span></div><div className="small muted">glow</div></div></div>
+      </PageHero>
 
       {isNew && (
         <section className="panel gridlines">
@@ -82,10 +86,10 @@ export default function Home() {
           <span className="tile tile--lg tile--lamp" style={{ animation: stats?.glowToday ? "glow 3s ease-in-out infinite" : undefined }}><Flame /></span>
           <div><div className="big">{stats?.streak ?? "–"}</div><div className="small muted">day streak · best {stats?.bestStreak ?? 0}</div></div>
         </div>
-        <div className="panel stat">
-          <Ring value={goal} />
-          <div><div className="big">{stats?.glowToday ?? 0}<span className="muted" style={{ fontSize: 16 }}>/{stats?.dailyGoal ?? 20}</span></div><div className="small muted">glow today</div></div>
-        </div>
+        <Link to="/app/highlights" className="panel stat">
+          <span className="tile tile--lg tile--mint"><Highlighter /></span>
+          <div><div className="big">{stats?.counts.highlights ?? "–"}</div><div className="small muted">highlights · {stats?.counts.notes ?? 0} with notes</div></div>
+        </Link>
         <Link to="/app/analytics" className="panel" style={{ display: "block" }}>
           <div className="row"><span className="tile tile--iris"><Trophy /></span><div><div style={{ color: "var(--ink)", fontWeight: 600 }}>{stats?.level.name ?? "Spark"}</div><div className="small muted">{stats ? `${stats.glowTotal} glow · ${Math.max(0, stats.level.next - stats.glowTotal)} to ${LEVELS[stats.level.index + 1]?.name ?? "the top"}` : "…"}</div></div></div>
           <div className="meter" style={{ marginTop: 14 }}><span style={{ width: `${(stats?.level.progress ?? 0) * 100}%`, background: "var(--key-iris)" }} /></div>

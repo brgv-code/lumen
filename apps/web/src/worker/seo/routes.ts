@@ -5,7 +5,7 @@ import { Marked } from "marked";
 import type { AppEnv } from "../env";
 import { COMPARES, UPDATED } from "./compare";
 import { ANSWERS } from "./answers";
-import { SITE, crumbs, crumbsLd, ctaBand, esc, faqLd, page, GLYPH } from "./layout";
+import { SITE, META, crumbs, crumbsLd, ctaBand, esc, faqLd, page, GLYPH } from "./layout";
 import README from "../../../../../README.md";
 import PLAN from "../../../../../docs/PLAN.md";
 import ARCHITECTURE from "../../../../../docs/ARCHITECTURE.md";
@@ -18,6 +18,11 @@ import EXTENSION from "../../../../../docs/EXTENSION.md";
 import AUDIT from "../../../../../docs/AUDIT.md";
 
 export const seo = new Hono<AppEnv>();
+
+seo.use("*", async (c, next) => {
+  META.verify = c.env.GOOGLE_SITE_VERIFICATION ?? "";
+  await next();
+});
 
 const html = (body: string, status = 200) =>
   new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300, s-maxage=3600" } });
@@ -60,7 +65,7 @@ seo.get("/compare/:slug", (c) => {
     <div><h2 style="font-size:18px">Choose Lumen if</h2><ul>${x.chooseLumen.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>
   </div></section>
   <section class="s-panel"><h2>${x.kind === "alternative" ? `Moving from ${esc(x.name)}` : "Switching takes five minutes"}</h2><ol class="steps">${x.switchSteps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></section>
-  <section class="s-panel s-faq"><h2>Questions</h2>${x.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</section>
+  ${qaTabs("Questions", x.faq)}
 </div>
 <aside class="s-side">
   <div class="side-card"><span class="tile tile--lamp">${GLYPH.highlighter}</span><b style="color:var(--ink)">Try Lumen free</b><p class="small muted">A demo account with sample reading, no sign up.</p><a class="key key--lamp key--sm" href="/login">Open the demo</a></div>
@@ -69,6 +74,17 @@ seo.get("/compare/:slug", (c) => {
 </aside></div>${ctaBand()}`,
   }));
 });
+
+/** Questions as tabs: every answer sits in the same grid cell, so the box is as tall as the
+ *  longest answer and switching never moves anything below or beside it. No JS needed. */
+function qaTabs(title: string, faq: [string, string][]) {
+  const list = faq.slice(0, 8);
+  return `<section class="s-panel"><h2>${esc(title)}</h2><div class="qa">
+${list.map((_, k) => `<input type="radio" name="qa" id="qa${k}" class="qa__r"${k === 0 ? " checked" : ""}>`).join("")}
+<div class="qa__list">${list.map(([q], k) => `<label for="qa${k}"><span class="qa__n">${k + 1}</span><span>${esc(q)}</span></label>`).join("")}</div>
+<div class="qa__panes">${list.map(([q, ans]) => `<div class="qa__pane"><span class="eyebrow">Answer</span><h3>${esc(q)}</h3><p>${esc(ans)}</p></div>`).join("")}</div>
+</div></section>`;
+}
 
 /* ---------------- answers ---------------- */
 
@@ -110,7 +126,7 @@ seo.get("/answers/:slug", (c) => {
   <div class="answer-box"><span class="eyebrow">Short answer</span><p>${esc(a.short)}</p></div>
   <section class="s-panel"><h2>Step by step</h2><ol class="steps">${a.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></section>
   <section class="s-panel"><h2>Good to know</h2>${a.body.map((p) => `<p>${esc(p)}</p>`).join("")}</section>
-  <section class="s-panel s-faq"><h2>Related questions</h2>${a.faq.map(([q, x]) => `<details><summary>${esc(q)}</summary><p>${esc(x)}</p></details>`).join("")}</section>
+  ${qaTabs("Related questions", a.faq)}
   <p class="updated">Updated ${UPDATED}.</p>
 </div>
 <aside class="s-side">
@@ -118,6 +134,32 @@ seo.get("/answers/:slug", (c) => {
   ${related.length ? `<div class="side-card"><span class="eyebrow">Read next</span><ul>${related.map((r) => `<li><a href="/answers/${r.slug}">${esc(r.question)}</a></li>`).join("")}</ul></div>` : ""}
   ${cmp.length ? `<div class="side-card"><span class="eyebrow">Comparisons</span><ul>${cmp.map((k) => `<li><a href="/compare/${k.slug}">${esc(k.kind === "alternative" ? `${k.name} alternative` : `Lumen vs ${k.name}`)}</a></li>`).join("")}</ul></div>` : ""}
 </aside></div>${ctaBand()}`,
+  }));
+});
+
+
+/* ---------------- pricing ---------------- */
+
+const PLANS = [
+  { name: "Reader", price: "€0", note: "free forever for personal reading", hot: false, soon: false, items: ["Unlimited saves, highlights and notes", "Obsidian, Markdown and webhook destinations", "100 AI answers a day; your own model unlimited", "Connect your agent (MCP)", "Daily reads, reminders, radar, analytics", "Full export any time"] },
+  { name: "Pro", price: "€6", note: "per month, billed yearly (planned)", hot: true, soon: false, items: ["Everything in Reader", "Notion sync and scheduled pushes", "1,000 AI answers a day", "Higher agent limits", "PDF highlighting (coming soon)", "Priority on new formats"] },
+  { name: "Team", price: "€12", note: "per member, per month", hot: false, soon: true, items: ["Shared collections", "Team reading digests", "SSO with Google Workspace", "Admin and audit log"] },
+];
+const PRICING_FAQ: [string, string][] = [
+  ["Is Lumen free?", "Yes. The Reader plan is free for personal reading, with no card and no trial clock. During the public preview every feature is free."],
+  ["When does Pro start?", "Paid plans start after the preview. Everything you save stays yours and exportable whatever plan you are on."],
+  ["Can I use my own AI model for free?", "Yes. Ollama on your machine, any OpenAI compatible key, or Claude through your own CLI are unlimited on every plan."],
+  ["Can I self host?", "Yes. Lumen is open source and runs on Cloudflare Workers and D1; see the deploy guide."],
+];
+
+seo.get("/pricing", () => {
+  const trail: [string, string][] = [["Home", "/"], ["Pricing", "/pricing"]];
+  const cards = PLANS.map((p) => `<div class="price-card${p.hot ? " price-card--hot" : ""}"><div class="row"><h3>${p.name}</h3>${p.hot ? '<span class="chip chip--lamp" style="margin-left:auto">Most loved</span>' : ""}${p.soon ? '<span class="chip" style="margin-left:auto">Coming soon</span>' : ""}</div><div><span class="amount">${p.price}</span> <span class="small">${esc(p.note)}</span></div><ul>${p.items.map((i) => `<li><span class="tick">✓</span>${esc(i)}</li>`).join("")}</ul>${p.soon ? '<span class="key key--ghost" style="opacity:.6">Coming soon</span>' : `<a class="key ${p.hot ? "key--lamp" : "key--ghost"}" href="/login">${p.hot ? "Start free, upgrade later" : "Start free"}</a>`}</div>`).join("");
+  return html(page({
+    path: "/pricing", title: "Pricing: free for personal reading | Lumen",
+    description: "Lumen is free for personal reading: unlimited highlights, Obsidian and markdown sync, agent access over MCP, and 100 AI answers a day. Pro and Team plans are planned.",
+    jsonLd: [crumbsLd(trail), faqLd(PRICING_FAQ), { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Lumen", applicationCategory: "ProductivityApplication", operatingSystem: "Web, Chrome", offers: [{ "@type": "Offer", name: "Reader", price: "0", priceCurrency: "EUR" }] }],
+    body: `${crumbs(trail)}<section class="surface s-hero" style="text-align:center"><span class="label-pill">Pricing</span><h1 style="margin-left:auto;margin-right:auto"><span class="lead-in">Free to read.</span> <span class="payoff">Fair to grow.</span></h1><p class="dek" style="margin-left:auto;margin-right:auto">Every feature is free during the public preview. Bring your own model and it stays unlimited forever.</p></section><div class="price-grid-s">${cards}</div>${qaTabs("Pricing questions", PRICING_FAQ)}${ctaBand()}`,
   }));
 });
 
@@ -202,14 +244,14 @@ for (const key of Object.keys(LEGAL)) {
 /* ---------------- machine readable ---------------- */
 
 const urls = () => [
-  "/", "/compare", "/answers", "/docs", "/changelog", "/privacy", "/terms",
+  "/", "/pricing", "/compare", "/answers", "/docs", "/changelog", "/privacy", "/terms",
   ...COMPARES.map((c) => `/compare/${c.slug}`),
   ...ANSWERS.map((a) => `/answers/${a.slug}`),
   ...DOCS.filter((d) => d.slug).map((d) => `/docs/${d.slug}`),
 ];
 
 seo.get("/sitemap.xml", () => new Response(
-  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls().map((u) => `  <url><loc>${SITE.url}${u}</loc><lastmod>${UPDATED}</lastmod></url>`).join("\n")}\n</urlset>\n`,
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls().map((u) => `  <url><loc>${SITE.url}${u}</loc><lastmod>${UPDATED}</lastmod><changefreq>${u === "/" || u === "/changelog" ? "weekly" : "monthly"}</changefreq><priority>${u === "/" ? "1.0" : u.split("/").length === 2 ? "0.8" : "0.6"}</priority></url>`).join("\n")}\n</urlset>\n`,
   { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } },
 ));
 
@@ -219,7 +261,7 @@ seo.get("/robots.txt", () => new Response(
 ));
 
 seo.get("/llms.txt", () => new Response(
-  `# Lumen\n\n> ${SITE.description}\n\nLumen is free for personal reading and open source (${SITE.github}). Key ideas: highlighting never blocks copy and paste; each collection sends new highlights once to a chosen note (Obsidian, Notion, markdown, webhook); bring your own model (hosted, Ollama, OpenAI compatible, Claude via CLI); agents connect through MCP at ${SITE.url}/mcp.\n\n## Docs\n${DOCS.map((d) => `- [${d.title}](${SITE.url}/docs${d.slug ? "/" + d.slug : ""}): ${d.blurb}`).join("\n")}\n\n## Comparisons\n${COMPARES.map((c) => `- [${c.title}](${SITE.url}/compare/${c.slug}): ${c.answer}`).join("\n")}\n\n## Answers\n${ANSWERS.map((a) => `- [${a.question}](${SITE.url}/answers/${a.slug}): ${a.short}`).join("\n")}\n`,
+  `# Lumen\n\n> ${SITE.description}\n\nLumen is free for personal reading and open source (${SITE.github}). Key ideas: highlighting never blocks copy and paste; each collection sends new highlights once to a chosen note (Obsidian, Notion, markdown, webhook); bring your own model (hosted, Ollama, OpenAI compatible, Claude via CLI); agents connect through MCP at ${SITE.url}/mcp.\n\n## Product\n- [Pricing](${SITE.url}/pricing): free for personal reading; Pro and Team planned\n- [Changelog](${SITE.url}/changelog)\n\n## Docs\n${DOCS.map((d) => `- [${d.title}](${SITE.url}/docs${d.slug ? "/" + d.slug : ""}): ${d.blurb}`).join("\n")}\n\n## Comparisons\n${COMPARES.map((c) => `- [${c.title}](${SITE.url}/compare/${c.slug}): ${c.answer}`).join("\n")}\n\n## Answers\n${ANSWERS.map((a) => `- [${a.question}](${SITE.url}/answers/${a.slug}): ${a.short}`).join("\n")}\n`,
   { headers: { "content-type": "text/plain; charset=utf-8" } },
 ));
 

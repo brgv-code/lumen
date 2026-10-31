@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHero } from "../../components/PageHero";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { Item } from "@lumen/core";
 import { Download, Library as LibIcon, Plus, Send } from "lucide-react";
@@ -48,30 +49,19 @@ export default function LibraryPage() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          {collection ? (
-            <>
-              <Link to="/app/collections" className="eyebrow">Collections</Link>
-              <h1 style={{ marginTop: 8 }}><span className="lead-in">{collection.emoji}</span> <span className="payoff">{collection.name}</span></h1>
-              {collection.description && <p className="muted" style={{ marginTop: 6 }}>{collection.description}</p>}
-            </>
-          ) : (
-            <>
-              <span className="eyebrow">Library</span>
-              <h1 style={{ marginTop: 8 }}><span className="lead-in">Everything you saved,</span> <span className="payoff">ready to read.</span></h1>
-            </>
-          )}
-        </div>
-        <span className="spacer" />
-        {collection && (
-          <>
-            <a className="key key--ghost key--sm" href={`/api/v1/collections/${collection.id}/export.md?format=house`}><Download size={15} /> Export .md</a>
-            <Link className="key key--ghost key--sm" to="/app/integrations"><Send size={15} /> {collection.destinationId ? "Destination set" : "Send to a note"}</Link>
-          </>
-        )}
-        <button className="key key--sm" onClick={openSave}><Plus size={15} /> Save a link</button>
-      </div>
+      <PageHero
+        pill={collection ? <Link to="/app/collections">← Collections</Link> : <><LibIcon size={13} /> Library</>}
+        lead={collection ? collection.emoji : "Everything you saved,"}
+        pay={collection ? collection.name : "ready to read."}
+        sub={collection?.description ?? "Inbox, reading, done: progress is tracked as you scroll, and every page opens in a calm reader."}
+        mesh="mesh-sky"
+        tiles={[["tile--sky", <LibIcon />], ["tile--lamp", <Plus />], ["tile--mint", <Send />], ["tile--ink", <Download />]]}
+        actions={<>
+          <button className="key key--lamp key--sm" onClick={openSave}><Plus size={15} /> Save a link</button>
+          {collection && <a className="key key--ghost key--sm" href={`/api/v1/collections/${collection.id}/export.md?format=house`}><Download size={15} /> Export .md</a>}
+          {collection && <Link className="key key--ghost key--sm" to="/app/integrations"><Send size={15} /> {collection.destinationId ? "Destination set" : "Send to a note"}</Link>}
+        </>}
+      />
 
       <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
         <Segmented label="Status" size="sm" value={status} onChange={(v) => set("status", v === "active" ? "" : v)} options={[

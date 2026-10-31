@@ -9,6 +9,10 @@ export interface Env {
   /** Turn the "Try the demo" sandbox on (default on). */
   DEMO_ENABLED?: string;
   AI_MODEL?: string;
+  /** Google Search Console HTML tag verification token. */
+  GOOGLE_SITE_VERIFICATION?: string;
+  /** Secret for the persistent test account login link. */
+  DEV_LOGIN_KEY?: string;
 }
 
 export interface SessionUser {

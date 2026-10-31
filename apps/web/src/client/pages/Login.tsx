@@ -9,6 +9,7 @@ const ERRORS: Record<string, string> = {
   github_not_configured: "GitHub sign in is not configured on this deployment yet.",
   state_mismatch: "That sign in link expired. Try again.",
   exchange_failed: "The provider did not confirm your sign in. Try again.",
+  dev_login: "That test login link is not valid.",
 };
 
 function GoogleMark() {
