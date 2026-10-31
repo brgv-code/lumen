@@ -2,6 +2,8 @@ import { READER_SYSTEM, readerPrompt, type AIAction } from "@lumen/core";
 
 export const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 export const SPARK_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+/** Ask uses the larger model: it has to reason over a whole page plus library items. */
+export const CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 export function promptFor(action: AIAction, text: string, opts: { question?: string; title?: string; context?: string }) {
   return [

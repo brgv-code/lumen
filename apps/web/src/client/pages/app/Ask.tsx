@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowUp, MessageCircle, Sparkles, Highlighter, BookOpen, Library } from "lucide-react";
 import { streamChat, type ChatSource } from "../../lib/api";
 import { PageHero } from "../../components/PageHero";
+import { Md } from "../../components/Md";
+import { useNavigate } from "react-router-dom";
 
 interface Msg { role: "user" | "assistant"; content: string; sources?: ChatSource[]; error?: string; streaming?: boolean }
 
@@ -10,6 +12,7 @@ const STARTERS = ["What have I been reading about lately?", "Which of my highlig
 
 export default function Ask() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const nav = useNavigate();
   const [q, setQ] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs]);
@@ -43,10 +46,11 @@ export default function Ask() {
           <div key={k} style={{ justifySelf: "end", maxWidth: "80%", background: "var(--ink)", color: "var(--on-ink)", padding: "10px 14px", borderRadius: "16px 16px 4px 16px" }}>{m.content}</div>
         ) : (
           <div key={k} className="stack" style={{ gap: 8 }}>
-            <div className="card-flat" style={{ padding: "12px 14px", whiteSpace: "pre-wrap", lineHeight: 1.6, color: m.error ? "var(--peach)" : "var(--ink-2)" }}>
-              <span className={m.streaming ? "caret" : ""}>{m.error ?? m.content}</span>
+            <div className="card-flat answer-md" style={{ padding: "12px 14px", lineHeight: 1.6, color: m.error ? "var(--peach)" : "var(--ink-2)" }}>
+              {m.error ? m.error : <Md text={m.content} onCite={(n) => { const s = m.sources?.find((x) => x.n === n); if (s) nav(`/app/read/${s.itemId}${s.kind === "highlight" ? `#${s.id}` : ""}`); }} />}
+              {m.streaming && <span className="caret" />}
             </div>
-            {m.sources && m.sources.length > 0 && (
+            {!m.streaming && m.sources && m.sources.length > 0 && /\[\d+\]/.test(m.content) && (
               <div className="grid-2" style={{ gap: 8 }}>
                 {m.sources.map((s) => (
                   <Link key={s.n} to={`/app/read/${s.itemId}${s.kind === "highlight" ? `#${s.id}` : ""}`} className="card-flat row" style={{ padding: 10, alignItems: "flex-start" }}>

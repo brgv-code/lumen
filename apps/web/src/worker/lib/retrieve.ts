@@ -43,8 +43,8 @@ export async function retrieve(db: D1Database, userId: string, query: string, li
 }
 
 export function sourcesBlock(src: Source[]) {
-  if (!src.length) return "Library: nothing relevant found.";
-  return "From the reader's Lumen library:\n" + src.map((s) => s.kind === "highlight"
+  if (!src.length) return "(nothing in the library matched)";
+  return src.map((s) => s.kind === "highlight"
     ? `[${s.n}] Highlight from "${s.title}": "${s.quote?.slice(0, 400)}"${s.note ? ` (their note: ${s.note.slice(0, 200)})` : ""}`
     : `[${s.n}] Saved article "${s.title}"${s.excerpt ? `: ${s.excerpt.slice(0, 240)}` : ""}`).join("\n");
 }

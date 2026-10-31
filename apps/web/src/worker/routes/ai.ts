@@ -3,7 +3,7 @@ import { AI_ACTIONS } from "@lumen/core";
 import type { AppEnv, SessionUser } from "../env";
 import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
-import { DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
+import { CHAT_MODEL, DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
 import { retrieve, sourcesBlock } from "../lib/retrieve";
 import { LIBRARY_SYSTEM } from "@lumen/core";
 import { safeJson, toIdea } from "../lib/map";
@@ -49,20 +49,21 @@ ai.post("/chat", async (c) => {
   const question = str(b.question, 1500);
   if (!question) fail(422, "bad_request", "Ask a question.");
   await spend(c.env.DB, u);
-  const sources = await retrieve(c.env.DB, u.id, `${question} ${b.selection ?? ""} ${b.page?.title ?? ""}`);
-  const page = b.page?.text ? `The reader is on "${b.page.title ?? "a page"}" (${b.page.url ?? ""}). Page text (trimmed): """${b.page.text.slice(0, 5000)}"""` : "";
-  const sel = b.selection ? `They selected: """${b.selection.slice(0, 1500)}"""` : "";
+  const sources = await retrieve(c.env.DB, u.id, `${question} ${b.selection ?? ""} ${b.page?.title ?? ""}`, 5);
+  const pageText = (b.page?.text ?? "").replace(/\s+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
+  const page = pageText ? `PAGE: "${b.page?.title ?? "Untitled"}" (${b.page?.url ?? ""})\n"""${pageText.slice(0, 12000)}"""` : "";
+  const sel = b.selection ? `SELECTION: """${b.selection.slice(0, 2000)}"""` : "";
   const history = (b.history ?? []).slice(-6).filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
   let stream: ReadableStream;
   try {
-    stream = (await c.env.AI.run((c.env.AI_MODEL || DEFAULT_MODEL) as Parameters<Ai["run"]>[0], {
+    stream = (await c.env.AI.run(CHAT_MODEL as Parameters<Ai["run"]>[0], {
       messages: [
         { role: "system", content: LIBRARY_SYSTEM },
         ...history,
-        { role: "user", content: [page, sel, sourcesBlock(sources), `Question: ${question}`].filter(Boolean).join("\n\n") },
+        { role: "user", content: [page, sel, `LIBRARY:\n${sourcesBlock(sources)}`, `QUESTION: ${question}`].filter(Boolean).join("\n\n") },
       ],
       stream: true,
-      max_tokens: 500,
+      max_tokens: 700,
     } as never)) as unknown as ReadableStream;
   } catch (e) {
     console.error("chat failed", e);

@@ -12,8 +12,10 @@ export default defineContentScript({
   matches: ["<all_urls>"],
   runAt: "document_idle",
   main() {
-    if ((window as any).__lumen) return;
-    (window as any).__lumen = true;
+    const v = chrome.runtime.getManifest().version;
+    if ((window as any).__lumen === v) return;
+    document.querySelectorAll("lumen-ui").forEach((n) => n.remove());
+    (window as any).__lumen = v;
     new Lumen().start();
   },
 });

@@ -525,3 +525,8 @@
 .tour-who b { color: var(--ink); font-weight: 600; margin-right: 4px; }
 /* narrow pages (settings, ask) sit centred in the main column */
 .page--narrow { max-width: 880px; width: 100%; margin-inline: auto; }
+
+.answer-md .md-p { margin: 0 0 10px; } .answer-md .md-p:last-child { margin: 0; }
+.answer-md .md-list { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; }
+.answer-md b { color: var(--ink); }
+.answer-md .cite { border: 0; cursor: pointer; display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; margin: 0 1px; border-radius: 6px; font: 700 11px var(--font-ui); color: #fff; background: var(--key-iris); vertical-align: 1px; }

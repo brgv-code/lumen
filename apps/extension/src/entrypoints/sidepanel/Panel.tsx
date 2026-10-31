@@ -3,6 +3,8 @@ import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
 import { Picker } from "../popup/Picker";
+import { readPage, type PageContext } from "../../lib/page";
+import { Md } from "../../lib/md";
 
 type Tab = "ask" | "page" | "you";
 interface Source { n: number; kind: string; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null }
@@ -23,11 +25,13 @@ export default function Panel() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [usePage, setUsePage] = useState(true);
+  const [ctxInfo, setCtxInfo] = useState<PageContext | null | "none">(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const refreshTab = useCallback(async () => {
     const t = await activeTab();
     setCur(t ?? null);
+    readPage(t).then((c) => setCtxInfo(c ?? "none")).catch(() => setCtxInfo("none"));
     if (t?.url?.startsWith("http")) setPage(await send<PageState>({ type: "PAGE_STATE", url: t.url }).catch(() => null));
     else setPage(null);
   }, []);
@@ -52,8 +56,8 @@ export default function Panel() {
   const ask = async (question: string) => {
     if (!question.trim()) return;
     const t = await activeTab();
-    let ctx: { selection: string; text: string; title: string } | null = null;
-    if (usePage && t?.id && t.url?.startsWith("http")) ctx = await chrome.tabs.sendMessage(t.id, { type: "GET_TEXT" }).catch(() => null);
+    const ctx = usePage ? await readPage(t) : null;
+    if (usePage) setCtxInfo(ctx ?? "none");
     const history = msgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content }));
     setMsgs((l) => [...l, { role: "user", content: question }, { role: "assistant", content: "", streaming: true }]);
     setInput("");
@@ -114,10 +118,11 @@ export default function Panel() {
             ) : (
               <div key={k} className="stack" style={{ gap: 6 }}>
                 <div className="bubble ai" style={m.error ? { color: "var(--peach)" } : undefined}>
-                  {m.error ?? m.content}{m.streaming && <span className="caret-i">▍</span>}
+                  {m.error ? m.error : <Md text={m.content} onCite={(n) => { const src = m.sources?.find((x) => x.n === n); if (src) openInLumen(`/app/read/${src.itemId}${src.kind === "highlight" ? `#${src.id}` : ""}`); }} />}
+                  {m.streaming && <span className="caret-i">▍</span>}
                 </div>
                 {m.upgrade && <button className="key lamp" style={{ height: 32 }} onClick={() => openInLumen("/app/upgrade")}>See Pro</button>}
-                {m.sources && m.sources.length > 0 && (
+                {!m.streaming && m.sources && m.sources.length > 0 && /\[\d+\]/.test(m.content) && (
                   <div className="stack" style={{ gap: 4 }}>
                     <div className="eyebrow">From your library</div>
                     {m.sources.map((src) => (
@@ -172,6 +177,14 @@ export default function Panel() {
 
       {tab === "ask" && (
         <form style={{ padding: 12, borderTop: "1px solid var(--hair)", display: "grid", gap: 8 }} onSubmit={(e) => { e.preventDefault(); ask(input); }}>
+          {usePage && ctxInfo && (
+            <div className={`ctx ${ctxInfo === "none" ? "off" : ""}`}>
+              <span className="dot" />
+              {ctxInfo === "none"
+                ? <span>Can't read this page (browser pages and built in PDFs). Answers use your library only.</span>
+                : <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Reading: <b style={{ color: "var(--ink)", fontWeight: 500 }}>{ctxInfo.title}</b>{ctxInfo.selection ? " · your selection" : ""}</span>}
+            </div>
+          )}
           <textarea rows={2} placeholder="Ask about this page or anything you have saved…" value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }} />
           <div className="row small muted">

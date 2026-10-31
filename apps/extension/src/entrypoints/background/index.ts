@@ -48,6 +48,7 @@ export default defineBackground(() => {
 
   chrome.runtime.onInstalled.addListener((d) => {
     buildMenus();
+    injectIntoOpenTabs();
     if (d.reason === "install") chrome.runtime.openOptionsPage();
   });
   chrome.runtime.onStartup.addListener(() => buildMenus());
@@ -74,6 +75,17 @@ export default defineBackground(() => {
     chrome.notifications.clear(nid);
   });
 });
+
+/** After install or update, existing tabs have no (or a stale) content script: add the current one. */
+async function injectIntoOpenTabs() {
+  const files = chrome.runtime.getManifest().content_scripts?.[0]?.js ?? [];
+  if (!files.length) return;
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  for (const t of tabs) {
+    if (t.id === undefined || t.discarded) continue;
+    chrome.scripting.executeScript({ target: { tabId: t.id }, files }).catch(() => {});
+  }
+}
 
 function safePost(port: chrome.runtime.Port, m: object) {
   try { port.postMessage(m); } catch { /* closed */ }

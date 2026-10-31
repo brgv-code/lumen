@@ -15,7 +15,7 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "lumen-db", "database_id": "47eaaa2b-a68e-47ad-92a7-98cc662c2b48", "migrations_dir": "migrations" }
   ],
-  "ai": { "binding": "AI" },
+  "ai": { "binding": "AI", "remote": true },
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "triggers": { "crons": ["17 */6 * * *"] },
   "vars": { "DEMO_ENABLED": "true" },
