@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { HIGHLIGHT_COLORS, ITEM_KINDS, ITEM_STATUSES, type ItemStatus } from "@lumen/core";
+import { normalizeColor, ITEM_KINDS, ITEM_STATUSES, type ItemStatus } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, decodeCursor, encodeCursor, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
 import { toHighlight, toItem } from "../lib/map";
@@ -166,7 +166,7 @@ items.post("/:id/highlights", async (c) => {
   const stmts = [
     db.prepare("INSERT INTO highlights (id, user_id, item_id, quote, prefix, suffix, position, color, note, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
       .bind(hid, u.id, item.id, quote, String(b.prefix ?? "").slice(0, 64), String(b.suffix ?? "").slice(0, 64), Math.max(0, Number(b.position) || 0),
-        oneOf(b.color, HIGHLIGHT_COLORS) ?? "sun", note, t, t),
+        normalizeColor(b.color) ?? "sun", note, t, t),
     glowStmt(db, u, "highlight", item.id),
     ...(note ? [glowStmt(db, u, "note", item.id)] : []),
     ...(item.status === "inbox" ? [db.prepare("UPDATE items SET status = 'reading', updated_at = ? WHERE id = ?").bind(t, item.id)] : []),

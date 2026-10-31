@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Link, useLocation, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
 import type { AIAction, Highlight, ItemWithContent, TextQuote } from "@lumen/core";
-import { citeForClipboard, HIGHLIGHT_COLORS } from "@lumen/core";
+import { citeForClipboard, HIGHLIGHT_COLORS, colorName, colorSwatch, colorVar } from "@lumen/core";
+import { ColorWheel, recentColors, rememberColor, lastColor, setLastColor } from "../../components/ColorPicker";
 import { anchorToRange, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { ArrowLeft, Archive, BookOpen, Check, Copy, ExternalLink, Heart, MessageSquareText, Sparkles, Wand2, HelpCircle, X } from "lucide-react";
 import { api, streamAI } from "../../lib/api";
@@ -24,6 +25,7 @@ export default function Reader() {
   const [missing, setMissing] = useState(false);
   const [alsoSaving, setAlsoSaving] = useState(0);
   const [sel, setSel] = useState<Sel | null>(null);
+  const [wheel, setWheel] = useState(false);
   const [ai, setAi] = useState<AIState | null>(null);
   const [ask, setAsk] = useState("");
   const [progress, setProgress] = useState(0);
@@ -46,7 +48,7 @@ export default function Reader() {
     unwrapMarks(root, "mark[data-hl]");
     for (const h of [...hls].sort((a, b) => b.position - a.position)) {
       const r = anchorToRange(root, h);
-      if (r) wrapRange(r, { "data-hl": h.id, class: `hl-${h.color}` });
+      if (r) for (const m of wrapRange(r, { "data-hl": h.id, class: "hl" })) m.style.setProperty("--hl", colorVar(h.color));
     }
   }, [html, hls]);
 
@@ -100,6 +102,8 @@ export default function Reader() {
 
   const highlight = async (color: string, withNote = false) => {
     if (!sel || !item) return;
+    setLastColor(color);
+    setWheel(false);
     const q = sel.quote;
     setSel(null);
     window.getSelection()?.removeAllRanges();
@@ -249,13 +253,15 @@ export default function Reader() {
       </div>
 
       {sel && (
-        <div className="toolbar" data-lumen-ui style={{ position: "fixed", left: Math.min(Math.max(sel.x, 190), window.innerWidth - 190), top: Math.max(8, sel.y - 50) }} onMouseDown={(e) => e.preventDefault()}>
-          {HIGHLIGHT_COLORS.map((c) => <button key={c} className={`sw swatch-${c}`} aria-label={`Highlight ${c}`} title={`Highlight (${c})`} onClick={() => highlight(c)} />)}
+        <div className="toolbar" data-lumen-ui style={{ position: "fixed", left: Math.min(Math.max(sel.x, 280), window.innerWidth - 280), top: Math.max(8, sel.y - 50) }} onMouseDown={(e) => { if (!(e.target instanceof HTMLInputElement)) e.preventDefault(); }}>
+          {[...HIGHLIGHT_COLORS, ...recentColors()].map((c) => <button key={c} className="sw" style={{ background: colorSwatch(c) }} aria-label={`Highlight ${colorName(c)}`} title={`Highlight (${colorName(c)})`} onClick={() => highlight(c)} />)}
+          <button className="sw cp-wheel-btn" aria-label="Highlight in any colour" title="Any colour" aria-expanded={wheel} onClick={() => setWheel((w) => !w)} />
           <span className="sep" />
-          <button onClick={() => highlight("sun", true)}><MessageSquareText size={14} /> Note</button>
+          <button onClick={() => highlight(lastColor(), true)}><MessageSquareText size={14} /> Note</button>
           <button onClick={() => runAI("explain", sel.quote.quote)}><Sparkles size={14} /> Explain</button>
           <button onClick={() => runAI("define", sel.quote.quote)}><HelpCircle size={14} /> Define</button>
           <button onClick={copySel}><Copy size={14} /> Copy</button>
+          {wheel && <div className="cp-pop cp-pop--center" onMouseDown={(e) => e.stopPropagation()}><ColorWheel initial={lastColor().startsWith("#") ? lastColor() : "#ff7a59"} onPick={(c) => { rememberColor(c); setWheel(false); highlight(c); }} /></div>}
         </div>
       )}
     </>

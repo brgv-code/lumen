@@ -1,4 +1,5 @@
 // Public share pages: /s/:id and its link preview image /s/:id/og.jpg.
+import { colorVar } from "@lumen/core";
 import type { Env } from "../env";
 import { SITE, esc, page } from "./layout";
 import { notFound } from "./routes";
@@ -23,7 +24,7 @@ export async function sharePage(env: Env, id: string, ctx: { waitUntil(p: Promis
   let description = "";
   if (s.kind === "highlight") {
     description = `“${String(p.quote ?? "").slice(0, 180)}” from ${p.title ?? "an article"}`;
-    inner = `<blockquote class="sh-quote"><mark class="hl-${esc(p.color ?? "sun")}">${esc(p.quote ?? "")}</mark></blockquote>
+    inner = `<blockquote class="sh-quote"><mark class="hl" style="--hl:${colorVar(p.color)}">${esc(p.quote ?? "")}</mark></blockquote>
       ${p.note ? `<p class="sh-note"><b>${esc(owner)}'s note:</b> ${esc(p.note)}</p>` : ""}
       ${p.url ? `<a class="sh-source" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title ?? p.url)} <span>↗</span></a>` : ""}`;
   } else if (s.kind === "progress") {

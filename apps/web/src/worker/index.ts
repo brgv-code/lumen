@@ -34,7 +34,7 @@ app.onError((err, c) => {
 });
 
 /** Latest extension version, so older installs can say "update available". Bump with each release. */
-const EXTENSION_VERSION = "2.5.4";
+const EXTENSION_VERSION = "2.6.0";
 app.get("/api/health", (c) => c.json({ ok: true, service: "lumen", extension: EXTENSION_VERSION, time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*" }));
 
 app.route("/auth", auth);

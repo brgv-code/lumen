@@ -1,3 +1,4 @@
+import { colorRgb } from "@lumen/core";
 // Share cards drawn on a canvas, in the Lumen look, at the sizes each platform wants.
 
 export type CardFormat = "link" | "square" | "portrait" | "story";
@@ -15,7 +16,6 @@ export interface ProgressCardData { kind: "progress"; owner: string; streak: num
 export interface CollectionCardData { kind: "collection"; owner: string; name: string; emoji: string; description?: string | null; items: { title: string; site?: string | null }[]; total: number }
 export type CardData = HighlightCardData | ProgressCardData | CollectionCardData;
 
-const MARK: Record<string, string> = { sun: "255,196,0", mint: "30,200,130", iris: "125,105,255", peach: "255,110,80", sky: "60,135,255" };
 
 interface Palette { bg: (c: CanvasRenderingContext2D, w: number, h: number) => void; card: string; ink: string; ink2: string; ink3: string; well: string; dark: boolean }
 const PALETTES: Record<CardTheme, Palette> = {
@@ -161,7 +161,7 @@ export function renderCard(canvas: HTMLCanvasElement, data: CardData, format: Ca
     const lh = px * 1.42;
     const block = lines.length * lh;
     let ly = qTop + Math.max(0, (qH - block) / (tall || lines.length <= 3 ? 2 : 3)) + px;
-    const rgb = MARK[data.color] ?? MARK.sun;
+    const rgb = colorRgb(data.color).join(",");
     for (const l of lines) {
       c.font = ser(px);
       const lw = c.measureText(l).width;

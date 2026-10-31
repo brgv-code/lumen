@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { HIGHLIGHT_PALETTE } from "@lumen/core";
 import { PageHero } from "../../components/PageHero";
 import type { Highlight } from "@lumen/core";
 import { citeForClipboard } from "@lumen/core";
@@ -45,10 +46,11 @@ export default function Highlights() {
         actions={<button className="key key--ghost key--sm" onClick={copyAll}><Copy size={15} /> Copy all shown</button>}
       />
       <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
-        <Segmented label="Colour" size="sm" value={color} onChange={setColor} options={[
-          { value: "all", label: "All" },
-          ...["sun", "mint", "iris", "peach", "sky"].map((c) => ({ value: c, label: <span className="row" style={{ gap: 6 }}><span className={`dot swatch-${c}`} />{c[0].toUpperCase() + c.slice(1)}</span> })),
-        ]} />
+        <div className="hl-filter" role="group" aria-label="Filter by colour">
+          <button aria-pressed={color === "all"} onClick={() => setColor("all")}>All</button>
+          {HIGHLIGHT_PALETTE.map((c) => <button key={c.id} className="cp-sw" style={{ width: 18, height: 18, background: c.swatch }} title={c.name} aria-label={`Only ${c.name}`} aria-pressed={color === c.id} onClick={() => setColor(color === c.id ? "all" : c.id)} />)}
+          <button className="cp-sw cp-wheel-btn" style={{ width: 18, height: 18 }} title="Custom colours" aria-label="Only custom colours" aria-pressed={color === "custom"} onClick={() => setColor(color === "custom" ? "all" : "custom")} />
+        </div>
         <button className={`chip ${notes ? "chip--ink" : ""}`} style={{ height: 32, padding: "0 12px" }} onClick={() => setNotes(!notes)}>✎ With notes</button>
         <div className="search" style={{ maxWidth: 300, flex: 1 }}>
           <Search size={15} />

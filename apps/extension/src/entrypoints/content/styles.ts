@@ -22,12 +22,15 @@ button { font: inherit; cursor: pointer; border: 0; }
 .bar .more { color: rgba(255,255,255,.5); }
 .hl-group { position: relative; display: inline-flex; }
 .flyout { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%) scale(.9); opacity: 0; pointer-events: none;
-  display: flex; gap: 6px; padding: 6px 8px; border-radius: 99px; background: rgba(18,18,21,.96); box-shadow: 0 10px 20px -10px rgba(0,0,0,.6);
+  display: grid; grid-template-columns: repeat(8, 18px); gap: 7px; padding: 8px 10px; border-radius: 16px; background: rgba(18,18,21,.96); box-shadow: 0 10px 20px -10px rgba(0,0,0,.6);
   transition: opacity 140ms ease, transform 160ms cubic-bezier(.34,1.56,.64,1); }
 .hl-group:hover .flyout { opacity: 1; transform: translateX(-50%) scale(1); pointer-events: auto; }
 .flyout::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
 .flyout .sw { width: 18px; height: 18px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); transition: transform 140ms cubic-bezier(.34,1.56,.64,1); }
 .flyout .sw:hover { transform: scale(1.2); }
+/* the main highlight button shows the colour it will use */
+.hl-group > .act { position: relative; }
+.hl-group > .act::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 6px; height: 6px; border-radius: 99px; background: var(--dot, #ffd34d); box-shadow: 0 0 0 1.5px #121215; }
 .sep { width: 1px; height: 16px; background: rgba(255,255,255,.14); margin: 0 3px; }
 
 /* floating panel: sits over the page, never resizes it */
@@ -78,8 +81,7 @@ button { font: inherit; cursor: pointer; border: 0; }
 .chip { font-size: 11.5px; padding: 2px 8px; border-radius: 99px; background: #fff; color: #3a3a3f; box-shadow: inset 0 0 0 1px rgba(14,14,16,.1); }
 .q { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: #fff; color: #0e0e10;
   font-family: "Newsreader", Georgia, serif; font-size: 15px; line-height: 1.55; max-height: 120px; overflow: auto; }
-.q.lumen-sun { background: #fff6d1; } .q.lumen-mint { background: #e4f8ee; } .q.lumen-iris { background: #efecff; }
-.q.lumen-peach { background: #ffeee7; } .q.lumen-sky { background: #e7f0ff; }
+.q[style] { background: rgb(var(--lc) / .2); box-shadow: inset 3px 0 0 rgb(var(--lc) / .9); }
 .note { background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; font-size: 13.5px; }
 .answer { background: #fff; border-radius: 12px; padding: 12px; white-space: pre-wrap; min-height: 44px; font-size: 14px; color: #3a3a3f; }
 .answer.streaming::after { content: ""; display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: -2px; border-radius: 2px; background: #6d5bff; animation: blink 900ms infinite; }
@@ -113,11 +115,7 @@ textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px r
 :host(.dark) .card { background: #18181b; color: #c9c9ce; box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 60px -20px rgba(0,0,0,.8); }
 :host(.dark) .head b, :host(.dark) .q, :host(.dark) textarea, :host(.dark) input { color: #f4f4f5; }
 :host(.dark) .q, :host(.dark) .note, :host(.dark) .answer, :host(.dark) textarea, :host(.dark) input, :host(.dark) .key.ghost, :host(.dark) .chip { background: #222226; }
-:host(.dark) .q.lumen-sun { background: rgba(255,213,74,.22); }
-:host(.dark) .q.lumen-mint { background: rgba(46,204,142,.2); }
-:host(.dark) .q.lumen-iris { background: rgba(140,125,255,.24); }
-:host(.dark) .q.lumen-peach { background: rgba(255,130,100,.22); }
-:host(.dark) .q.lumen-sky { background: rgba(80,150,255,.22); }
+:host(.dark) .q[style] { background: rgb(var(--lc) / .22); }
 :host(.dark) .answer { color: #c9c9ce; }
 :host(.dark) .chip { color: #c9c9ce; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
 :host(.dark) .key.ghost { color: #f4f4f5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
@@ -132,11 +130,8 @@ export const MARK_CSS = `
    --lumen-a (light pages) and --lumen-da (dark pages) come from the Strength setting. */
 mark.lumen-mark { color: inherit !important; border-radius: 3px; padding: 0 1px; cursor: pointer;
   -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-color 150ms ease; }
-mark.lumen-sun   { --lc: 255 196 0;   background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
-mark.lumen-mint  { --lc: 30 200 130;  background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
-mark.lumen-iris  { --lc: 125 105 255; background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
-mark.lumen-peach { --lc: 255 110 80;  background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
-mark.lumen-sky   { --lc: 60 135 255;  background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
+/* the colour comes from style="--lc: r g b" on each mark, so any palette or custom colour works */
+mark.lumen-mark { --lc: 255 196 0; background: rgb(var(--lc) / var(--lumen-a, .28)) !important; }
 mark.lumen-mark:hover { background: rgb(var(--lc) / calc(var(--lumen-a, .28) + .12)) !important; }
 /* dark pages: a fainter tint plus a thin coloured underline */
 mark.lumen-mark.lumen-dark { background: rgb(var(--lc) / var(--lumen-da, .16)) !important; box-shadow: inset 0 -2px 0 rgb(var(--lc) / .85) !important; }

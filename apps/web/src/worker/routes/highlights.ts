@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { HIGHLIGHT_COLORS } from "@lumen/core";
+import { normalizeColor } from "@lumen/core";
 import type { AppEnv } from "../env";
-import { body, decodeCursor, encodeCursor, fail, now, oneOf } from "../lib/util";
+import { body, decodeCursor, encodeCursor, fail, now } from "../lib/util";
 import { toHighlight } from "../lib/map";
 import { glowStmt } from "../lib/glow";
 
@@ -15,8 +15,8 @@ highlights.get("/", async (c) => {
   const q = c.req.query();
   const where = ["h.user_id = ?"];
   const args: unknown[] = [u.id];
-  const color = oneOf(q.color, HIGHLIGHT_COLORS);
-  if (color) { where.push("h.color = ?"); args.push(color); }
+  if (q.color === "custom") where.push("h.color LIKE '#%'");
+  else { const color = normalizeColor(q.color); if (color) { where.push("h.color = ?"); args.push(color); } }
   if (q.item) { where.push("h.item_id = ?"); args.push(q.item); }
   if (q.collection) { where.push("i.collection_id = ?"); args.push(q.collection); }
   if (q.notes === "1") where.push("h.note IS NOT NULL");
@@ -39,7 +39,8 @@ highlights.patch("/:id", async (c) => {
   const sets: string[] = [];
   const args: unknown[] = [];
   const stmts: D1PreparedStatement[] = [];
-  const color = oneOf(b.color, HIGHLIGHT_COLORS);
+  const color = normalizeColor(b.color);
+  if (b.color !== undefined && !color) fail(422, "bad_color", "Colour must be a palette name or #rrggbb.");
   if (color) { sets.push("color = ?"); args.push(color); }
   if (b.note !== undefined) {
     const note = typeof b.note === "string" && b.note.trim() ? b.note.trim().slice(0, 4000) : null;

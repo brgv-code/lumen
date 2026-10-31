@@ -1,10 +1,10 @@
 import { BarChart3, BookOpen, CheckCircle2, Clock, Type } from "lucide-react";
+import { colorName, colorSwatch } from "@lumen/core";
 import { PageHero } from "../../components/PageHero";
 import { api } from "../../lib/api";
 import { useAsync } from "../../lib/hooks";
 import { useApp } from "./Layout";
 
-const COLOR_HEX: Record<string, string> = { sun: "#ffd34d", mint: "#3fd39a", iris: "#8a7bff", peach: "#ff8a6b", sky: "#5b9bff" };
 
 export default function Analytics() {
   const a = useAsync(() => api.analytics(), []);
@@ -90,10 +90,10 @@ export default function Analytics() {
         <section className="panel">
           <h2 style={{ marginBottom: 14 }}>Highlight colours</h2>
           <div style={{ display: "flex", height: 18, borderRadius: 9, overflow: "hidden", background: "var(--well)" }}>
-            {(d?.colors ?? []).map((c) => <span key={c.color} title={`${c.color}: ${c.n}`} style={{ width: `${(c.n / colorTotal) * 100}%`, background: COLOR_HEX[c.color] }} />)}
+            {(d?.colors ?? []).map((c) => <span key={c.color} title={`${colorName(c.color)}: ${c.n}`} style={{ width: `${(c.n / colorTotal) * 100}%`, background: colorSwatch(c.color) }} />)}
           </div>
           <div className="row" style={{ flexWrap: "wrap", gap: 12, marginTop: 12 }}>
-            {(d?.colors ?? []).map((c) => <span key={c.color} className="row small" style={{ gap: 6 }}><span className="dot" style={{ color: COLOR_HEX[c.color] }} />{c.color} · {c.n}</span>)}
+            {(d?.colors ?? []).map((c) => <span key={c.color} className="row small" style={{ gap: 6 }}><span className="dot" style={{ color: colorSwatch(c.color) }} />{colorName(c.color)} · {c.n}</span>)}
           </div>
           <div className="card-flat row" style={{ padding: 12, marginTop: 16 }}>
             <span className="tile tile--sm tile--ink"><BarChart3 /></span>

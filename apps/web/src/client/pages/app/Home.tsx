@@ -6,6 +6,7 @@ import { LEVELS } from "@lumen/core";
 import { useApp } from "./Layout";
 import { useAsync, hostOf } from "../../lib/hooks";
 import { api, agentLabel } from "../../lib/api";
+import { hlStyle } from "../../lib/hl";
 import { Empty, Segmented, useToast } from "../../components/ui";
 import { SiteLetter } from "../../components/cards";
 
@@ -128,7 +129,7 @@ export default function Home() {
               {(reads.data?.resurface ?? []).map((h) => (
                 <Link key={h.id} to={`/app/read/${h.itemId}#${h.id}`} className="card-flat" style={{ padding: 12, display: "grid", gap: 4 }}>
                   <span className="eyebrow">Worth revisiting</span>
-                  <span style={{ fontFamily: "var(--font-read)", color: "var(--ink)", fontSize: 15 }}><mark className={`hl-${h.color}`}>{h.quote}</mark></span>
+                  <span style={{ fontFamily: "var(--font-read)", color: "var(--ink)", fontSize: 15 }}><mark className="hl" style={hlStyle(h.color)}>{h.quote}</mark></span>
                   <span className="small muted">{h.item?.title}</span>
                 </Link>
               ))}
@@ -202,7 +203,7 @@ export default function Home() {
           <div className="stack" style={{ gap: 10 }}>
             {(hls.data?.data ?? []).slice(0, 4).map((h) => (
               <Link key={h.id} to={`/app/read/${h.itemId}`} className="card-flat" style={{ padding: "12px 14px", display: "grid", gap: 6 }}>
-                <span style={{ fontFamily: "var(--font-read)", fontSize: 15.5, color: "var(--ink)", lineHeight: 1.5 }}><mark className={`hl-${h.color}`}>{h.quote}</mark></span>
+                <span style={{ fontFamily: "var(--font-read)", fontSize: 15.5, color: "var(--ink)", lineHeight: 1.5 }}><mark className="hl" style={hlStyle(h.color)}>{h.quote}</mark></span>
                 <span className="small muted">{h.item?.title}{h.note ? ` · ✎ ${h.note}` : ""}</span>
               </Link>
             ))}

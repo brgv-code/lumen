@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { colorSwatch } from "@lumen/core";
 import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
@@ -9,7 +10,6 @@ import { Md } from "../../lib/md";
 type Tab = "ask" | "page" | "you";
 interface Source { n: number; kind: string; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null }
 interface Msg { role: "user" | "assistant"; content: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean }
-const SWATCH: Record<string, string> = { sun: "#ffe58a", mint: "#bdefd5", iris: "#dcd6ff", peach: "#ffd5c6", sky: "#cfe2ff" };
 
 async function activeTab() {
   const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -170,7 +170,7 @@ export default function Panel() {
                 <div className="eyebrow">Highlights here · {page?.highlights.length ?? 0}</div>
                 {(page?.highlights ?? []).map((h: Highlight) => (
                   <button key={h.id} className="pick" style={{ alignItems: "flex-start" }} onClick={() => cur?.id && chrome.tabs.sendMessage(cur.id, { type: "SCROLL_TO", id: h.id }).catch(() => {})}>
-                    <span style={{ width: 4, alignSelf: "stretch", borderRadius: 4, background: SWATCH[h.color], flex: "none" }} />
+                    <span style={{ width: 4, alignSelf: "stretch", borderRadius: 4, background: colorSwatch(h.color), flex: "none" }} />
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "block", fontFamily: "Newsreader, Georgia, serif", fontSize: 14, color: "var(--ink)" }}>{h.quote.slice(0, 180)}{h.quote.length > 180 ? "…" : ""}</span>
                       {h.note && <span className="small muted">✎ {h.note.slice(0, 140)}</span>}

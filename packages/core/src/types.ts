@@ -1,7 +1,7 @@
 // Shared shapes for the API, the web app and the extension.
 
-export const HIGHLIGHT_COLORS = ["sun", "mint", "iris", "peach", "sky"] as const;
-export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
+import type { HighlightColor } from "./colors.ts";
+export type { HighlightColor } from "./colors.ts";
 
 export const ITEM_STATUSES = ["inbox", "reading", "done", "archived"] as const;
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
@@ -83,7 +83,7 @@ export interface Collection {
   id: string;
   name: string;
   emoji: string;
-  color: HighlightColor;
+  color: "sun" | "mint" | "iris" | "peach" | "sky";
   description: string | null;
   destinationId: string | null;
   itemCount: number;

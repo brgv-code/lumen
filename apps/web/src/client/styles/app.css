@@ -558,3 +558,40 @@
 .emoji-grid button { aspect-ratio: 1; border: 0; border-radius: 9px; background: var(--well); font-size: 18px; cursor: pointer; transition: transform 140ms var(--ease-spring); }
 .emoji-grid button:hover { transform: scale(1.12); }
 .emoji-grid button[aria-pressed="true"] { background: var(--raised); box-shadow: 0 0 0 2px var(--lamp); }
+
+/* ---------- highlight colour picker ---------- */
+.cp { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cp-sw { border: 0; padding: 0; border-radius: 99px; cursor: pointer; flex: none; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08); transition: transform 160ms var(--ease-spring), box-shadow 160ms; }
+.cp-sw:hover { transform: scale(1.15); }
+.cp-sw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--ink); }
+.cp-wheel-btn { background: conic-gradient(#ff4d4d, #ffd34d, #3fd39a, #2cc6d4, #5b9bff, #bb7bff, #ff6fa5, #ff4d4d); position: relative; }
+.cp-wheel-btn::after { content: ""; position: absolute; inset: 28%; border-radius: 99px; background: var(--raised); }
+.cp-pop { position: absolute; top: calc(100% + 10px); z-index: 60; padding: 16px; border-radius: 22px; background: var(--raised); box-shadow: var(--shadow-pop, 0 24px 60px -20px rgb(0 0 0 / 0.35)), 0 0 0 1px rgb(0 0 0 / 0.05); animation: cp-in 180ms var(--ease-spring); }
+.cp-pop--left { left: 0; } .cp-pop--right { right: 0; }
+@keyframes cp-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
+.cw { display: grid; gap: 12px; width: 220px; justify-items: center; }
+.cw-ring { position: relative; border-radius: 50%; cursor: crosshair; touch-action: none;
+  background: radial-gradient(circle closest-side, #fff, rgb(255 255 255 / 0)), conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.cw-ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #000; opacity: var(--v, 0); pointer-events: none; }
+.cw-thumb { position: absolute; left: calc(50% - 9px); top: calc(50% - 9px); width: 18px; height: 18px; border-radius: 99px; z-index: 1; pointer-events: none; box-shadow: 0 0 0 3px #fff, 0 2px 8px rgb(0 0 0 / 0.35); }
+.cw-v { width: 100%; height: 12px; border-radius: 99px; appearance: none; -webkit-appearance: none; outline: none; }
+.cw-v::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 99px; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.35); cursor: pointer; }
+.cw-v::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 99px; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.35); cursor: pointer; }
+.cw-row { display: flex; gap: 8px; align-items: center; width: 100%; }
+.cw-preview { width: 30px; height: 30px; border-radius: 10px; flex: none; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1); }
+.cw-hex { flex: 1; min-width: 0; height: 34px; font-size: 13px; text-transform: lowercase; }
+.cw-hint { margin: 0; font-size: 12px; color: var(--ink-3); text-align: center; }
+.cp-menu { width: 252px; }
+.cp-menu .cw { width: 100%; }
+.cp-pop--up { top: auto; bottom: calc(100% + 10px); }
+.cp-menu > .cp { display: grid; grid-template-columns: repeat(5, 24px); gap: 10px; justify-content: center; }
+.cp-inline { grid-column: 1 / -1; margin-top: 6px; }
+.cp-current { box-shadow: 0 0 0 2px var(--raised), 0 0 0 3px rgb(0 0 0 / 0.12); }
+.cp-pop--center { left: 50%; transform: translateX(-50%); white-space: normal; color: var(--ink); animation: none; }
+.toolbar .cp-wheel-btn::after { background: #121215; }
+.toolbar .sw { border: 0; }
+.hl-filter { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 99px; background: var(--well); }
+.hl-filter > button:not(.cp-sw) { border: 0; background: transparent; font: 500 12.5px var(--font-ui); color: var(--ink-2); padding: 4px 8px; border-radius: 99px; cursor: pointer; }
+.hl-filter > button[aria-pressed="true"]:not(.cp-sw) { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.toolbar .cp-pop .key { height: 34px; padding: 0 14px; color: #fff; background: linear-gradient(180deg, var(--lamp-hi), var(--lamp-lo)); box-shadow: 0 8px 16px -8px rgb(255 106 26 / 0.7); }
+.toolbar .cp-pop .key:hover { color: #fff; filter: brightness(1.05); }

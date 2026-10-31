@@ -30,7 +30,7 @@ erDiagram
 | `collections` | shelves per project | `destination_id` (nullable) |
 | `items` | saved pages | unique `(user_id, url)`, `status`, `progress`, `content_html`, `content_text`, `reading_minutes` |
 | `tags`, `item_tags` | free tagging | unique `(user_id, name)` |
-| `highlights` | text quote selectors | `quote`, `prefix`, `suffix`, `position`, `color`, `note` |
+| `highlights` | text quote selectors | `quote`, `prefix`, `suffix`, `position`, `color` (palette name or `#rrggbb`, see `packages/core/src/colors.ts`), `note` |
 | `deliveries` | the ledger | PK `(highlight_id, destination_id)`, `status`, `attempts`, `error` |
 | `activity` | glow ledger | `day` in the reader's time zone, `kind`, `glow` |
 | `ideas` | Spark output | `outline` and `source_item_ids` as JSON |

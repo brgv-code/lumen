@@ -327,6 +327,8 @@ mark,
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
+/* any highlight colour: style="--hl: r g b" (see colorVar in @lumen/core) */
+.hl { --hl: 255 196 0; background: rgb(var(--hl) / var(--hl-a, 0.4)); }
 .hl-sun { background: var(--sun-mark); }
 .hl-mint { background: var(--mint-mark); }
 .hl-iris { background: var(--iris-mark); }

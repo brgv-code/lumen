@@ -44,16 +44,16 @@ Base URL: `https://lumen.brgv95.workers.dev`. JSON in, JSON out. Errors are alwa
 ## Highlights
 | Method | Path | Body / query | Notes |
 |---|---|---|---|
-| POST | `/api/v1/items/:id/highlights` | `{ quote, prefix, suffix, position, color, note? }` | colours: `sun, mint, iris, peach, sky`; moves inbox items to reading |
-| GET | `/api/v1/highlights` | `color`, `item`, `collection`, `notes=1`, `q`, `cursor`, `limit` ≤ 200 | each includes `item { id, title, url, siteName }` |
-| PATCH | `/api/v1/highlights/:id` | `{ color?, note? }` | first note awards glow |
+| POST | `/api/v1/items/:id/highlights` | `{ quote, prefix, suffix, position, color, note? }` | colour: a palette name (`sun, peach, rose, grape, iris, sky, teal, mint, lime, slate`) or any `#rrggbb` (also `#rgb` or bare `rrggbb`); moves inbox items to reading |
+| GET | `/api/v1/highlights` | `color` (a name, a hex, or `custom` for every hex colour), `item`, `collection`, `notes=1`, `q`, `cursor`, `limit` ≤ 200 | each includes `item { id, title, url, siteName }` |
+| PATCH | `/api/v1/highlights/:id` | `{ color?, note? }` | first note awards glow; an unknown colour is `422 bad_color` |
 | DELETE | `/api/v1/highlights/:id` | | |
 
 ## Collections
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/api/v1/collections` | | with `itemCount`, `highlightCount` |
-| POST | `/api/v1/collections` | `{ name, emoji?, color?, description?, destinationId? }` | |
+| POST | `/api/v1/collections` | `{ name, emoji?, color?, description?, destinationId? }` | collection colours stay `sun, mint, iris, peach, sky` |
 | PATCH | `/api/v1/collections/:id` | any of the above, `destinationId: null` to detach | |
 | DELETE | `/api/v1/collections/:id` | | items stay, `collection_id` cleared |
 | GET | `/api/v1/collections/:id/export.md?format=house\|callout\|plain` | | the whole collection as one note |

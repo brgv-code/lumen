@@ -20,6 +20,7 @@
   --lamp-lo: #ff6a1a;
   --lamp-tint: #fff3dd;
   --sun-mark: #ffe58a;
+  --hl-a: 0.42;
 
   --iris: #6d5bff;
   --iris-tint: #f1efff;
@@ -82,6 +83,7 @@
     --on-ink: #0e0e10;
     --lamp-tint: #3a2a12;
     --sun-mark: rgba(255, 213, 74, 0.38);
+    --hl-a: 0.36;
     --iris-tint: #25213f;
     --iris-mark: rgba(140, 125, 255, 0.4);
     --mint-tint: #12291f;
@@ -110,6 +112,7 @@
   --ink-4: #5c5c63;
   --on-ink: #0e0e10;
   --lamp-tint: #3a2a12;
+  --hl-a: 0.36;
   --sun-mark: rgba(255, 213, 74, 0.38);
   --iris-tint: #25213f;
   --iris-mark: rgba(140, 125, 255, 0.4);

@@ -81,7 +81,7 @@ const TOOLS: Tool[] = [
     name: "list_highlights",
     title: "List highlights",
     description: "The user's highlights and margin notes across everything they read, newest first. Filter by text, colour, or only those with notes.",
-    inputSchema: { type: "object", properties: { query: str, color: { type: "string", enum: ["sun", "mint", "iris", "peach", "sky"] }, with_notes: { type: "boolean" }, limit: int(1, 100) } },
+    inputSchema: { type: "object", properties: { query: str, color: { type: "string", description: "A palette colour (sun, peach, rose, grape, iris, sky, teal, mint, lime, slate) or a custom #rrggbb; or \"custom\" for any custom colour" }, with_notes: { type: "boolean" }, limit: int(1, 100) } },
     annotations: { readOnlyHint: true },
     run: async (a, call) => {
       const r = await api(call, `/api/v1/highlights${qs({ q: a.query, color: a.color, notes: a.with_notes ? 1 : undefined, limit: a.limit ?? 30 })}`);
@@ -161,7 +161,7 @@ const TOOLS: Tool[] = [
     name: "add_highlight",
     title: "Highlight a passage",
     description: "Highlight an exact passage from a saved item's text, optionally with a margin note. The quote must appear in the item text (use get_item first).",
-    inputSchema: { type: "object", properties: { item_id: str, quote: str, note: str, color: { type: "string", enum: ["sun", "mint", "iris", "peach", "sky"] } }, required: ["item_id", "quote"] },
+    inputSchema: { type: "object", properties: { item_id: str, quote: str, note: str, color: { type: "string", description: "A palette colour (sun, peach, rose, grape, iris, sky, teal, mint, lime, slate) or a custom #rrggbb" } }, required: ["item_id", "quote"] },
     run: async (a, call) => {
       const r = await api(call, `/api/v1/items/${encodeURIComponent(String(a.item_id))}`);
       const item = r.item as Json;

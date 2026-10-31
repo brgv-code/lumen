@@ -3,6 +3,8 @@ import type { Highlight, Item } from "@lumen/core";
 import { citeForClipboard } from "@lumen/core";
 import { Copy, ExternalLink, Heart, Trash2, Highlighter, Share2 } from "lucide-react";
 import { useApp } from "../pages/app/Layout";
+import { ColorMenu } from "./ColorPicker";
+import { hlStyle } from "../lib/hl";
 import { hostOf, timeAgo } from "../lib/hooks";
 import { useToast } from "./ui";
 
@@ -69,7 +71,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
   };
   return (
     <article className="hl-card">
-      <blockquote><mark className={`hl-${h.color}`}>{h.quote}</mark></blockquote>
+      <blockquote><mark className="hl" style={hlStyle(h.color)}>{h.quote}</mark></blockquote>
       {onNote ? (
         <NoteEditor value={h.note} onSave={onNote} />
       ) : h.note ? <div className="note">✎ {h.note}</div> : null}
@@ -78,9 +80,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
         <span style={{ whiteSpace: "nowrap" }}>· {timeAgo(h.createdAt)}</span>
         <span className="spacer" />
         {onColor && (
-          <div className="swatches" style={{ marginRight: 6 }}>
-            {["sun", "mint", "iris", "peach", "sky"].map((c) => <button key={c} className={`swatch-${c}`} aria-label={`Colour ${c}`} aria-pressed={h.color === c} onClick={() => onColor(c)} />)}
-          </div>
+          <div style={{ marginRight: 6, display: "inline-flex" }}><ColorMenu value={h.color} onChange={onColor} /></div>
         )}
         <button className="icon-btn" onClick={shareIt} aria-label="Share as a card" title="Share as a card"><Share2 size={15} /></button>
         <button className="icon-btn" onClick={copy} aria-label="Copy with citation" title="Copy with citation"><Copy size={15} /></button>

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { HIGHLIGHT_COLORS, formatSourceBlock } from "@lumen/core";
+import { COLLECTION_COLORS, formatSourceBlock } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, fail, id, now, oneOf, str } from "../lib/util";
 import { toCollection } from "../lib/map";
@@ -25,7 +25,7 @@ collections.post("/", async (c) => {
   const cid = id("col_");
   const t = now();
   await c.env.DB.prepare("INSERT INTO collections (id, user_id, name, emoji, color, description, destination_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
-    .bind(cid, u.id, name, str(b.emoji, 8) ?? "📚", oneOf(b.color, HIGHLIGHT_COLORS) ?? "sun", str(b.description, 280) ?? null, b.destinationId ?? null, t, t).run();
+    .bind(cid, u.id, name, str(b.emoji, 8) ?? "📚", oneOf(b.color, COLLECTION_COLORS) ?? "sun", str(b.description, 280) ?? null, b.destinationId ?? null, t, t).run();
   const row = await c.env.DB.prepare(`${SELECT} WHERE c.id = ?`).bind(cid).first();
   return c.json({ collection: toCollection(row!) }, 201);
 });
@@ -39,7 +39,7 @@ collections.patch("/:id", async (c) => {
   if (name) { sets.push("name = ?"); args.push(name); }
   const emoji = str(b.emoji, 8);
   if (emoji) { sets.push("emoji = ?"); args.push(emoji); }
-  const color = oneOf(b.color, HIGHLIGHT_COLORS);
+  const color = oneOf(b.color, COLLECTION_COLORS);
   if (color) { sets.push("color = ?"); args.push(color); }
   if (b.description !== undefined) { sets.push("description = ?"); args.push(str(b.description, 280) ?? null); }
   if (b.destinationId !== undefined) {

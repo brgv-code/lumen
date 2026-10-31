@@ -1,13 +1,13 @@
 // Lumen in the page: a selection toolbar that never takes over copy and paste,
 // highlights that come back when you return, and margin answers in a side card.
-import { HIGHLIGHT_COLORS, citeForClipboard, type Highlight, type TextQuote } from "@lumen/core";
+import { HIGHLIGHT_COLORS, citeForClipboard, colorName, colorSwatch, colorVar, normalizeColor, type Highlight, type TextQuote } from "@lumen/core";
+import { WHEEL_CSS, bindWheel, wheelHTML } from "./wheel";
 import { anchorToRange, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { UI_CSS, MARK_CSS } from "./styles";
 import { ICON, LABEL, LAMP } from "./icons";
 import { DEFAULT_SETTINGS, type Settings } from "../../lib/types";
 import { resolveTheme } from "../../lib/theme";
 
-const SWATCH: Record<string, string> = { sun: "#ffd34d", mint: "#3fd39a", iris: "#8a7bff", peach: "#ff8a6b", sky: "#5b9bff" };
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -45,6 +45,33 @@ class Lumen {
   pending: { quote: TextQuote; rect: DOMRect } | null = null;
   activeMark: string | null = null;
   aiText = "";
+  lastColor = "sun";
+  recentColors: string[] = [];
+
+  /** Palette, recent custom colours, then the wheel. `on` marks the current colour. */
+  swatches(on?: string) {
+    const colors = [...HIGHLIGHT_COLORS, ...this.recentColors.filter((c) => !(HIGHLIGHT_COLORS as string[]).includes(c))];
+    return colors.map((c) => `<button class="sw ${c === on ? "on" : ""}" data-color="${c}" style="background:${colorSwatch(c)}" title="Highlight ${colorName(c)}"></button>`).join("")
+      + `<button class="sw wheel" data-act="wheel" title="Any colour"></button>`;
+  }
+
+  useColor(c: string) {
+    this.lastColor = c;
+    if (c.startsWith("#")) this.recentColors = [c, ...this.recentColors.filter((x) => x !== c)].slice(0, 4);
+    chrome.storage.local.set({ lumenLastColor: this.lastColor, lumenRecentColors: this.recentColors }).catch(() => {});
+  }
+
+  /** The "any colour" card: wheel, brightness, hex. */
+  wheelCard(title: string, initial: string, onPick: (c: string) => void) {
+    this.card.hidden = false;
+    this.card.innerHTML = `<div class="head"><span class="tile">✦</span><b>${title}</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>${wheelHTML()}`;
+    const get = bindWheel(this.card, initial, onPick);
+    this.card.onclick = (ev) => {
+      const b = (ev.target as HTMLElement).closest("button");
+      if (b?.dataset.act === "close") return this.hideCard();
+      if (b?.dataset.act === "use-color") { const c = get(); if (c) onPick(c); }
+    };
+  }
 
   start() {
     document.querySelectorAll("style[data-lumen-ui]").forEach((n) => n.remove());
@@ -57,12 +84,16 @@ class Lumen {
     this.host.setAttribute("data-lumen-ui", "");
     this.host.style.cssText = "all: initial; position: absolute; top: 0; left: 0; z-index: 2147483646;";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${UI_CSS}</style><div class="bar" hidden></div><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
+    this.root.innerHTML = `<style>${UI_CSS}${WHEEL_CSS}</style><div class="bar" hidden></div><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
     this.bar = this.root.querySelector(".bar")!;
     this.card = this.root.querySelector(".card")!;
     this.toastEl = this.root.querySelector(".toast")!;
     this.helperEl = this.root.querySelector(".helper")!;
     document.documentElement.appendChild(this.host);
+    chrome.storage.local.get(["lumenLastColor", "lumenRecentColors"]).then((v) => {
+      this.lastColor = normalizeColor(v.lumenLastColor) ?? "sun";
+      this.recentColors = Array.isArray(v.lumenRecentColors) ? v.lumenRecentColors.filter((c: unknown) => normalizeColor(c)?.startsWith("#")).slice(0, 4) : [];
+    }).catch(() => {});
 
     document.addEventListener("mouseup", (e) => this.onSelect(e), true);
     document.addEventListener("keyup", (e) => { if (e.shiftKey || e.key === "Shift") this.onSelect(e); }, true);
@@ -126,7 +157,8 @@ class Lumen {
     unwrapMarks(document.body, "mark.lumen-mark");
     for (const h of [...this.highlights].sort((a, b) => b.position - a.position)) {
       const r = anchorToRange(document.body, h);
-      if (r) wrapRange(r, { class: `lumen-mark lumen-${h.color}`, "data-lumen-id": h.id, title: h.note ? `Note: ${h.note}` : "Lumen highlight" });
+      // CSSOM rather than a style attribute: strict page CSPs block inline style attributes
+      if (r) for (const m of wrapRange(r, { class: "lumen-mark", "data-lumen-id": h.id, title: h.note ? `Note: ${h.note}` : "Lumen highlight" })) m.style.setProperty("--lc", colorVar(h.color));
     }
     this.adaptMarks();
   }
@@ -201,7 +233,7 @@ class Lumen {
     const t = this.settings.toolbar;
     const acts = t.actions.length ? t.actions : DEFAULT_SETTINGS.toolbar.actions;
     const btn = (a: string) => a === "highlight"
-      ? `<span class="hl-group"><button data-color="sun" class="act" title="Highlight">${ICON.highlight}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button><span class="flyout">${HIGHLIGHT_COLORS.map((c) => `<button class="sw" data-color="${c}" style="background:${SWATCH[c]}" title="Highlight ${c}"></button>`).join("")}</span></span>`
+      ? `<span class="hl-group"><button data-color="${this.lastColor}" class="act" title="Highlight (${colorName(this.lastColor)})" style="--dot:${colorSwatch(this.lastColor)}">${ICON.highlight}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button><span class="flyout">${this.swatches()}</span></span>`
       : `<button class="act" data-act="${a}" title="${LABEL[a]}">${ICON[a as keyof typeof ICON]}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button>`;
     this.bar.className = `bar${t.labels ? " labels" : ""}`;
     this.bar.innerHTML = acts.map(btn).join("") + `<span class="sep"></span><button class="act more" data-act="more" title="Toolbar settings">${ICON.more}</button>`;
@@ -218,7 +250,8 @@ class Lumen {
       if (b.dataset.color) return this.highlight(b.dataset.color);
       const q = this.pending!.quote.quote;
       switch (b.dataset.act) {
-        case "note": return this.highlight("sun", true);
+        case "note": return this.highlight(this.lastColor, true);
+        case "wheel": { this.hideBar(); const p = this.pending; return this.wheelCard("Highlight in any colour", this.lastColor, (c) => { this.pending = p; this.hideCard(); this.highlight(c); }); }
         case "copy": return this.copy();
         case "save": return this.highlight("mint");
         case "ask": return this.openPanel(`What does this mean: “${q.slice(0, 400)}”`, q);
@@ -310,6 +343,7 @@ class Lumen {
   async highlight(color: string, withNote = false, collectionId?: string) {
     if (!this.pending) return;
     const quote = this.pending.quote;
+    this.useColor(color);
     this.hideBar();
     window.getSelection()?.removeAllRanges();
     type AddResult = { ok: boolean; highlight?: Highlight; error?: string; local?: boolean };
@@ -344,9 +378,9 @@ class Lumen {
     this.card.hidden = false;
     this.card.innerHTML = `
       <div class="head"><span class="tile">✦</span><b>Highlight</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
-      <blockquote class="q lumen-${h.color}">${esc(h.quote)}</blockquote>
+      <blockquote class="q" style="--lc: ${colorVar(h.color)}">${esc(h.quote)}</blockquote>
       ${h.note ? `<div class="note">✎ ${esc(h.note)}</div>` : ""}
-      <div class="row">${HIGHLIGHT_COLORS.map((c) => `<button class="sw ${c === h.color ? "on" : ""}" data-color="${c}" style="background:${SWATCH[c]}"></button>`).join("")}</div>
+      <div class="row">${this.swatches(h.color)}</div>
       <div class="row">
         <button class="key" data-act="note">${h.note ? "Edit note" : "Add note"}</button>
         <button class="key ghost" data-act="copy">Copy</button>
@@ -357,11 +391,14 @@ class Lumen {
     this.card.onclick = async (ev) => {
       const b = (ev.target as HTMLElement).closest("button");
       if (!b) return;
-      if (b.dataset.color) {
-        const r = await send<{ highlight: Highlight }>({ type: "UPDATE_HIGHLIGHT", id: h.id, url: location.href, color: b.dataset.color });
+      const recolor = async (color: string) => {
+        if (color.startsWith("#")) this.useColor(color);
+        const r = await send<{ highlight: Highlight }>({ type: "UPDATE_HIGHLIGHT", id: h.id, url: location.href, color });
         this.replace(r.highlight);
-        return this.cardFor(r.highlight);
-      }
+        this.cardFor(r.highlight);
+      };
+      if (b.dataset.color) return recolor(b.dataset.color);
+      if (b.dataset.act === "wheel") return this.wheelCard("Recolour highlight", h.color, recolor);
       switch (b.dataset.act) {
         case "close": return this.hideCard();
         case "note": return this.noteEditor(h);
@@ -386,7 +423,7 @@ class Lumen {
     this.card.hidden = false;
     this.card.innerHTML = `
       <div class="head"><span class="tile">✎</span><b>Margin note</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
-      <blockquote class="q lumen-${h.color}">${esc(h.quote)}</blockquote>
+      <blockquote class="q" style="--lc: ${colorVar(h.color)}">${esc(h.quote)}</blockquote>
       <textarea placeholder="Why does this matter to you?">${esc(h.note ?? "")}</textarea>
       <div class="row"><button class="key" data-act="save">Save note</button><span class="hint">⌘↵</span></div>`;
     const ta = this.card.querySelector("textarea")!;
@@ -462,7 +499,7 @@ class Lumen {
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed) {
           const quote = describeRange(document.body, sel.getRangeAt(0));
-          if (quote) { this.pending = { quote, rect: sel.getRangeAt(0).getBoundingClientRect() }; this.highlight("sun", false, (m as { collectionId?: string }).collectionId); }
+          if (quote) { this.pending = { quote, rect: sel.getRangeAt(0).getBoundingClientRect() }; this.highlight(this.lastColor, false, (m as { collectionId?: string }).collectionId); }
         }
       }
       if (m.cmd === "highlight" || m.cmd === "explain") {
@@ -471,7 +508,7 @@ class Lumen {
           const quote = describeRange(document.body, sel.getRangeAt(0));
           if (quote) {
             this.pending = { quote, rect: sel.getRangeAt(0).getBoundingClientRect() };
-            m.cmd === "highlight" ? this.highlight("sun") : this.ai("explain", quote.quote);
+            m.cmd === "highlight" ? this.highlight(this.lastColor) : this.ai("explain", quote.quote);
           }
         }
       }
