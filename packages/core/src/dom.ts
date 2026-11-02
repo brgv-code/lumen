@@ -51,6 +51,17 @@ export function describeRange(root: Node, range: Range): TextQuote | null {
   return sel;
 }
 
+/** The first candidate whose text overlaps the quote, so Keep attaches instead of highlighting twice. */
+export function coveringQuote<T extends TextQuote>(root: Node, quote: TextQuote, candidates: readonly T[]): T | undefined {
+  const { text } = buildTextIndex(root);
+  const span = matchQuote(text, quote);
+  if (!span) return undefined;
+  return candidates.find((candidate) => {
+    const hit = matchQuote(text, candidate);
+    return hit !== null && hit[0] < span[1] && span[0] < hit[1];
+  });
+}
+
 export function anchorToRange(root: Node, sel: TextQuote): Range | null {
   const index = buildTextIndex(root);
   const hit = matchQuote(index.text, sel);

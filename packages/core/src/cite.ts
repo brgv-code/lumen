@@ -1,10 +1,12 @@
-import type { HighlightFormat } from "./types.ts";
+import type { AIAction, HighlightFormat } from "./types.ts";
+import { answerLabel } from "./answers.ts";
 
 interface CiteInput {
   quote: string;
   note?: string | null;
   title: string;
   url: string;
+  answers?: { action: AIAction; question: string | null; answer: string }[];
 }
 
 /** A link that scrolls to and marks the passage in Chromium, Safari and Firefox. */
@@ -44,6 +46,21 @@ export function citeAsPlainText(h: CiteInput): string {
  * - plain:   a markdown blockquote
  */
 export function formatHighlight(h: CiteInput, format: HighlightFormat): string {
+  const answers = formatAnswers(h.answers ?? [], format);
+  return answers ? `${formatPassage(h, format)}\n\n${answers}` : formatPassage(h, format);
+}
+
+/** Kept answers under their highlight: collapsed callouts in Obsidian formats, bold paragraphs in plain. */
+function formatAnswers(answers: NonNullable<CiteInput["answers"]>, format: HighlightFormat): string {
+  return answers.map((kept) => {
+    const heading = kept.question ? `${answerLabel(kept.action)}: ${kept.question.trim()}` : answerLabel(kept.action);
+    const body = kept.answer.trim();
+    if (format === "plain") return `**${heading}:** ${body}`;
+    return [`> [!${kept.action}]- ${heading}`, ...body.split("\n").map((line) => (line ? `> ${line}` : ">"))].join("\n");
+  }).join("\n\n");
+}
+
+function formatPassage(h: CiteInput, format: HighlightFormat): string {
   const link = textFragmentUrl(h.url, h.quote);
   const quote = h.quote.replace(/\s+/g, " ").trim();
   switch (format) {

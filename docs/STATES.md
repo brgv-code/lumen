@@ -44,25 +44,56 @@ stateDiagram-v2
   signed_in --> [*]: delete account (cascade)
 ```
 
-## Extension selection toolbar
+## Selection bar (extension, web reader, landing demo)
+One module, `packages/core/src/bar.ts`. It owns its shadow root and only reports what the reader
+chose; the host page decides what highlighting, answering or copying means.
 ```mermaid
 stateDiagram-v2
   [*] --> idle
-  idle --> toolbar: mouseup / shift keyup with a non empty selection outside inputs
-  toolbar --> idle: click elsewhere, scroll, Escape, selection collapsed
-  toolbar --> saving: colour swatch or Note
-  saving --> idle: painted, toast "Highlighted"
-  saving --> note_editor: Note was chosen
-  note_editor --> idle: Save (Cmd+Enter) or close
-  toolbar --> answering: Explain / Define / Ask
-  answering --> answering: chunks stream into the card
-  answering --> idle: close
-  toolbar --> idle: Copy (citation on clipboard)
-  idle --> mark_card: click on an existing mark
-  mark_card --> idle: recolour, note, copy, delete, close
+  idle --> settling: mouseup, shift keyup or selectionchange outside the bar
+  settling --> idle: collapsed, under 2 characters, inside an input or editor, off on this site, or a newer selection arrived
+  settling --> open: snapshot taken (quote, cloned range, line rects)
+  state open {
+    [*] --> rising
+    rising --> shown: 140 ms rise, 18 ms stagger (fade only under reduced motion)
+    shown --> more: More, or ArrowDown on More
+    more --> shown: Escape (focus back on More)
+  }
+  open --> open: scroll or resize moves the bar with the snapshot rects
+  open --> idle: Escape, mousedown outside, page selection collapsed (not while focus is in the bar)
+  open --> idle: Highlight, a swatch, Note, Explain, Simplify, Copy, or a More item
+  idle --> [*]: destroy() removes listeners, animations and the host
 ```
-The toolbar never calls `preventDefault` on copy, and pressing a toolbar button prevents only its
-own mousedown so the page selection stays alive.
+- The bar never calls `preventDefault` on copy. Buttons prevent their own mousedown so the page
+  selection stays alive. Ask about this… hands the passage to the panel; the bar has no input.
+- Copy puts the plain text on the clipboard; Copy with citation (in More) adds the source link.
+- Once open, everything reads from the snapshot, never the live selection, so a later focus
+  change or DOM repaint cannot change what an action acts on.
+- Keys pressed inside the bar stop at its shadow root, so host shortcuts (YouTube `k`, GitHub `t`)
+  do not fire.
+- Arrow keys move between the bar's buttons (one Tab stop) and through the open More menu.
+
+## Margin answer
+What happens after Explain, Simplify or a More action that answers, on either surface.
+```mermaid
+stateDiagram-v2
+  [*] --> streaming: request sent
+  streaming --> answered: done
+  streaming --> failed: quota, provider or network error
+  streaming --> discarded: card closed (request aborted)
+  answered --> streaming: follow up asked in the card
+  answered --> kept: Keep
+  answered --> discarded: card closed or page left
+  failed --> discarded: card closed
+  kept --> kept: later follow ups in this card are kept too
+  discarded --> [*]
+  kept --> [*]: stored in highlight_answers
+```
+- Keep attaches to the highlight that already covers the passage, otherwise it highlights the
+  passage in the last used colour first. The note is never touched; it holds only the reader's words.
+- Answers that are not kept live only in the open card.
+- A kept answer reaches notes with its highlight when the highlight is still pending for a
+  destination. Answers kept after the highlight was delivered wait for answer deliveries (LUM-2).
 
 ## AI request
 ```mermaid

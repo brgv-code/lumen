@@ -4,3 +4,6 @@ export * from "./text.ts";
 export * from "./cite.ts";
 export * from "./glow.ts";
 export * from "./prompts.ts";
+export * from "./answers.ts";
+export * from "./toolbar.ts";
+export * from "./icons.ts";

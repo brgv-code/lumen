@@ -15,6 +15,7 @@ export function readerPrompt(action: AIAction, text: string, opts: { question?: 
     summarize: "Summarize this in two or three sentences.",
     define: "Define the term or concept as it is used in this article (use the surrounding text), then give one short example.",
     simplify: "Rewrite this passage so a 12 year old understands it, keeping the meaning.",
+    counterpoint: "Give the strongest counterpoint to this passage: the argument or evidence a careful critic would raise, in the article's own terms. End with one sentence on what would settle it. Keep it under 120 words.",
     expand: "Expand on this passage: the background it assumes, why it is true or contested, and one concrete example. Keep it under 150 words.",
     ask: `Answer this question about the passage: ${opts.question?.slice(0, 500) || "What is this about?"}`,
   }[action];
