@@ -1,4 +1,4 @@
-import type { AIAction, HighlightFormat } from "./types.ts";
+import type { AIAction, Citation, HighlightFormat } from "./types.ts";
 import { answerLabel } from "./answers.ts";
 
 interface CiteInput {
@@ -99,6 +99,42 @@ function formatPassage(h: CiteInput, format: HighlightFormat): string {
   }
 }
 
+const CITATION = /\[p(\d+)\]/g;
+
+/** Answer text split around [p12] markers, so surfaces can render each as a ¶12 link. */
+export function splitCitations(text: string): (string | { n: number })[] {
+  const parts: (string | { n: number })[] = [];
+  let last = 0;
+  for (const match of text.matchAll(CITATION)) {
+    const at = match.index ?? 0;
+    if (at > last) parts.push(text.slice(last, at));
+    parts.push({ n: Number(match[1]) });
+    last = at + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+/** For a note: [p3] becomes ([¶3](text fragment link)); numbers with no stored quote are dropped. */
+export function linkCitations(text: string, citations: readonly Citation[], url: string): string {
+  return text.replace(CITATION, (_marker, digits: string) => {
+    const cited = citations.find((citation) => citation.n === Number(digits));
+    return cited ? `([¶${digits}](${textFragmentUrl(url, cited.quote.quote)}))` : "";
+  }).replace(/ +([.,;])/g, "$1");
+}
+
+/** A TL;DR for a note: at the top of its source block, or as its own block when the page was sent before. */
+export function formatTldr(source: { title: string; url: string }, tldr: { text: string; citations: readonly Citation[] }, format: HighlightFormat, placement: "top" | "own"): string {
+  const body = linkCitations(tldr.text.trim(), tldr.citations, source.url);
+  const pointer = `↳ TL;DR of "${source.title}" ([source](${source.url}))`;
+  if (format === "plain") {
+    const plain = body.includes("\n") ? `**TL;DR:**\n\n${body}` : `**TL;DR:** ${body}`;
+    return placement === "own" ? `${pointer}\n\n${plain}` : plain;
+  }
+  const callout = [`> [!tldr]${placement === "own" ? "-" : ""} TL;DR`, ...body.split("\n").map((line) => (line ? `> ${line}` : ">"))].join("\n");
+  return placement === "own" ? `${pointer}\n${callout}` : callout;
+}
+
 /** A heading block written once per source, followed by its new highlights, then answers kept late. */
 export function formatSourceBlock(
   source: { title: string; url: string; siteName?: string | null },
@@ -106,10 +142,16 @@ export function formatSourceBlock(
   format: HighlightFormat,
   when = new Date(),
   late: { highlight: Pick<CiteInput, "quote" | "url">; answer: KeptInput }[] = [],
+  tldr?: { text: string; citations: readonly Citation[]; placement: "top" | "own" },
 ): string {
   const day = when.toISOString().slice(0, 10);
   const head = `\n## ${escapeMd(source.title)}\n${source.siteName ? `${source.siteName} · ` : ""}[source](${source.url}) · clipped ${day}\n`;
-  const blocks = [...highlights.map((h) => formatHighlight(h, format)), ...late.map((entry) => formatLateAnswer(entry.highlight, entry.answer, format))];
+  const blocks = [
+    ...(tldr?.placement === "top" ? [formatTldr(source, tldr, format, "top")] : []),
+    ...highlights.map((h) => formatHighlight(h, format)),
+    ...late.map((entry) => formatLateAnswer(entry.highlight, entry.answer, format)),
+    ...(tldr?.placement === "own" ? [formatTldr(source, tldr, format, "own")] : []),
+  ];
   return head + "\n" + blocks.join("\n\n") + "\n";
 }
 

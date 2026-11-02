@@ -20,7 +20,7 @@ export const BAR_LABEL: Record<BarAction, string> = {
   explain: "Explain",
   simplify: "Simplify",
   expand: "Expand",
-  summarize: "Summary",
+  summarize: "TL;DR",
   define: "Define",
   counterpoint: "Counterpoint",
   related: "Related in your library",

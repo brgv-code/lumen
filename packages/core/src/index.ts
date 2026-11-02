@@ -7,3 +7,4 @@ export * from "./prompts.ts";
 export * from "./answers.ts";
 export * from "./toolbar.ts";
 export * from "./icons.ts";
+export * from "./slash.ts";

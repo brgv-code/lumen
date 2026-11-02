@@ -83,6 +83,22 @@ export interface Highlight extends TextQuote {
   answers?: HighlightAnswer[];
 }
 
+/** A [p12] marker in an answer, resolved to the paragraph it names. */
+export interface Citation {
+  n: number;
+  quote: TextQuote;
+}
+
+/** The TL;DR the reader kept for a page; one per item. */
+export interface ItemTldr {
+  id: string;
+  itemId: string;
+  text: string;
+  model: string | null;
+  citations: Citation[];
+  createdAt: number;
+}
+
 export interface HighlightAnswer {
   id: string;
   highlightId: string;
