@@ -7,6 +7,7 @@ import { ColorMenu } from "./ColorPicker";
 import { hlStyle } from "../lib/hl";
 import { hostOf, timeAgo } from "../lib/hooks";
 import { useToast } from "./ui";
+import { capture } from "../lib/analytics";
 
 const LETTER_BG = ["var(--key-lamp)", "var(--key-iris)", "linear-gradient(180deg,#3fd39a,#0f9a63)", "linear-gradient(180deg,#5b9bff,#2563eb)", "linear-gradient(180deg,#ff8a6b,#e24c2b)"];
 export function SiteLetter({ url }: { url: string }) {
@@ -83,7 +84,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFoll
         <NoteEditor value={h.note} onSave={onNote} />
       ) : h.note ? <div className="note">✎ {h.note}</div> : null}
       {answers.length > 0 && (
-        <button className="chip chip--iris thread__toggle" aria-expanded={open || Boolean(followUp)} onClick={() => setOpen(!open)}>
+        <button className="chip chip--iris thread__toggle" aria-expanded={open || Boolean(followUp)} onClick={() => { if (!open) capture("thread_opened", { answers: answers.length }); setOpen(!open); }}>
           {answers.length === 1 ? "1 answer" : `${answers.length} answers`}
         </button>
       )}
