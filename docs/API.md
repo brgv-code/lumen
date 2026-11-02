@@ -68,7 +68,7 @@ Base URL: `https://readwithlumen.app`. JSON in, JSON out. Errors are always
 | POST | `/api/v1/destinations` | `{ kind, name, config, secret? }` | see configs below |
 | PATCH | `/api/v1/destinations/:id` | `{ name?, config?, secret? }` | |
 | DELETE | `/api/v1/destinations/:id` | | |
-| GET | `/api/v1/destinations/:id/pending` | | `{ highlightIds, markdown, groups }`: only highlights this destination has not received |
+| GET | `/api/v1/destinations/:id/pending` | | `{ highlightIds, answerIds, counts, markdown, groups }`: only highlights and kept answers this destination has not received; `highlightIds` also lists the highlights of late answers, so clients that ack only highlights still deliver them |
 | POST | `/api/v1/destinations/:id/ack` | `{ highlightIds, error? }` | records delivery; idempotent |
 | POST | `/api/v1/destinations/:id/push` | | server delivery for `notion` and `webhook` |
 
@@ -81,7 +81,11 @@ Configs:
 Formats: `house` = `==quote==^[note] ([title](link))`, `callout` = Obsidian `> [!quote]`, `plain` = blockquote.
 Kept answers ride under a highlight that has not reached the destination yet: a collapsed
 `> [!explain]- Explain` callout in `house` and `callout`, a `**Explain:**` paragraph in `plain`, a
-toggle block in Notion. Answers kept after delivery wait for answer deliveries (LUM-2).
+toggle block in Notion. An answer kept after its highlight was delivered follows as its own block,
+`↳ Explain on "first six words…" ([source](link))` and then the answer. New highlights end with a
+`^lumen-…` block id. `POST /ack` takes `{ highlightIds, answerIds?, error? }`; without `answerIds`,
+the answers kept on those highlights until now count as delivered. `/push` returns
+`{ delivered, answers }`.
 Every link is a text fragment URL (`#:~:text=`) that scrolls to the passage.
 
 Webhook payload:
@@ -89,8 +93,11 @@ Webhook payload:
 { "type": "highlights.created",
   "highlights": [{ "id": "hl_…", "quote": "…", "note": null,
                    "answers": [{ "action": "explain", "question": null, "answer": "…", "model": "…" }],
-                   "source": { "title": "…", "url": "…", "link": "…#:~:text=…" } }] }
+                   "source": { "title": "…", "url": "…", "link": "…#:~:text=…" } }],
+  "answers": [{ "id": "ans_…", "highlightId": "hl_…", "action": "ask", "question": "…", "answer": "…",
+                "model": "…", "source": { "title": "…", "url": "…", "link": "…" } }] }
 ```
+Top level `answers` holds answers kept after their highlight was already delivered.
 
 ## Discover
 | Method | Path | Body / query | Returns |

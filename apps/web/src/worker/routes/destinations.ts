@@ -4,12 +4,14 @@
 // the vault lives on the reader's machine: the client asks for /pending, writes the
 // rendered markdown, then calls /ack. Notion and webhooks are pushed by the server
 // with /push. Either way the (highlight, destination) ledger guarantees a highlight
-// is written once, so clipping a page again never duplicates.
+// is written once, so clipping a page again never duplicates. Kept answers have their own
+// ledger, answer_deliveries: they ride along with a pending highlight, or follow later as
+// their own block.
 import { Hono } from "hono";
-import { DESTINATION_KINDS, answerLabel, formatHighlight, formatSourceBlock, textFragmentUrl, type HighlightAnswer, type HighlightFormat } from "@lumen/core";
+import { DESTINATION_KINDS, answerLabel, blockIdFor, formatHighlight, formatLateAnswer, formatSourceBlock, lateAnswerHeading, textFragmentUrl, type HighlightAnswer, type HighlightFormat } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
-import { safeJson, toDestination } from "../lib/map";
+import { safeJson, toAnswer, toDestination } from "../lib/map";
 import { listAnswers } from "../lib/answers";
 import { requirePro } from "../lib/plan";
 
@@ -19,7 +21,9 @@ const SELECT = `SELECT d.*,
   (SELECT count(*) FROM deliveries x WHERE x.destination_id = d.id AND x.status = 'delivered') AS delivered_count,
   (SELECT max(delivered_at) FROM deliveries x WHERE x.destination_id = d.id) AS last_delivered_at,
   (SELECT count(*) FROM highlights h JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
-     WHERE c.destination_id = d.id AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = d.id AND x.status = 'delivered')) AS pending_count
+     WHERE c.destination_id = d.id AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = d.id AND x.status = 'delivered'))
+  + (SELECT count(*) FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
+     WHERE c.destination_id = d.id AND NOT EXISTS (SELECT 1 FROM answer_deliveries y WHERE y.answer_id = a.id AND y.destination_id = d.id AND y.status = 'delivered')) AS pending_count
   FROM destinations d`;
 
 const FORMATS = ["house", "callout", "plain"] as const;
@@ -85,38 +89,58 @@ destinations.delete("/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Highlights not yet delivered to this destination, grouped by source and rendered. */
+/** Highlights and kept answers not yet delivered to this destination, grouped by source and rendered. */
 destinations.get("/:id/pending", async (c) => {
   const u = c.get("user");
   const d = await own(c.env.DB, u.id, c.req.param("id"));
   const cfg = safeJson<Record<string, string>>(d.config, {});
   const format = (cfg.format as HighlightFormat) || "plain";
-  const pending = await pendingFor(c.env.DB, d.id);
-  const groups = groupBySource(pending);
-  const markdown = groups.map((g) => formatSourceBlock(g.source, g.highlights, format)).join("");
+  const { highlights: pending, late } = await pendingFor(c.env.DB, d.id);
+  const groups = groupBySource(pending, late);
+  const withId = (h: PendingRow) => ({ ...h, blockId: blockIdFor(h.id) });
+  const markdown = groups.map((g) => formatSourceBlock(g.source, g.highlights.map(withId), format, undefined, g.late.map((l) => ({ highlight: l, answer: l.answer })))).join("");
+  const answerIds = [...pending.flatMap((h) => h.answers.map((a) => a.id)), ...late.map((l) => l.answer.id)];
   return c.json({
     destination: toDestination(d),
-    highlightIds: pending.map((p) => p.id),
+    // Late answers' highlights are listed too, so clients that only ack highlight ids still deliver them.
+    highlightIds: [...new Set([...pending.map((p) => p.id), ...late.map((l) => l.highlightId)])],
+    answerIds,
+    counts: { highlights: pending.length, answers: answerIds.length },
     markdown,
-    groups: groups.map((g) => ({ source: g.source, highlights: g.highlights.map((h) => ({ id: h.id, quote: h.quote, note: h.note, answers: h.answers, markdown: formatHighlight(h, format) })) })),
+    groups: groups.map((g) => ({
+      source: g.source,
+      highlights: g.highlights.map((h) => ({ id: h.id, quote: h.quote, note: h.note, answers: h.answers, markdown: formatHighlight(withId(h), format) })),
+      late: g.late.map((l) => ({ highlightId: l.highlightId, answer: l.answer, markdown: formatLateAnswer(l, l.answer, format) })),
+    })),
   });
 });
 
-/** Client confirms it wrote these highlights. Idempotent. */
+/** Client confirms it wrote these highlights and answers. Idempotent. */
 destinations.post("/:id/ack", async (c) => {
   const u = c.get("user");
   const d = await own(c.env.DB, u.id, c.req.param("id"));
-  const b = await body<{ highlightIds?: string[]; error?: string }>(c);
+  const b = await body<{ highlightIds?: string[]; answerIds?: string[]; error?: string }>(c);
   const ids = (b.highlightIds ?? []).filter((x) => typeof x === "string").slice(0, 500);
-  if (!ids.length) return c.json({ acked: 0 });
+  const answerIds = Array.isArray(b.answerIds) ? b.answerIds.filter((x) => typeof x === "string").slice(0, 500) : null;
+  if (!ids.length && !answerIds?.length) return c.json({ acked: 0, answers: 0 });
   const status = b.error ? "failed" : "delivered";
   const t = now();
-  await c.env.DB.batch(ids.map((hid) =>
-    c.env.DB.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at)
-      SELECT h.id, ?, ?, 1, ?, ? FROM highlights h WHERE h.id = ? AND h.user_id = ?
-      ON CONFLICT(highlight_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
-      .bind(d.id, status, b.error ?? null, t, hid, u.id)));
-  return c.json({ acked: ids.length, status });
+  const db = c.env.DB;
+  await db.batch([
+    ...ids.map((hid) =>
+      db.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at)
+        SELECT h.id, ?, ?, 1, ?, ? FROM highlights h WHERE h.id = ? AND h.user_id = ?
+        ON CONFLICT(highlight_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+        .bind(d.id, status, b.error ?? null, t, hid, u.id)),
+    // Clients from before LUM-2 ack only highlights: their answers kept up to now went out with them.
+    ...(answerIds ?? ids).map((key) =>
+      db.prepare(`INSERT INTO answer_deliveries (answer_id, destination_id, status, attempts, error, delivered_at)
+        SELECT a.id, ?, ?, 1, ?, ? FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id
+        WHERE ${answerIds ? "a.id = ?" : "h.id = ? AND a.created_at <= ?"} AND h.user_id = ?
+        ON CONFLICT(answer_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+        .bind(d.id, status, b.error ?? null, t, key, ...(answerIds ? [] : [t]), u.id)),
+  ]);
+  return c.json({ acked: ids.length, answers: answerIds?.length ?? 0, status });
 });
 
 /** Server side delivery for Notion and webhooks. */
@@ -126,42 +150,69 @@ destinations.post("/:id/push", async (c) => {
   if (d.kind !== "notion" && d.kind !== "webhook") fail(422, "client_delivered", `${d.kind} is delivered by the extension or the browser. Use /pending and /ack.`);
   requirePro(c, d.kind as "notion" | "webhook");
   if (u.is_demo === 1) fail(403, "demo", "Pushing to external services is off in the demo.");
-  const pending = await pendingFor(c.env.DB, d.id);
-  if (!pending.length) return c.json({ delivered: 0 });
+  const { highlights: pending, late } = await pendingFor(c.env.DB, d.id);
+  const answerIds = [...pending.flatMap((h) => h.answers.map((a) => a.id)), ...late.map((l) => l.answer.id)];
+  if (!pending.length && !late.length) return c.json({ delivered: 0, answers: 0 });
   const cfg = safeJson<Record<string, string>>(d.config, {});
   let error: string | null = null;
   try {
-    if (d.kind === "notion") await pushNotion(cfg.pageId, d.secret, pending);
-    else await pushWebhook(cfg.url, d.secret, pending);
+    if (d.kind === "notion") await pushNotion(cfg.pageId, d.secret, pending, late);
+    else await pushWebhook(cfg.url, d.secret, pending, late);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
   const t = now();
-  await c.env.DB.batch(pending.map((p) => c.env.DB.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at) VALUES (?,?,?,1,?,?)
-    ON CONFLICT(highlight_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
-    .bind(p.id, d.id, error ? "failed" : "delivered", error, t)));
+  const db = c.env.DB;
+  await db.batch([
+    ...pending.map((p) => db.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at) VALUES (?,?,?,1,?,?)
+      ON CONFLICT(highlight_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+      .bind(p.id, d.id, error ? "failed" : "delivered", error, t)),
+    ...answerIds.map((answerId) => db.prepare(`INSERT INTO answer_deliveries (answer_id, destination_id, status, attempts, error, delivered_at) VALUES (?,?,?,1,?,?)
+      ON CONFLICT(answer_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+      .bind(answerId, d.id, error ? "failed" : "delivered", error, t)),
+  ]);
   if (error) fail(502, "push_failed", error);
-  return c.json({ delivered: pending.length });
+  return c.json({ delivered: pending.length, answers: answerIds.length });
 });
 
 interface PendingRow { id: string; quote: string; note: string | null; title: string; url: string; site_name: string | null; item_id: string; answers: HighlightAnswer[] }
+/** An answer kept after its highlight reached this destination. */
+interface LateRow { highlightId: string; quote: string; title: string; url: string; site_name: string | null; item_id: string; answer: HighlightAnswer }
 
-/** Kept answers ride along with a highlight that has not reached this destination yet. */
-async function pendingFor(db: D1Database, destinationId: string): Promise<PendingRow[]> {
+async function pendingFor(db: D1Database, destinationId: string): Promise<{ highlights: PendingRow[]; late: LateRow[] }> {
+  return { highlights: await pendingHighlights(db, destinationId), late: await lateAnswers(db, destinationId) };
+}
+
+/** Highlights this destination has not received, with the answers that ride along with them. */
+async function pendingHighlights(db: D1Database, destinationId: string): Promise<PendingRow[]> {
   const { results } = await db.prepare(`SELECT h.id, h.quote, h.note, i.title, i.url, i.site_name, i.id AS item_id
     FROM highlights h JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
     WHERE c.destination_id = ? AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ? AND x.status = 'delivered')
     ORDER BY i.created_at, h.position LIMIT 500`).bind(destinationId, destinationId).all<Omit<PendingRow, "answers">>();
-  const answers = await listAnswers(db, results.map((row) => row.id));
+  const answers = await listAnswers(db, results.map((row) => row.id), destinationId);
   return results.map((row) => ({ ...row, answers: answers.get(row.id) ?? [] }));
 }
 
-function groupBySource(rows: PendingRow[]) {
-  const map = new Map<string, { source: { title: string; url: string; siteName: string | null }; highlights: (PendingRow & { title: string; url: string })[] }>();
-  for (const r of rows) {
-    if (!map.has(r.item_id)) map.set(r.item_id, { source: { title: r.title, url: r.url, siteName: r.site_name }, highlights: [] });
-    map.get(r.item_id)!.highlights.push(r);
-  }
+async function lateAnswers(db: D1Database, destinationId: string): Promise<LateRow[]> {
+  const { results } = await db.prepare(`SELECT a.*, h.quote, h.item_id, i.title, i.url, i.site_name
+    FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
+    WHERE c.destination_id = ?
+      AND EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ? AND x.status = 'delivered')
+      AND NOT EXISTS (SELECT 1 FROM answer_deliveries y WHERE y.answer_id = a.id AND y.destination_id = ? AND y.status = 'delivered')
+    ORDER BY i.created_at, h.position, a.created_at LIMIT 500`).bind(destinationId, destinationId, destinationId).all<Record<string, string>>();
+  return results.map((row) => ({ highlightId: row.highlight_id, quote: row.quote, title: row.title, url: row.url, site_name: row.site_name, item_id: row.item_id, answer: toAnswer(row) }));
+}
+
+type Source = { title: string; url: string; siteName: string | null };
+
+function groupBySource(rows: PendingRow[], late: LateRow[]) {
+  const map = new Map<string, { source: Source; highlights: PendingRow[]; late: LateRow[] }>();
+  const groupFor = (r: { item_id: string; title: string; url: string; site_name: string | null }) => {
+    if (!map.has(r.item_id)) map.set(r.item_id, { source: { title: r.title, url: r.url, siteName: r.site_name }, highlights: [], late: [] });
+    return map.get(r.item_id)!;
+  };
+  for (const r of rows) groupFor(r).highlights.push(r);
+  for (const l of late) groupFor(l).late.push(l);
   return [...map.values()];
 }
 
@@ -172,7 +223,7 @@ async function own(db: D1Database, userId: string, destinationId: string) {
   return row;
 }
 
-async function pushNotion(pageId: string, token: string | null, rows: PendingRow[]) {
+async function pushNotion(pageId: string, token: string | null, rows: PendingRow[], late: LateRow[]) {
   if (!token) throw new Error("Add a Notion integration token first.");
   const children = rows.flatMap((r) => [
     { object: "block", type: "quote", quote: { rich_text: [{ type: "text", text: { content: r.quote.slice(0, 1900) } }] } },
@@ -190,7 +241,16 @@ async function pushNotion(pageId: string, token: string | null, rows: PendingRow
         children: [{ object: "block", type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: kept.answer.slice(0, 1900) } }] } }],
       },
     })),
-  ]);
+  ]).concat(late.map((l) => ({
+    object: "block", type: "toggle",
+    toggle: {
+      rich_text: [
+        { type: "text", text: { content: lateAnswerHeading(l.quote, l.answer.action).slice(0, 200) + " " } },
+        { type: "text", text: { content: "source", link: { url: textFragmentUrl(l.url, l.quote) } }, annotations: { color: "gray" } },
+      ],
+      children: [{ object: "block", type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: l.answer.answer.slice(0, 1900) } }] } }],
+    },
+  })));
   for (let i = 0; i < children.length; i += 90) {
     const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
       method: "PATCH",
@@ -201,8 +261,9 @@ async function pushNotion(pageId: string, token: string | null, rows: PendingRow
   }
 }
 
-async function pushWebhook(url: string, secret: string | null, rows: PendingRow[]) {
-  const payload = JSON.stringify({ type: "highlights.created", highlights: rows.map((r) => ({ id: r.id, quote: r.quote, note: r.note, answers: r.answers.map((kept) => ({ action: kept.action, question: kept.question, answer: kept.answer, model: kept.model })), source: { title: r.title, url: r.url, link: textFragmentUrl(r.url, r.quote) } })) });
+async function pushWebhook(url: string, secret: string | null, rows: PendingRow[], late: LateRow[]) {
+  const lateAnswersPayload = late.map((l) => ({ id: l.answer.id, highlightId: l.highlightId, action: l.answer.action, question: l.answer.question, answer: l.answer.answer, model: l.answer.model, source: { title: l.title, url: l.url, link: textFragmentUrl(l.url, l.quote) } }));
+  const payload = JSON.stringify({ type: "highlights.created", answers: lateAnswersPayload, highlights: rows.map((r) => ({ id: r.id, quote: r.quote, note: r.note, answers: r.answers.map((kept) => ({ action: kept.action, question: kept.question, answer: kept.answer, model: kept.model })), source: { title: r.title, url: r.url, link: textFragmentUrl(r.url, r.quote) } })) });
   const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "Lumen-Webhook/1" };
   if (secret) {
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
