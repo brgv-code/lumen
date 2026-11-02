@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { normalizeColor } from "@lumen/core";
+import { AI_ACTIONS, normalizeColor } from "@lumen/core";
 import type { AppEnv } from "../env";
-import { body, decodeCursor, encodeCursor, fail, now } from "../lib/util";
-import { toHighlight } from "../lib/map";
+import { body, decodeCursor, encodeCursor, fail, id, now, oneOf, str } from "../lib/util";
+import { toAnswer, toHighlight } from "../lib/map";
 import { glowStmt } from "../lib/glow";
 
 export const highlights = new Hono<AppEnv>();
@@ -53,6 +53,28 @@ highlights.patch("/:id", async (c) => {
   await db.batch(stmts);
   const updated = await db.prepare(`${SELECT} WHERE h.id = ?`).bind(row.id).first();
   return c.json({ highlight: toHighlight(updated!) });
+});
+
+/** Keep a margin answer on this highlight. Follow ups in the same card pass the answer they follow. */
+highlights.post("/:id/answers", async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  const highlight = await db.prepare("SELECT id FROM highlights WHERE user_id = ? AND id = ?").bind(user.id, c.req.param("id")).first<{ id: string }>();
+  if (!highlight) fail(404, "not_found", "No such highlight.");
+  const b = await body<{ action?: string; question?: string; answer?: string; model?: string; parentId?: string }>(c);
+  const action = oneOf(b.action, AI_ACTIONS);
+  const answer = str(b.answer, 8000);
+  if (!action || !answer) fail(422, "bad_request", "Pass the action and the answer.");
+  const parentId = str(b.parentId, 64) ?? null;
+  if (parentId) {
+    const parent = await db.prepare("SELECT 1 FROM highlight_answers WHERE id = ? AND highlight_id = ?").bind(parentId, highlight.id).first();
+    if (!parent) fail(422, "bad_parent", "A follow up must stay on the same highlight.");
+  }
+  const answerId = id("ans_");
+  await db.prepare("INSERT INTO highlight_answers (id, highlight_id, parent_id, action, question, answer, model, created_at) VALUES (?,?,?,?,?,?,?,?)")
+    .bind(answerId, highlight.id, parentId, action, str(b.question, 1500) ?? null, answer, str(b.model, 100) ?? null, now()).run();
+  const row = await db.prepare("SELECT * FROM highlight_answers WHERE id = ?").bind(answerId).first();
+  return c.json({ answer: toAnswer(row!) }, 201);
 });
 
 highlights.delete("/:id", async (c) => {

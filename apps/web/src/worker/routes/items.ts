@@ -3,6 +3,7 @@ import { normalizeColor, ITEM_KINDS, ITEM_STATUSES, type ItemStatus } from "@lum
 import type { AppEnv } from "../env";
 import { body, decodeCursor, encodeCursor, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
 import { toHighlight, toItem } from "../lib/map";
+import { withAnswers } from "../lib/answers";
 import { extractFromHtml, extractFromUrl } from "../lib/extract";
 import { glowStmt } from "../lib/glow";
 import { peerFilter } from "./discover";
@@ -57,7 +58,7 @@ items.get("/lookup", async (c) => {
   const row = await c.env.DB.prepare(`${ITEM_SELECT} WHERE i.user_id = ? AND i.url = ?`).bind(u.id, normalizeUrl(url)).first();
   if (!row) return c.json({ item: null, highlights: [] });
   const { results } = await c.env.DB.prepare("SELECT * FROM highlights WHERE item_id = ? ORDER BY position").bind(row.id).all();
-  return c.json({ item: toItem(row), highlights: results.map(toHighlight) });
+  return c.json({ item: toItem(row), highlights: await withAnswers(c.env.DB, results.map(toHighlight)) });
 });
 
 items.post("/", async (c) => {
@@ -110,7 +111,7 @@ items.get("/:id", async (c) => {
     c.env.DB.prepare("UPDATE items SET last_opened_at = ? WHERE id = ?").bind(now(), row.id),
   ]);
   const n = (peers.results[0] as { n: number }).n;
-  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: hl.results.map((r) => toHighlight(r as Record<string, unknown>)), alsoSaving: n >= 2 ? n : 0 });
+  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: await withAnswers(c.env.DB, hl.results.map((r) => toHighlight(r as Record<string, unknown>))), alsoSaving: n >= 2 ? n : 0 });
 });
 
 items.patch("/:id", async (c) => {

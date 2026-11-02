@@ -6,10 +6,11 @@
 // with /push. Either way the (highlight, destination) ledger guarantees a highlight
 // is written once, so clipping a page again never duplicates.
 import { Hono } from "hono";
-import { DESTINATION_KINDS, formatHighlight, formatSourceBlock, textFragmentUrl, type HighlightFormat } from "@lumen/core";
+import { DESTINATION_KINDS, answerLabel, formatHighlight, formatSourceBlock, textFragmentUrl, type HighlightAnswer, type HighlightFormat } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
 import { safeJson, toDestination } from "../lib/map";
+import { listAnswers } from "../lib/answers";
 import { requirePro } from "../lib/plan";
 
 export const destinations = new Hono<AppEnv>();
@@ -97,7 +98,7 @@ destinations.get("/:id/pending", async (c) => {
     destination: toDestination(d),
     highlightIds: pending.map((p) => p.id),
     markdown,
-    groups: groups.map((g) => ({ source: g.source, highlights: g.highlights.map((h) => ({ id: h.id, quote: h.quote, note: h.note, markdown: formatHighlight(h, format) })) })),
+    groups: groups.map((g) => ({ source: g.source, highlights: g.highlights.map((h) => ({ id: h.id, quote: h.quote, note: h.note, answers: h.answers, markdown: formatHighlight(h, format) })) })),
   });
 });
 
@@ -143,14 +144,16 @@ destinations.post("/:id/push", async (c) => {
   return c.json({ delivered: pending.length });
 });
 
-interface PendingRow { id: string; quote: string; note: string | null; title: string; url: string; site_name: string | null; item_id: string }
+interface PendingRow { id: string; quote: string; note: string | null; title: string; url: string; site_name: string | null; item_id: string; answers: HighlightAnswer[] }
 
+/** Kept answers ride along with a highlight that has not reached this destination yet. */
 async function pendingFor(db: D1Database, destinationId: string): Promise<PendingRow[]> {
   const { results } = await db.prepare(`SELECT h.id, h.quote, h.note, i.title, i.url, i.site_name, i.id AS item_id
     FROM highlights h JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
     WHERE c.destination_id = ? AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ? AND x.status = 'delivered')
-    ORDER BY i.created_at, h.position LIMIT 500`).bind(destinationId, destinationId).all<PendingRow>();
-  return results;
+    ORDER BY i.created_at, h.position LIMIT 500`).bind(destinationId, destinationId).all<Omit<PendingRow, "answers">>();
+  const answers = await listAnswers(db, results.map((row) => row.id));
+  return results.map((row) => ({ ...row, answers: answers.get(row.id) ?? [] }));
 }
 
 function groupBySource(rows: PendingRow[]) {
@@ -180,6 +183,13 @@ async function pushNotion(pageId: string, token: string | null, rows: PendingRow
         { type: "text", text: { content: r.title.slice(0, 200), link: { url: textFragmentUrl(r.url, r.quote) } }, annotations: { color: "gray" } },
       ] },
     },
+    ...r.answers.map((kept) => ({
+      object: "block", type: "toggle",
+      toggle: {
+        rich_text: [{ type: "text", text: { content: (kept.question ? `${answerLabel(kept.action)}: ${kept.question}` : answerLabel(kept.action)).slice(0, 200) } }],
+        children: [{ object: "block", type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: kept.answer.slice(0, 1900) } }] } }],
+      },
+    })),
   ]);
   for (let i = 0; i < children.length; i += 90) {
     const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
@@ -192,7 +202,7 @@ async function pushNotion(pageId: string, token: string | null, rows: PendingRow
 }
 
 async function pushWebhook(url: string, secret: string | null, rows: PendingRow[]) {
-  const payload = JSON.stringify({ type: "highlights.created", highlights: rows.map((r) => ({ id: r.id, quote: r.quote, note: r.note, source: { title: r.title, url: r.url, link: textFragmentUrl(r.url, r.quote) } })) });
+  const payload = JSON.stringify({ type: "highlights.created", highlights: rows.map((r) => ({ id: r.id, quote: r.quote, note: r.note, answers: r.answers.map((kept) => ({ action: kept.action, question: kept.question, answer: kept.answer, model: kept.model })), source: { title: r.title, url: r.url, link: textFragmentUrl(r.url, r.quote) } })) });
   const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "Lumen-Webhook/1" };
   if (secret) {
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);

@@ -57,7 +57,7 @@ ai.post("/run", async (c) => {
     console.error("ai run failed", e);
     fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment, or switch to a local model in the extension.");
   }
-  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
 });
 
 /** Ask Lumen: chat grounded in the page (optional) and the reader's own library.
