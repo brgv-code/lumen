@@ -1,4 +1,4 @@
-import type { Highlight } from "@lumen/core";
+import { BAR_SETTINGS_VERSION, answerFromNote, upgradeBarActions, type Highlight } from "@lumen/core";
 import { DEFAULT_SETTINGS, type Settings } from "./types";
 
 const SETTINGS = "lumen_settings_v2";
@@ -12,7 +12,7 @@ export async function getSettings(): Promise<Settings> {
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
-    toolbar: { ...DEFAULT_SETTINGS.toolbar, ...(saved.toolbar ?? {}) },
+    toolbar: { ...DEFAULT_SETTINGS.toolbar, ...(saved.toolbar ?? {}), actions: upgradeBarActions(saved.toolbar?.actions, saved.toolbar?.version), version: BAR_SETTINGS_VERSION },
     helper: { ...DEFAULT_SETTINGS.helper, ...(saved.helper ?? {}) },
   };
 }
@@ -28,7 +28,16 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
 
 export async function localHighlights(url: string): Promise<Highlight[]> {
   const r = await chrome.storage.local.get(LOCAL);
-  return (r[LOCAL] ?? {})[url] ?? [];
+  const list: Highlight[] = (r[LOCAL] ?? {})[url] ?? [];
+  return list.map(answerOutOfNote);
+}
+
+/** Before LUM-1 a kept answer sat in the note as "Explain: …"; it becomes a kept answer again. */
+function answerOutOfNote(highlight: Highlight): Highlight {
+  const found = answerFromNote(highlight.note);
+  if (!found) return highlight;
+  const kept = { id: `${highlight.id}_note`, highlightId: highlight.id, parentId: null, action: found.action, question: null, answer: found.answer, model: null, createdAt: highlight.updatedAt };
+  return { ...highlight, note: null, answers: [...(highlight.answers ?? []), kept] };
 }
 
 export async function setLocalHighlights(url: string, list: Highlight[]) {

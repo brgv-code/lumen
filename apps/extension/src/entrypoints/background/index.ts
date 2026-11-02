@@ -292,7 +292,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const send = (m: object) => tabId !== undefined && chrome.tabs.sendMessage(tabId, m).catch(() => {});
       streamAnswer(msg, s, {
         chunk: (chunk) => send({ type: "AI_CHUNK", chunk }),
-        done: () => send({ type: "AI_DONE" }),
+        done: (model) => send({ type: "AI_DONE", model }),
         error: (error) => send({ type: "AI_ERROR", error }),
       });
       return { ok: true, provider: s.provider };
@@ -384,6 +384,19 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const r = await cloudApi.updateHighlight(msg.id, { color: msg.color, note: msg.note });
       if (msg.note) autoSend(tabId);
       return { ok: true, highlight: r.highlight };
+    }
+
+    case "KEEP_ANSWER": {
+      const kept = { highlightId: msg.highlightId, parentId: msg.parentId ?? null, action: msg.action, question: msg.question, answer: msg.answer, model: msg.model };
+      if (msg.highlightId.startsWith("local_")) {
+        const url = pageKey(msg.url);
+        const answer = { ...kept, id: `local_ans_${Date.now().toString(36)}`, createdAt: Date.now() };
+        await setLocalHighlights(url, (await localHighlights(url)).map((h) => (h.id === msg.highlightId ? { ...h, answers: [...(h.answers ?? []), answer] } : h)));
+        return { ok: true, answer };
+      }
+      const r = await cloud<{ answer: unknown }>("POST", `/highlights/${msg.highlightId}/answers`, kept);
+      autoSend(tabId);
+      return { ok: true, answer: r.answer };
     }
 
     case "DELETE_HIGHLIGHT": {

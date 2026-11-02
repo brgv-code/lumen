@@ -1,4 +1,4 @@
-import type { AIAction, Collection, Highlight, Item, TextQuote } from "@lumen/core";
+import { BAR_ACTIONS, BAR_SETTINGS_VERSION, DEFAULT_BAR_ACTIONS, type AIAction, type BarAction, type Collection, type Highlight, type Item, type TextQuote } from "@lumen/core";
 
 export type Provider = "lumen" | "ollama" | "openai" | "claude";
 
@@ -23,14 +23,15 @@ export interface Settings {
   markStrength: "soft" | "medium" | "strong";
 }
 
-export const TOOLBAR_ACTIONS = ["highlight", "note", "explain", "expand", "summarize", "define", "ask", "save", "copy"] as const;
-export type ToolbarAction = (typeof TOOLBAR_ACTIONS)[number];
+export const TOOLBAR_ACTIONS = BAR_ACTIONS;
+export type ToolbarAction = BarAction;
 
 export interface ToolbarSettings {
   enabled: boolean;
   actions: ToolbarAction[];   // shown, in order
   labels: boolean;            // icons only, or icons with words
   disabledSites: string[];    // hostnames where the toolbar stays hidden
+  version?: number;           // BAR_SETTINGS_VERSION once upgraded for LUM-1
 }
 
 export interface HelperSettings {
@@ -54,7 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   obsidianKey: "",
   autoSend: true,
   reminders: true,
-  toolbar: { enabled: true, actions: ["highlight", "note", "explain", "expand", "summarize", "save", "copy"], labels: false, disabledSites: [] },
+  toolbar: { enabled: true, actions: DEFAULT_BAR_ACTIONS, labels: false, disabledSites: [], version: BAR_SETTINGS_VERSION },
   helper: { mode: "chosen", sites: [], hiddenOn: [], name: "Lumi", side: "right" },
   theme: "system",
   panel: "floating",
@@ -75,6 +76,7 @@ export type Msg =
   | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; quote: TextQuote; color: string; note?: string; collectionId?: string }
   | { type: "UPDATE_HIGHLIGHT"; id: string; url: string; color?: string; note?: string | null }
   | { type: "DELETE_HIGHLIGHT"; id: string; url: string }
+  | { type: "KEEP_ANSWER"; highlightId: string; url: string; action: AIAction; question: string | null; answer: string; model: string | null; parentId?: string }
   | { type: "GET_COLLECTIONS" }
   | { type: "SET_TARGET"; collectionId: string }
   | { type: "GET_SETTINGS" }

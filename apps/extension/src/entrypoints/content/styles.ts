@@ -7,32 +7,6 @@ button { font: inherit; cursor: pointer; border: 0; }
 @keyframes pop { 0% { transform: scale(.9); opacity: 0 } 60% { transform: scale(1.03); opacity: 1 } 100% { transform: scale(1) } }
 @keyframes blink { 50% { opacity: .2 } }
 
-.bar {
-  position: absolute; display: flex; align-items: center; gap: 1px; padding: 4px;
-  background: rgba(18,18,21,.96); color: #fff; border-radius: 12px; white-space: nowrap;
-  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 16px 30px -12px rgba(0,0,0,.55);
-  animation: pop 220ms cubic-bezier(.34,1.56,.64,1) both; backdrop-filter: blur(8px);
-}
-.bar .act { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 30px; min-width: 30px; justify-content: center; padding: 0 7px;
-  background: transparent; color: rgba(255,255,255,.82); border-radius: 8px; font-size: 12.5px; font-weight: 500; }
-.bar .act:hover { background: rgba(255,255,255,.12); color: #fff; }
-.bar .act svg { flex: none; }
-.bar:not(.labels) .act span { display: none; }
-.bar .act[data-color="sun"] svg { color: #ffd34d; }
-.bar .more { color: rgba(255,255,255,.5); }
-.hl-group { position: relative; display: inline-flex; }
-.flyout { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%) scale(.9); opacity: 0; pointer-events: none;
-  display: grid; grid-template-columns: repeat(8, 18px); gap: 7px; padding: 8px 10px; border-radius: 16px; background: rgba(18,18,21,.96); box-shadow: 0 10px 20px -10px rgba(0,0,0,.6);
-  transition: opacity 140ms ease, transform 160ms cubic-bezier(.34,1.56,.64,1); }
-.hl-group:hover .flyout { opacity: 1; transform: translateX(-50%) scale(1); pointer-events: auto; }
-.flyout::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
-.flyout .sw { width: 18px; height: 18px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); transition: transform 140ms cubic-bezier(.34,1.56,.64,1); }
-.flyout .sw:hover { transform: scale(1.2); }
-/* the main highlight button shows the colour it will use */
-.hl-group > .act { position: relative; }
-.hl-group > .act::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 6px; height: 6px; border-radius: 99px; background: var(--dot, #ffd34d); box-shadow: 0 0 0 1.5px #121215; }
-.sep { width: 1px; height: 16px; background: rgba(255,255,255,.14); margin: 0 3px; }
-
 /* floating panel: sits over the page, never resizes it */
 .fpanel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(400px, calc(100vw - 24px)); z-index: 2147483647;
   border-radius: 20px; overflow: hidden; background: #f6f6f5; box-shadow: 0 0 0 1px rgba(14,14,16,.08), 0 30px 80px -20px rgba(0,0,0,.45);
@@ -101,6 +75,11 @@ textarea, input { width: 100%; border: 0; border-radius: 10px; padding: 10px 12p
 textarea { min-height: 80px; resize: vertical; }
 textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px rgba(255,138,31,.16); }
 .hint { font-size: 12px; color: #8c8c92; }
+.foot { margin-top: 8px; font-size: 11.5px; color: #8c8c92; }
+.foot:empty { display: none; }
+.kept { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: #fff; font-size: 13px; line-height: 1.45; color: #3a3a3f; }
+.kept summary { cursor: pointer; font-weight: 600; color: #5b48f5; }
+.kept div { margin-top: 6px; white-space: pre-wrap; }
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 16px; border-radius: 14px;
   background: #121215; color: #fff; font-size: 13.5px; font-weight: 500; box-shadow: 0 18px 34px -12px rgba(0,0,0,.5);
   animation: pop 300ms cubic-bezier(.34,1.56,.64,1) both; }
@@ -117,6 +96,8 @@ textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px r
 :host(.dark) .q, :host(.dark) .note, :host(.dark) .answer, :host(.dark) textarea, :host(.dark) input, :host(.dark) .key.ghost, :host(.dark) .chip { background: #222226; }
 :host(.dark) .q[style] { background: rgb(var(--lc) / .22); }
 :host(.dark) .answer { color: #c9c9ce; }
+:host(.dark) .kept { background: #222226; color: #c9c9ce; }
+:host(.dark) .kept summary { color: #a99cff; }
 :host(.dark) .chip { color: #c9c9ce; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
 :host(.dark) .key.ghost { color: #f4f4f5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
 :host(.dark) .x:hover { background: #2a2a2f; color: #fff; }

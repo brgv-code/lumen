@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { send } from "../../lib/msg";
-import { TOOLBAR_ACTIONS, type Provider, type Settings, type ToolbarAction } from "../../lib/types";
+import { DEFAULT_SETTINGS, TOOLBAR_ACTIONS, type Provider, type Settings, type ToolbarAction } from "../../lib/types";
 import { ICON, LABEL } from "../content/icons";
 
 const Svg = ({ a }: { a: string }) => <i className="svg" dangerouslySetInnerHTML={{ __html: ICON[a as keyof typeof ICON] }} />;
@@ -16,12 +16,16 @@ const ACTION_INFO: Record<ToolbarAction, [string, string]> = {
   highlight: ["🖍", "Highlight (hover for colours)"],
   note: ["✎", "Note on the passage"],
   explain: ["✦", "Explain in plain words"],
+  simplify: ["🪶", "Simplify into plain words"],
   expand: ["⤢", "Expand with background"],
   summarize: ["≡", "Summary"],
   define: ["📖", "Define a word or term"],
+  counterpoint: ["⚖", "Counterpoint: the strongest objection"],
+  related: ["📚", "Related in your library"],
   ask: ["?", "Ask in the side panel"],
   save: ["🔖", "Save the passage to your bank"],
-  copy: ["⧉", "Copy with a link back"],
+  copy: ["⧉", "Copy the text"],
+  cite: ["❝", "Copy with a link back"],
 };
 
 export default function Options() {
@@ -101,7 +105,7 @@ export default function Options() {
               </div>
             </div>
             <div className="surface stack" style={{ gap: 6 }}>
-              <div className="eyebrow">Actions</div>
+              <div className="row"><div className="eyebrow" style={{ flex: 1 }}>Actions</div><button className="chip" style={{ border: 0, cursor: "pointer" }} onClick={() => setTb({ actions: DEFAULT_SETTINGS.toolbar.actions })}>Reset to default</button></div>
               {ordered.map((a) => {
                 const on = tb.actions.includes(a);
                 return (

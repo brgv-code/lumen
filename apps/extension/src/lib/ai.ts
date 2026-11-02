@@ -3,7 +3,8 @@ import { READER_SYSTEM, readerPrompt, type AIAction } from "@lumen/core";
 import type { Settings } from "./types";
 
 interface Req { action: AIAction; text: string; question?: string; title?: string; context?: string }
-type On = { chunk: (t: string) => void; done: () => void; error: (e: string) => void };
+/** done gets the model that answered, for the card footer. */
+type On = { chunk: (t: string) => void; done: (model?: string) => void; error: (e: string) => void };
 
 export async function streamAnswer(req: Req, s: Settings, on: On) {
   try {
@@ -17,7 +18,7 @@ export async function streamAnswer(req: Req, s: Settings, on: On) {
   }
 }
 
-async function readSSE(res: Response, pick: (j: any) => string | undefined, on: On) {
+async function readSSE(res: Response, pick: (j: any) => string | undefined, on: On, model?: string) {
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -30,11 +31,11 @@ async function readSSE(res: Response, pick: (j: any) => string | undefined, on: 
     for (const line of lines) {
       if (!line.startsWith("data:")) continue;
       const d = line.slice(5).trim();
-      if (d === "[DONE]") return on.done();
+      if (d === "[DONE]") return on.done(model);
       try { const t = pick(JSON.parse(d)); if (t) on.chunk(t); } catch { /* partial */ }
     }
   }
-  on.done();
+  on.done(model);
 }
 
 async function viaLumen(req: Req, s: Settings, on: On) {
@@ -45,7 +46,7 @@ async function viaLumen(req: Req, s: Settings, on: On) {
     body: JSON.stringify(req),
   });
   if (!res.ok) { let m = `Lumen answered ${res.status}`; try { m = (await res.json()).error?.message ?? m; } catch { /* */ } return on.error(m); }
-  await readSSE(res, (j) => j.response, on);
+  await readSSE(res, (j) => j.response, on, res.headers.get("x-lumen-model") ?? undefined);
 }
 
 async function viaOllama(prompt: string, s: Settings, on: On) {
@@ -67,10 +68,10 @@ async function viaOllama(prompt: string, s: Settings, on: On) {
     buf = lines.pop() ?? "";
     for (const l of lines) {
       if (!l.trim()) continue;
-      try { const j = JSON.parse(l); if (j.response) on.chunk(j.response); if (j.done) return on.done(); } catch { /* */ }
+      try { const j = JSON.parse(l); if (j.response) on.chunk(j.response); if (j.done) return on.done(s.model); } catch { /* */ }
     }
   }
-  on.done();
+  on.done(s.model);
 }
 
 async function viaOpenAI(prompt: string, s: Settings, on: On) {
@@ -80,7 +81,7 @@ async function viaOpenAI(prompt: string, s: Settings, on: On) {
     body: JSON.stringify({ model: s.model, stream: true, messages: [{ role: "system", content: READER_SYSTEM }, { role: "user", content: prompt }] }),
   });
   if (!res.ok) return on.error(`API answered ${res.status}: ${(await res.text()).slice(0, 160)}`);
-  await readSSE(res, (j) => j.choices?.[0]?.delta?.content, on);
+  await readSSE(res, (j) => j.choices?.[0]?.delta?.content, on, s.model);
 }
 
 const NO_PERMISSION = "Allow the Claude helper first: open Lumen settings and pick Claude (local CLI).";
@@ -104,7 +105,7 @@ async function viaClaude(prompt: string, s: Settings, on: On): Promise<void> {
     port.onMessage.addListener((m: { chunk?: string; done?: boolean; error?: string }) => {
       if (m.chunk) on.chunk(m.chunk);
       if (m.error) { finished = true; on.error(m.error); port.disconnect(); resolve(); }
-      if (m.done) { finished = true; on.done(); port.disconnect(); resolve(); }
+      if (m.done) { finished = true; on.done(`claude ${s.claudeModel}`); port.disconnect(); resolve(); }
     });
     port.onDisconnect.addListener(() => {
       if (!finished) on.error(chrome.runtime.lastError?.message?.includes("not found")
