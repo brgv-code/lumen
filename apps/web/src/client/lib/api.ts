@@ -1,4 +1,4 @@
-import type { AIAction, Collection, Destination, Highlight, Idea, Item, ItemWithContent, Page, Stats, User } from "@lumen/core";
+import type { AIAction, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemWithContent, Page, Stats, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
@@ -82,6 +82,8 @@ export const api = {
   highlights: (q: { color?: string; q?: string; collection?: string; notes?: boolean; cursor?: string | null } = {}) =>
     req<Page<Highlight>>("GET", "/api/v1/highlights" + qs({ ...q, notes: q.notes ? 1 : undefined })),
   updateHighlight: (id: string, d: { color?: string; note?: string | null }) => req<{ highlight: Highlight }>("PATCH", `/api/v1/highlights/${id}`, d),
+  keepAnswer: (highlightId: string, d: { action: AIAction; question: string | null; answer: string; model: string | null; parentId?: string }) =>
+    req<{ answer: HighlightAnswer }>("POST", `/api/v1/highlights/${highlightId}/answers`, d),
   deleteHighlight: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/highlights/${id}`),
 
   collections: () => req<{ data: Collection[] }>("GET", "/api/v1/collections"),
@@ -135,12 +137,12 @@ export const api = {
   deleteToken: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/tokens/${id}`),
 };
 
-/** Stream an AI answer; calls onText with the growing answer. */
+/** Stream an AI answer; calls onText with the growing answer and resolves with the model that wrote it. */
 export async function streamAI(
   d: { action: AIAction; text: string; question?: string; title?: string },
   onText: (full: string) => void,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<{ answer: string; model: string | null }> {
   const res = await fetch("/api/v1/ai/run", {
     method: "POST",
     headers: { "content-type": "application/json", "x-lumen": "1" },
@@ -153,6 +155,7 @@ export async function streamAI(
     if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: msg }));
     throw new ApiError(res.status, "ai", msg);
   }
+  const model = res.headers.get("x-lumen-model");
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "", full = "";
@@ -165,7 +168,7 @@ export async function streamAI(
     for (const line of lines) {
       if (!line.startsWith("data:")) continue;
       const data = line.slice(5).trim();
-      if (data === "[DONE]") return full;
+      if (data === "[DONE]") return { answer: full, model };
       try {
         const j = JSON.parse(data);
         const t = j.response ?? j.choices?.[0]?.delta?.content ?? "";
@@ -173,14 +176,14 @@ export async function streamAI(
       } catch { /* partial */ }
     }
   }
-  return full;
+  return { answer: full, model };
 }
 
 export interface ChatSource { n: number; kind: "highlight" | "item"; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null; excerpt?: string | null }
 
 /** Ask your library: streams the answer, calls onSources once. */
 export async function streamChat(
-  d: { question: string; history?: { role: string; content: string }[] },
+  d: { question: string; history?: { role: string; content: string }[]; selection?: string },
   on: { text: (full: string) => void; sources: (s: ChatSource[]) => void },
   signal?: AbortSignal,
 ): Promise<string> {

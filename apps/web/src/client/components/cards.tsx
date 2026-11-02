@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Highlight, Item } from "@lumen/core";
-import { citeForClipboard } from "@lumen/core";
+import { answerLabel, citeForClipboard } from "@lumen/core";
 import { Copy, ExternalLink, Heart, Trash2, Highlighter, Share2 } from "lucide-react";
 import { useApp } from "../pages/app/Layout";
 import { ColorMenu } from "./ColorPicker";
@@ -75,6 +75,12 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
       {onNote ? (
         <NoteEditor value={h.note} onSave={onNote} />
       ) : h.note ? <div className="note">✎ {h.note}</div> : null}
+      {(h.answers ?? []).map((kept) => (
+        <details key={kept.id} className="kept">
+          <summary>✦ {answerLabel(kept.action)}{kept.question ? `: ${kept.question}` : ""}</summary>
+          <p>{kept.answer}</p>
+        </details>
+      ))}
       <div className="row small muted" style={{ gap: 6 }}>
         <Link to={`/app/read/${h.itemId}#${h.id}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "50%", color: "var(--ink-2)", fontWeight: 500 }}>{title}</Link>
         <span style={{ whiteSpace: "nowrap" }}>· {timeAgo(h.createdAt)}</span>
