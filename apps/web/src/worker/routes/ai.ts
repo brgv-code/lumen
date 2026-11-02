@@ -15,7 +15,7 @@ export const ai = new Hono<AppEnv>();
 /** Count a hosted answer against the reader's daily cap and the site wide budget, and pick the
  *  model: past AI_SOFT_CAP answers a day across everyone, answers move to the small model so the
  *  free Workers AI allowance lasts the whole day. */
-async function spend(c: Context<AppEnv>, feature: string, preferred: string): Promise<string> {
+export async function spend(c: Context<AppEnv>, feature: string, preferred: string): Promise<string> {
   const user = c.get("user");
   const db = c.env.DB;
   const day = dayIn(user.timezone);

@@ -85,14 +85,15 @@ me.get("/export", async (c) => {
   const u = c.get("user");
   const db = c.env.DB;
   const q = (sql: string) => db.prepare(sql).bind(u.id);
-  const [items, highlights, collections, ideas, tags] = await db.batch([
+  const [items, highlights, collections, ideas, tags, recall] = await db.batch([
     q("SELECT id, url, title, site_name, author, excerpt, kind, status, progress, favorite, word_count, collection_id, created_at, finished_at FROM items WHERE user_id = ?"),
     q("SELECT id, item_id, quote, prefix, suffix, position, color, note, created_at FROM highlights WHERE user_id = ?"),
     q("SELECT id, name, emoji, color, description, created_at FROM collections WHERE user_id = ?"),
     q("SELECT id, title, angle, outline, status, created_at FROM ideas WHERE user_id = ?"),
     q("SELECT t.name, it.item_id FROM tags t JOIN item_tags it ON it.tag_id = t.id WHERE t.user_id = ?"),
+    q("SELECT id, item_id, highlight_id, question, answer, step, reviews, due_at, reviewed_at, created_at FROM recall_cards WHERE user_id = ?"),
   ]);
-  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), user: toUser(u), items: items.results, highlights: highlights.results, collections: collections.results, ideas: ideas.results, tags: tags.results }, null, 2), {
+  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), user: toUser(u), items: items.results, highlights: highlights.results, collections: collections.results, ideas: ideas.results, tags: tags.results, recall: recall.results }, null, 2), {
     headers: { "content-type": "application/json", "content-disposition": `attachment; filename="lumen-export-${now()}.json"` },
   });
 });

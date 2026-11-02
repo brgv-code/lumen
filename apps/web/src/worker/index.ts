@@ -22,6 +22,7 @@ import { purgeDemos } from "./lib/seed";
 import { refreshActiveRadars } from "./lib/radar";
 import { eventFor, trackUser } from "./lib/analytics";
 import { owner } from "./routes/owner";
+import { recall } from "./routes/recall";
 
 const app = new Hono<AppEnv>();
 let ctxRef: ExecutionContext | undefined;
@@ -92,6 +93,7 @@ app.route("/api/v1/billing", billing);
 app.route("/api/v1/following", following);
 app.route("/api/v1/shares", shares);
 app.route("/api/v1/owner", owner);
+app.route("/api/v1/recall", recall);
 
 app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 
