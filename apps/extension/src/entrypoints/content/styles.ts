@@ -25,6 +25,8 @@ button { font: inherit; cursor: pointer; border: 0; }
 .orb { position: relative; width: 46px; height: 46px; padding: 0; border-radius: 15px; background: none; filter: drop-shadow(0 10px 18px rgba(255,106,26,.45));
   animation: bob 6s ease-in-out infinite; transition: transform 180ms cubic-bezier(.34,1.56,.64,1); }
 .orb:hover { transform: scale(1.08) rotate(-4deg); }
+/* minimised panel: a dot says the chat is kept */
+.orb.minimized::after { content: ""; position: absolute; left: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 99px; background: #8a7bff; box-shadow: 0 0 0 2px #fff; animation: pop 300ms cubic-bezier(.34,1.56,.64,1) both; }
 .orb .badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: #121215; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 0 0 2px #fff; }
 .hname { font-size: 11px; font-weight: 600; color: #3a3a3f; background: rgba(255,255,255,.9); padding: 2px 8px; border-radius: 99px; opacity: 0; transform: translateY(-4px); transition: all 160ms ease; box-shadow: 0 4px 10px -6px rgba(0,0,0,.3); }
 .helper:hover .hname { opacity: 1; transform: none; }

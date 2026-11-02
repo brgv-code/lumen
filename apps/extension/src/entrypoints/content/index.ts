@@ -36,6 +36,8 @@ class Lumen {
   settings: Settings = DEFAULT_SETTINGS;
   helperEl!: HTMLElement;
   helperMenu = false;
+  /** The floating panel is hidden behind the Lumi lamp, its chat kept. */
+  panelMinimized = false;
   panelEl: HTMLElement | null = null;
   host!: HTMLElement;
   root!: ShadowRoot;
@@ -127,6 +129,7 @@ class Lumen {
       if (m?.type === "SHOW_PANEL") { this.showPanel(m.prompt); reply({ ok: true }); return; }
       if (m?.type === "TOGGLE_PANEL") { this.togglePanel(); reply({ ok: true }); return; }
       if (m?.type === "PANEL_CLOSE") { this.hidePanel(); reply({ ok: true }); return; }
+      if (m?.type === "PANEL_MINIMIZE") { this.minimizePanel(); reply({ ok: true }); return; }
       if (m?.type === "GET_PARAGRAPHS") { this.paragraphs = readableParagraphs(articleRoot()); reply({ title: document.title, paragraphs: this.paragraphs.map((p) => p.text) }); return; }
       if (m?.type === "SCROLL_TO_PARAGRAPH") { this.scrollToParagraph(Number(m.n)); reply({ ok: true }); return; }
       if (m?.type === "OPEN_THREAD") {
@@ -227,6 +230,7 @@ class Lumen {
   showPanel(prompt?: string) {
     if (this.settings.panel === "docked") { send({ type: "OPEN_PANEL", prompt }).catch(() => {}); return; }
     this.selectionBar.hide();
+    if (this.panelMinimized) { this.panelMinimized = false; this.renderHelper(); }
     if (!this.panelEl) {
       this.panelEl = document.createElement("div");
       this.panelEl.className = "fpanel";
@@ -241,6 +245,15 @@ class Lumen {
   hidePanel() {
     this.panelEl?.classList.remove("open");
     this.host.classList.remove("panel-open");
+    if (this.panelMinimized) { this.panelMinimized = false; this.renderHelper(); }
+  }
+
+  /** The lamp stands in for the panel; on sites where Lumi is off it shows only while minimised. */
+  minimizePanel() {
+    this.hidePanel();
+    this.panelMinimized = true;
+    this.helperMenu = false;
+    this.renderHelper();
   }
 
   togglePanel() {
@@ -302,7 +315,7 @@ class Lumen {
 
   renderHelper() {
     if (!this.helperEl) return;
-    const on = this.helperOn() && window.top === window;
+    const on = (this.helperOn() || this.panelMinimized) && window.top === window;
     this.host.classList.toggle("has-helper", on);
     this.host.classList.toggle("helper-left", this.settings.helper.side === "left");
     if (!on) { this.helperEl.hidden = true; return; }
@@ -321,12 +334,13 @@ class Lumen {
         <div class="hsep"></div>
         <button data-h="hide">${ICON.eyeOff}<span>Hide on ${location.hostname}</span></button>
       </div>` : ""}
-      <button class="orb" data-h="toggle" title="${esc(h.name)}">${LAMP}${count ? `<span class="badge">${count}</span>` : ""}</button>
+      <button class="orb${this.panelMinimized ? " minimized" : ""}" data-h="toggle" title="${this.panelMinimized ? "Open the panel" : esc(h.name)}">${LAMP}${count ? `<span class="badge">${count}</span>` : ""}</button>
       <span class="hname">${esc(h.name)}</span>`;
     this.helperEl.onclick = async (ev) => {
       const b = (ev.target as HTMLElement).closest("button");
       if (!b) return;
       const act = b.dataset.h;
+      if (act === "toggle" && this.panelMinimized) return this.showPanel();
       if (act === "toggle") { this.helperMenu = !this.helperMenu; return this.renderHelper(); }
       this.helperMenu = false; this.renderHelper();
       if (act === "save") return this.savePage();
