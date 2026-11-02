@@ -167,6 +167,20 @@ export default function Panel() {
                   {!page?.item && <button className="key lamp" onClick={async () => { if (cur?.id) { await chrome.tabs.sendMessage(cur.id, { type: "CMD", cmd: "save", collectionId: s.targetCollectionId || undefined }).catch(() => {}); setTimeout(refreshTab, 900); } }}>Save page</button>}
                   {page?.item && <button className="key ghost" onClick={() => openInLumen(`/app/read/${page.item!.id}`)}>Open in Lumen</button>}
                 </div>
+                {(page?.highlights ?? []).some((h) => h.answers?.length) && (
+                  <>
+                    <div className="eyebrow">Threads</div>
+                    {(page?.highlights ?? []).filter((h) => h.answers?.length).map((h: Highlight) => (
+                      <button key={h.id} className="pick" style={{ alignItems: "flex-start" }} onClick={() => cur?.id && chrome.tabs.sendMessage(cur.id, { type: "OPEN_THREAD", id: h.id }).catch(() => {})}>
+                        <span style={{ width: 4, alignSelf: "stretch", borderRadius: 4, background: colorSwatch(h.color), flex: "none" }} />
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: "block", fontFamily: "Newsreader, Georgia, serif", fontSize: 14, color: "var(--ink)" }}>{h.quote.slice(0, 120)}{h.quote.length > 120 ? "…" : ""}</span>
+                          <span className="small muted">{keptCount(h.answers?.length ?? 0)}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                )}
                 <div className="eyebrow">Highlights here · {page?.highlights.length ?? 0}</div>
                 {(page?.highlights ?? []).map((h: Highlight) => (
                   <button key={h.id} className="pick" style={{ alignItems: "flex-start" }} onClick={() => cur?.id && chrome.tabs.sendMessage(cur.id, { type: "SCROLL_TO", id: h.id }).catch(() => {})}>
@@ -210,6 +224,8 @@ export default function Panel() {
     </div>
   );
 }
+
+const keptCount = (count: number) => (count === 1 ? "1 kept answer" : `${count} kept answers`);
 
 function UpdateNote() {
   const [latest, setLatest] = useState<string | null>(null);

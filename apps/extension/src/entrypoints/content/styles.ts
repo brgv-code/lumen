@@ -76,6 +76,9 @@ textarea { min-height: 80px; resize: vertical; }
 textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px rgba(255,138,31,.16); }
 .hint { font-size: 12px; color: #8c8c92; }
 .foot { margin-top: 8px; font-size: 11.5px; color: #8c8c92; }
+.dots { position: absolute; top: 0; left: 0; }
+.dot { position: absolute; width: 9px; height: 9px; padding: 0; border-radius: 99px; background: #7d69ff; box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.25); cursor: pointer; }
+.dot:hover { transform: scale(1.3); }
 .foot:empty { display: none; }
 .kept { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: #fff; font-size: 13px; line-height: 1.45; color: #3a3a3f; }
 .kept summary { cursor: pointer; font-weight: 600; color: #5b48f5; }

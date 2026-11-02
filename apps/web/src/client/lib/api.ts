@@ -97,9 +97,9 @@ export const api = {
   createDestination: (d: { kind: string; name: string; config: Record<string, unknown>; secret?: string }) =>
     req<{ destination: Destination }>("POST", "/api/v1/destinations", d),
   deleteDestination: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/destinations/${id}`),
-  pending: (id: string) => req<{ highlightIds: string[]; markdown: string; groups: unknown[] }>("GET", `/api/v1/destinations/${id}/pending`),
-  ack: (id: string, highlightIds: string[], error?: string) => req<{ acked: number }>("POST", `/api/v1/destinations/${id}/ack`, { highlightIds, error }),
-  push: (id: string) => req<{ delivered: number }>("POST", `/api/v1/destinations/${id}/push`, {}),
+  pending: (id: string) => req<{ highlightIds: string[]; answerIds: string[]; counts: { highlights: number; answers: number }; markdown: string; groups: unknown[] }>("GET", `/api/v1/destinations/${id}/pending`),
+  ack: (id: string, highlightIds: string[], answerIds: string[], error?: string) => req<{ acked: number }>("POST", `/api/v1/destinations/${id}/ack`, { highlightIds, answerIds, error }),
+  push: (id: string) => req<{ delivered: number; answers: number }>("POST", `/api/v1/destinations/${id}/push`, {}),
 
   ideas: () => req<{ data: Idea[] }>("GET", "/api/v1/ideas"),
   spark: () => req<{ data: Idea[] }>("POST", "/api/v1/ai/spark", {}),

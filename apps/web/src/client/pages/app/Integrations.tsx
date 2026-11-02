@@ -39,7 +39,7 @@ export default function Integrations() {
     try {
       if (d.kind === "notion" || d.kind === "webhook") {
         const r = await api.push(d.id);
-        toast(r.delivered ? `Sent ${r.delivered} highlights to ${d.name}` : "Nothing new to send");
+        toast(r.answers ? `Sent ${r.delivered} highlights and ${r.answers} answers to ${d.name}` : r.delivered ? `Sent ${r.delivered} highlights to ${d.name}` : "Nothing new to send");
       } else {
         const p = await api.pending(d.id);
         if (!p.highlightIds.length) { toast("Nothing new: every highlight was already sent"); return; }
@@ -61,8 +61,8 @@ export default function Integrations() {
           }).catch(() => { throw new Error("Could not reach Obsidian. Is it open with the Local REST API plugin, and is its certificate trusted?"); });
           if (!res.ok) throw new Error(`Obsidian answered ${res.status}`);
         }
-        await api.ack(d.id, p.highlightIds);
-        toast(`Sent ${p.highlightIds.length} new highlights to ${d.name}`);
+        await api.ack(d.id, p.highlightIds, p.answerIds);
+        toast(p.counts.answers ? `Sent ${p.counts.highlights} highlights and ${p.counts.answers} answers to ${d.name}` : `Sent ${p.counts.highlights} new highlights to ${d.name}`);
       }
       load();
     } catch (e) { toast((e as Error).message, "err"); } finally { setBusy(null); }

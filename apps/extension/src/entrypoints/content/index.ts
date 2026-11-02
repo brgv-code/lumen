@@ -86,7 +86,7 @@ class Lumen {
     this.host.setAttribute("data-lumen-ui", "");
     this.host.style.cssText = "all: initial; position: absolute; top: 0; left: 0; z-index: 2147483646;";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${UI_CSS}${WHEEL_CSS}</style><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
+    this.root.innerHTML = `<style>${UI_CSS}${WHEEL_CSS}</style><div class="dots"></div><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
     this.card = this.root.querySelector(".card")!;
     this.toastEl = this.root.querySelector(".toast")!;
     this.helperEl = this.root.querySelector(".helper")!;
@@ -110,6 +110,8 @@ class Lumen {
       if (ch.lumen_settings_v2?.newValue) { this.settings = { ...DEFAULT_SETTINGS, ...ch.lumen_settings_v2.newValue }; this.applySettings(); }
     });
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applySettings());
+    let dotFrame = 0;
+    window.addEventListener("resize", () => { cancelAnimationFrame(dotFrame); dotFrame = requestAnimationFrame(() => this.placeDots()); });
     const mo = new MutationObserver(() => this.adaptMarks());
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
@@ -120,6 +122,13 @@ class Lumen {
       if (m?.type === "SHOW_PANEL") { this.showPanel(m.prompt); reply({ ok: true }); return; }
       if (m?.type === "TOGGLE_PANEL") { this.togglePanel(); reply({ ok: true }); return; }
       if (m?.type === "PANEL_CLOSE") { this.hidePanel(); reply({ ok: true }); return; }
+      if (m?.type === "OPEN_THREAD") {
+        const h = this.highlights.find((x) => x.id === m.id);
+        document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (h) this.cardFor(h, true);
+        reply({ ok: Boolean(h) });
+        return;
+      }
       if (m?.type === "SCROLL_TO") {
         const el = document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`) as HTMLElement | null;
         if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.animate([{ filter: "brightness(1)" }, { filter: "brightness(.8)" }, { filter: "brightness(1)" }], { duration: 700 }); }
@@ -164,6 +173,27 @@ class Lumen {
       if (r) for (const m of wrapRange(r, { class: "lumen-mark", "data-lumen-id": h.id, title: h.note ? `Note: ${h.note}` : "Lumen highlight" })) m.style.setProperty("--lc", colorVar(h.color));
     }
     this.adaptMarks();
+    this.placeDots();
+  }
+
+  /** A dot after the first line of each passage with kept answers; nothing until something is kept. */
+  placeDots() {
+    const layer = this.root.querySelector<HTMLElement>(".dots");
+    if (!layer) return;
+    layer.replaceChildren();
+    for (const h of this.highlights) {
+      const count = h.answers?.length ?? 0;
+      const line = count ? document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(h.id)}"]`)?.getClientRects()[0] : undefined;
+      if (!line) continue;
+      const dot = document.createElement("button");
+      dot.className = "dot";
+      dot.title = count === 1 ? "1 kept answer" : `${count} kept answers`;
+      dot.setAttribute("aria-label", dot.title);
+      dot.style.left = `${line.right + scrollX + 3}px`;
+      dot.style.top = `${line.top + scrollY + line.height / 2 - 4.5}px`;
+      dot.onclick = () => this.cardFor(h, true);
+      layer.appendChild(dot);
+    }
   }
 
   /** Light text or a dark background means a dark page: that mark becomes a tint plus underline. */
@@ -345,13 +375,13 @@ class Lumen {
     this.cardFor(h);
   }
 
-  cardFor(h: Highlight) {
+  cardFor(h: Highlight, expanded = false) {
     this.card.hidden = false;
     this.card.innerHTML = `
       <div class="head"><span class="tile">✦</span><b>Highlight</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
       <blockquote class="q" style="--lc: ${colorVar(h.color)}">${esc(h.quote)}</blockquote>
       ${h.note ? `<div class="note">✎ ${esc(h.note)}</div>` : ""}
-      ${(h.answers ?? []).map((kept) => `<details class="kept"><summary>✦ ${answerLabel(kept.action)}${kept.question ? `: ${esc(kept.question)}` : ""}</summary><div>${esc(kept.answer)}</div></details>`).join("")}
+      ${(h.answers ?? []).map((kept) => `<details class="kept"${expanded ? " open" : ""}><summary>${kept.parentId ? "↳" : "✦"} ${answerLabel(kept.action)}${kept.question ? `: ${esc(kept.question)}` : ""}</summary><div>${esc(kept.answer)}</div></details>`).join("")}
       <div class="row">${this.swatches(h.color)}</div>
       <div class="row">
         <button class="key" data-act="note">${h.note ? "Edit note" : "Add note"}</button>
@@ -474,6 +504,7 @@ class Lumen {
     const answer = r.answer;
     if (!r.ok || !answer) { this.toast(r.error ?? "Could not keep this answer", "err"); return false; }
     this.highlights = this.highlights.map((h) => (h.id === owner.id ? { ...h, answers: [...(h.answers ?? []), answer] } : h));
+    this.placeDots();
     this.toast("Kept with this highlight");
     return true;
   }

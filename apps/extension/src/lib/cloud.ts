@@ -32,9 +32,9 @@ export const cloudApi = {
   deleteHighlight: (id: string) => cloud<{ ok: true }>("DELETE", `/highlights/${id}`),
   collections: () => cloud<{ data: Collection[] }>("GET", "/collections"),
   destinations: () => cloud<{ data: { id: string; kind: string; name: string; config: Record<string, string> }[] }>("GET", "/destinations"),
-  pending: (id: string) => cloud<{ highlightIds: string[]; markdown: string }>("GET", `/destinations/${id}/pending`),
-  ack: (id: string, highlightIds: string[], error?: string) => cloud<{ acked: number }>("POST", `/destinations/${id}/ack`, { highlightIds, error }),
-  push: (id: string) => cloud<{ delivered: number }>("POST", `/destinations/${id}/push`, {}),
+  pending: (id: string) => cloud<{ highlightIds: string[]; answerIds: string[]; counts: { highlights: number; answers: number }; markdown: string }>("GET", `/destinations/${id}/pending`),
+  ack: (id: string, highlightIds: string[], answerIds: string[], error?: string) => cloud<{ acked: number }>("POST", `/destinations/${id}/ack`, { highlightIds, answerIds, error }),
+  push: (id: string) => cloud<{ delivered: number; answers: number }>("POST", `/destinations/${id}/push`, {}),
 };
 
 /**
@@ -52,7 +52,7 @@ export async function syncTarget(): Promise<{ sent: number; to?: string }> {
   if (!dest) return { sent: 0 };
   if (dest.kind === "notion" || dest.kind === "webhook") {
     const r = await cloudApi.push(dest.id);
-    return { sent: r.delivered, to: dest.name };
+    return { sent: r.delivered + r.answers, to: dest.name };
   }
   if (dest.kind !== "obsidian") return { sent: 0 };
   if (!s.obsidianKey) throw new CloudError(400, "Add your Obsidian Local REST API key in Lumen settings.");
@@ -66,9 +66,9 @@ export async function syncTarget(): Promise<{ sent: number; to?: string }> {
     body: p.markdown,
   });
   if (!res.ok) {
-    await cloudApi.ack(dest.id, p.highlightIds, `Obsidian ${res.status}`).catch(() => {});
+    await cloudApi.ack(dest.id, p.highlightIds, p.answerIds, `Obsidian ${res.status}`).catch(() => {});
     throw new CloudError(res.status, `Obsidian answered ${res.status}`);
   }
-  await cloudApi.ack(dest.id, p.highlightIds);
-  return { sent: p.highlightIds.length, to: dest.name };
+  await cloudApi.ack(dest.id, p.highlightIds, p.answerIds);
+  return { sent: p.counts.highlights + p.counts.answers, to: dest.name };
 }
