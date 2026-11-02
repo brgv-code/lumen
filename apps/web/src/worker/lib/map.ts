@@ -1,4 +1,4 @@
-import type { Item, Highlight, Collection, Destination, Idea, User } from "@lumen/core";
+import type { Item, Highlight, HighlightAnswer, ItemTldr, Collection, Destination, Idea, User } from "@lumen/core";
 import type { SessionUser } from "../env";
 import { entitlement } from "./plan";
 
@@ -59,6 +59,26 @@ export const toHighlight = (r: Row): Highlight => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   ...(r.item_title ? { item: { id: r.item_id, title: r.item_title, url: r.item_url, siteName: r.item_site } } : {}),
+});
+
+export const toAnswer = (r: Row): HighlightAnswer => ({
+  id: r.id,
+  highlightId: r.highlight_id,
+  parentId: r.parent_id ?? null,
+  action: r.action,
+  question: r.question ?? null,
+  answer: r.answer,
+  model: r.model ?? null,
+  createdAt: r.created_at,
+});
+
+export const toTldr = (r: Row): ItemTldr => ({
+  id: r.id,
+  itemId: r.item_id,
+  text: r.text,
+  model: r.model ?? null,
+  citations: safeJson(r.citations, []),
+  createdAt: r.created_at,
 });
 
 export const toCollection = (r: Row): Collection => ({

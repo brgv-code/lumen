@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import type { AppEnv, Env } from "../env";
 import { body, fail, now } from "../lib/util";
 import { toUser } from "../lib/map";
+import { track } from "../lib/analytics";
 
 export const billing = new Hono<AppEnv>();
 
@@ -64,7 +65,7 @@ billing.post("/preview", async (c) => {
 });
 
 /** Stripe webhook (no session): verify the signature, then flip the plan. */
-export async function stripeWebhook(req: Request, env: Env) {
+export async function stripeWebhook(req: Request, env: Env, ctx?: { waitUntil(p: Promise<unknown>): void }) {
   if (!env.STRIPE_WEBHOOK_SECRET) return new Response("not configured", { status: 501 });
   const payload = await req.text();
   const sig = req.headers.get("stripe-signature") ?? "";
@@ -86,5 +87,20 @@ export async function stripeWebhook(req: Request, env: Env) {
     const active = ["active", "trialing", "past_due"].includes(o.status);
     await env.DB.prepare("UPDATE users SET plan = ? WHERE stripe_customer_id = ?").bind(active ? "pro" : "free", o.customer).run();
   }
+  await revenueEvent(env, ctx, event.type, o);
   return Response.json({ received: true });
+}
+
+/** Revenue in PostHog: one event per payment, with the amount in the account's currency units. */
+async function revenueEvent(env: Env, ctx: { waitUntil(p: Promise<unknown>): void } | undefined, type: string, o: Record<string, any>) {
+  const byCustomer = async (cust?: string) => cust ? (await env.DB.prepare("SELECT id FROM users WHERE stripe_customer_id = ?").bind(cust).first<{ id: string }>())?.id : undefined;
+  if (type === "checkout.session.completed" && o.client_reference_id) {
+    track(env, ctx, o.client_reference_id, "subscription_started", { revenue: (o.amount_total ?? 0) / 100, currency: o.currency ?? null, $set: { plan: "pro" } });
+  } else if (type === "invoice.paid") {
+    const uid = await byCustomer(o.customer);
+    if (uid) track(env, ctx, uid, "payment_received", { revenue: (o.amount_paid ?? 0) / 100, currency: o.currency ?? null, billing_reason: o.billing_reason ?? null });
+  } else if (type === "customer.subscription.deleted") {
+    const uid = await byCustomer(o.customer);
+    if (uid) track(env, ctx, uid, "subscription_cancelled", { $set: { plan: "free" } });
+  }
 }

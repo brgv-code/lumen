@@ -79,6 +79,37 @@ The unpacked build has a fixed id (`ffjconacpmnbadoeegamifkellcddfja`, from the 
 **Connect this browser's extension** stores a token in it with one click. The extension's
 settings page has **Connect with Lumen**, which opens that flow.
 
+## Analytics (PostHog, EU)
+1. Create a project at https://eu.posthog.com and copy its **project API key** (`phc_...`, public).
+2. `npx wrangler secret put POSTHOG_KEY` (optional `POSTHOG_HOST`, default `https://eu.i.posthog.com`).
+   No redeploy needed.
+
+What is sent:
+- **Server events** (`lib/analytics.ts`), keyed by account id, never email or content:
+  `user_signed_up` (with `trial` and `trial_note`), `user_logged_in`, `demo_started`, `ai_answer`
+  (feature, model, small_model, source), `ai_limit_hit`, `agent_call` (tool, client), every
+  successful write in `eventFor()` (item_saved, highlight_created, collection_created,
+  destination_added, blog_followed, share_created, token_created, checkout_started, ...) with
+  `source` web, extension or agent, and revenue from the Stripe webhook (`subscription_started`,
+  `payment_received` with `revenue` and `currency`, `subscription_cancelled`).
+- **Web app** (`client/lib/analytics.ts`), only after the visitor allows it in the banner or in
+  Settings: pageviews, page leave (time on page), autocapture and session replay. The app shell has
+  `ph-mask`, so library text is masked in replays; all inputs are masked. Before consent the
+  library is not even downloaded. The extension has no analytics code.
+
+Owner page: `/app/owner` for emails in the `OWNER_EMAILS` var (signups, activation, AI per day,
+trial decisions).
+
+## Abuse guards
+- One trial per person (`lib/abuse.ts`): no trial without a verified email, for disposable
+  domains, GitHub accounts younger than 30 days, an email (canonical: no dots or +tags for Gmail)
+  that had a trial before (kept after account deletion), a device cookie `lumen_did` that had one
+  in 90 days, or a network with 2 trials in 30 days. Those accounts start on Free.
+- At most 5 new accounts per network per 24 hours (`/login?error=signup_limit`).
+- Hosted AI: 15 a day free, 100 on trial, 500 paid, 30 in the demo. Past `AI_SOFT_CAP` answers
+  a day across everyone (default 60) answers use the small model, so the free Workers AI
+  allowance lasts the day.
+
 ## Billing (Stripe)
 Freemium: every account gets 7 days of Pro, then the free plan unless they upgrade. Rules live in
 `apps/web/src/worker/lib/plan.ts`. Without Stripe secrets the Upgrade page collects early access

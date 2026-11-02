@@ -2,6 +2,8 @@
 import type { TextQuote } from "./types.ts";
 import { matchQuote, quoteFromText } from "./text.ts";
 
+const BLOCKS = "p, li, blockquote, pre, h2, h3, h4";
+
 interface TextIndex { text: string; nodes: { node: Text; start: number }[] }
 
 const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT"]);
@@ -49,6 +51,33 @@ export function describeRange(root: Node, range: Range): TextQuote | null {
   const sel = quoteFromText(index.text, start, end);
   if (!sel.quote.trim()) return null;
   return sel;
+}
+
+/** The article's paragraphs in reading order, for TL;DR citations; each keeps a quote to find it again. */
+export function readableParagraphs(root: Element, minLength = 30): { text: string; quote: TextQuote; element: Element }[] {
+  const index = buildTextIndex(root);
+  const blocks = Array.from(root.querySelectorAll(BLOCKS)).filter((block) => !block.closest("[data-lumen-ui]") && !block.parentElement?.closest(BLOCKS));
+  const found: { text: string; quote: TextQuote; element: Element }[] = [];
+  for (const element of blocks) {
+    const text = (element.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (text.length < minLength) continue;
+    const inside = index.nodes.filter((entry) => element.contains(entry.node));
+    const first = inside[0];
+    const last = inside[inside.length - 1];
+    if (first && last) found.push({ text, quote: quoteFromText(index.text, first.start, last.start + last.node.data.length), element });
+  }
+  return found;
+}
+
+/** The first candidate whose text overlaps the quote, so Keep attaches instead of highlighting twice. */
+export function coveringQuote<T extends TextQuote>(root: Node, quote: TextQuote, candidates: readonly T[]): T | undefined {
+  const { text } = buildTextIndex(root);
+  const span = matchQuote(text, quote);
+  if (!span) return undefined;
+  return candidates.find((candidate) => {
+    const hit = matchQuote(text, candidate);
+    return hit !== null && hit[0] < span[1] && span[0] < hit[1];
+  });
 }
 
 export function anchorToRange(root: Node, sel: TextQuote): Range | null {

@@ -340,55 +340,10 @@
   margin-top: 12px;
 }
 .rail {
-  position: sticky;
-  top: 74px;
   display: grid;
+  align-content: start;
   gap: 14px;
-  max-height: calc(100vh - 90px);
-  overflow: auto;
-  scrollbar-width: thin;
 }
-.toolbar {
-  position: absolute;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 5px;
-  background: #121215;
-  color: #fff;
-  border-radius: 13px;
-  box-shadow: 0 18px 34px -12px rgba(0, 0, 0, 0.55);
-  animation: pop 260ms var(--ease-spring) both;
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-.toolbar button {
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.85);
-  height: 30px;
-  padding: 0 9px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.toolbar button:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
-.toolbar .sw {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border-radius: 50%;
-  margin: 0 2px;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.22);
-  transition: transform 160ms var(--ease-spring);
-}
-.toolbar .sw:hover { transform: scale(1.2); background: inherit; }
-.toolbar .sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.14); margin: 0 4px; }
 .ai-answer {
   font-size: 14px;
   line-height: 1.6;
@@ -419,7 +374,6 @@
 .mobile-bar { display: none; }
 @media (max-width: 1100px) {
   .reader { grid-template-columns: 1fr; }
-  .rail { position: static; max-height: none; }
 }
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
@@ -454,6 +408,15 @@
 /* overflow guards */
 .rail > *, .hl-card, .item-card, .panel { min-width: 0; }
 .hl-card > .row { flex-wrap: wrap; row-gap: 4px; }
+.thread__toggle { justify-self: start; border: 0; cursor: pointer; }
+.thread { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--iris-tint); font-size: 13.5px; color: var(--ink-2); }
+.thread__label { font-weight: 600; color: var(--ink); }
+.thread__item p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.55; }
+/* the rail as a margin: cards level with their passages (lib/margin.ts) */
+.margin { position: relative; display: grid; gap: 10px; }
+.margin--aligned { display: block; }
+.margin--aligned > [data-anchor] { position: absolute; left: 0; right: 0; transition: top 180ms var(--ease-spring); }
+@media (prefers-reduced-motion: reduce) { .margin--aligned > [data-anchor] { transition: none; } }
 .rail .hl-card blockquote { font-size: 15.5px; }
 .rail .hl-card { padding: 14px; }
 .side__link > span:not(.count) { min-width: 0; }
@@ -595,3 +558,5 @@
 .hl-filter > button[aria-pressed="true"]:not(.cp-sw) { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
 .toolbar .cp-pop .key { height: 34px; padding: 0 14px; color: #fff; background: linear-gradient(180deg, var(--lamp-hi), var(--lamp-lo)); box-shadow: 0 8px 16px -8px rgb(255 106 26 / 0.7); }
 .toolbar .cp-pop .key:hover { color: #fff; filter: brightness(1.05); }
+/* TL;DR citations: ¶12 jumps to the paragraph */
+.ai-answer .cite { border: 0; cursor: pointer; padding: 0 5px; margin: 0 1px; border-radius: 6px; font: 600 11.5px var(--font-ui); color: var(--ink); background: var(--iris-tint); }

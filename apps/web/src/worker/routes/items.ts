@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { normalizeColor, ITEM_KINDS, ITEM_STATUSES, type ItemStatus } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, decodeCursor, encodeCursor, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
-import { toHighlight, toItem } from "../lib/map";
+import { toHighlight, toItem, toTldr } from "../lib/map";
+import { withAnswers } from "../lib/answers";
+import { cleanCitations, tldrFor } from "../lib/tldr";
 import { extractFromHtml, extractFromUrl } from "../lib/extract";
 import { glowStmt } from "../lib/glow";
 import { peerFilter } from "./discover";
@@ -55,9 +57,9 @@ items.get("/lookup", async (c) => {
   const url = c.req.query("url");
   if (!url) fail(400, "missing_url", "Pass ?url=");
   const row = await c.env.DB.prepare(`${ITEM_SELECT} WHERE i.user_id = ? AND i.url = ?`).bind(u.id, normalizeUrl(url)).first();
-  if (!row) return c.json({ item: null, highlights: [] });
+  if (!row) return c.json({ item: null, highlights: [], tldr: null });
   const { results } = await c.env.DB.prepare("SELECT * FROM highlights WHERE item_id = ? ORDER BY position").bind(row.id).all();
-  return c.json({ item: toItem(row), highlights: results.map(toHighlight) });
+  return c.json({ item: toItem(row), highlights: await withAnswers(c.env.DB, results.map(toHighlight)), tldr: await tldrFor(c.env.DB, String(row.id)) });
 });
 
 items.post("/", async (c) => {
@@ -110,7 +112,7 @@ items.get("/:id", async (c) => {
     c.env.DB.prepare("UPDATE items SET last_opened_at = ? WHERE id = ?").bind(now(), row.id),
   ]);
   const n = (peers.results[0] as { n: number }).n;
-  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: hl.results.map((r) => toHighlight(r as Record<string, unknown>)), alsoSaving: n >= 2 ? n : 0 });
+  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: await withAnswers(c.env.DB, hl.results.map((r) => toHighlight(r as Record<string, unknown>))), tldr: await tldrFor(c.env.DB, String(row.id)), alsoSaving: n >= 2 ? n : 0 });
 });
 
 items.patch("/:id", async (c) => {
@@ -157,6 +159,25 @@ items.delete("/:id", async (c) => {
   const r = await c.env.DB.prepare("DELETE FROM items WHERE user_id = ? AND id = ?").bind(u.id, c.req.param("id")).run();
   if (!r.meta.changes) fail(404, "not_found", "No such item.");
   return c.json({ ok: true });
+});
+
+/** Keep a TL;DR on the page; it replaces the one kept before. */
+items.put("/:id/tldr", async (c) => {
+  const u = c.get("user");
+  const db = c.env.DB;
+  const item = await db.prepare("SELECT id FROM items WHERE user_id = ? AND id = ?").bind(u.id, c.req.param("id")).first<{ id: string }>();
+  if (!item) fail(404, "not_found", "No such item.");
+  const b = await body<{ text?: string; model?: string; citations?: unknown }>(c);
+  const text = str(b.text, 6000);
+  if (!text) fail(422, "bad_request", "Pass the TL;DR text.");
+  const tldrId = id("tl_");
+  await db.batch([
+    db.prepare("DELETE FROM item_tldrs WHERE item_id = ?").bind(item.id),
+    db.prepare("INSERT INTO item_tldrs (id, item_id, text, model, citations, created_at) VALUES (?,?,?,?,?,?)")
+      .bind(tldrId, item.id, text, str(b.model, 100) ?? null, JSON.stringify(cleanCitations(b.citations)), now()),
+  ]);
+  const row = await db.prepare("SELECT * FROM item_tldrs WHERE id = ?").bind(tldrId).first();
+  return c.json({ tldr: toTldr(row!) }, 201);
 });
 
 items.post("/:id/highlights", async (c) => {

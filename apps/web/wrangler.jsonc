@@ -14,7 +14,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/", "/login", "/pricing", "/billing/*", "/s/*", "/api/*", "/auth/*", "/mcp", "/mcp/*", "/compare", "/compare/*", "/answers", "/answers/*", "/docs", "/docs/*", "/privacy", "/terms", "/changelog", "/sitemap.xml", "/robots.txt", "/llms.txt"]
+    "run_worker_first": ["/", "/chrome", "/login", "/pricing", "/billing/*", "/s/*", "/api/*", "/auth/*", "/mcp", "/mcp/*", "/compare", "/compare/*", "/answers", "/answers/*", "/docs", "/docs/*", "/privacy", "/terms", "/changelog", "/sitemap.xml", "/robots.txt", "/llms.txt"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "lumen-db", "database_id": "47eaaa2b-a68e-47ad-92a7-98cc662c2b48", "migrations_dir": "migrations" }
@@ -22,6 +22,6 @@
   "ai": { "binding": "AI", "remote": true },
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "triggers": { "crons": ["17 */6 * * *"] },
-  "vars": { "DEMO_ENABLED": "true" },
+  "vars": { "DEMO_ENABLED": "true", "OWNER_EMAILS": "hello@bhargav.dev", "AI_SOFT_CAP": "60" },
   "observability": { "enabled": true }
 }

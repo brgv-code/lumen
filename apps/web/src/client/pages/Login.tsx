@@ -10,6 +10,7 @@ const ERRORS: Record<string, string> = {
   state_mismatch: "That sign in link expired. Try again.",
   exchange_failed: "The provider did not confirm your sign in. Try again.",
   dev_login: "That test login link is not valid.",
+  signup_limit: "Too many new accounts from this network today. Try again tomorrow, or sign in to an account you already have.",
 };
 
 function GoogleMark() {

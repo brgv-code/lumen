@@ -16,6 +16,13 @@ export interface Env {
   STRIPE_SECRET_KEY?: string;
   STRIPE_PRICE_ID?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /** PostHog project key (phc_...), public. Analytics stay off without it. */
+  POSTHOG_KEY?: string;
+  POSTHOG_HOST?: string;
+  /** Comma separated emails that can open the owner page. */
+  OWNER_EMAILS?: string;
+  /** Hosted answers per day across everyone before answers move to the small model. */
+  AI_SOFT_CAP?: string;
 }
 
 export interface SessionUser {
@@ -34,6 +41,7 @@ export interface SessionUser {
   pro_interest_at?: number | null;
   reminders: number;
   created_at: number;
+  trial_note?: string | null;
 }
 
 export type SelfFetch = (path: string, init?: RequestInit) => Promise<Response>;

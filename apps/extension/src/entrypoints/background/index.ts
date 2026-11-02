@@ -1,5 +1,5 @@
-import type { Highlight } from "@lumen/core";
-import { streamAnswer, testProvider } from "../../lib/ai";
+import type { AIAction, Highlight } from "@lumen/core";
+import { streamAnswer, streamTldr, testProvider } from "../../lib/ai";
 import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
 import type { Msg, PageState } from "../../lib/types";
@@ -33,12 +33,21 @@ export default defineBackground(() => {
   // Ports: margin answers for the popup, library chat for the side panel.
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name === "lumen-ai") {
-      port.onMessage.addListener(async (req: { action: "explain" | "summarize" | "define" | "ask" | "expand"; text: string; question?: string; title?: string }) => {
+      port.onMessage.addListener(async (req: { action: AIAction; text: string; question?: string; title?: string }) => {
         const s = await getSettings();
         port.postMessage({ provider: s.provider });
         streamAnswer(req, s, {
           chunk: (chunk) => safePost(port, { chunk }),
           done: () => safePost(port, { done: true }),
+          error: (error) => safePost(port, { error }),
+        });
+      });
+    }
+    if (port.name === "lumen-tldr") {
+      port.onMessage.addListener(async (req: { title: string; paragraphs: string[] }) => {
+        streamTldr(req, await getSettings(), {
+          chunk: (chunk) => safePost(port, { chunk }),
+          done: (model) => safePost(port, { done: true, model }),
           error: (error) => safePost(port, { error }),
         });
       });
@@ -292,10 +301,29 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const send = (m: object) => tabId !== undefined && chrome.tabs.sendMessage(tabId, m).catch(() => {});
       streamAnswer(msg, s, {
         chunk: (chunk) => send({ type: "AI_CHUNK", chunk }),
-        done: () => send({ type: "AI_DONE" }),
+        done: (model) => send({ type: "AI_DONE", model }),
         error: (error) => send({ type: "AI_ERROR", error }),
       });
       return { ok: true, provider: s.provider };
+    }
+
+    case "AI_TLDR": {
+      const s = await getSettings();
+      const send = (m: object) => tabId !== undefined && chrome.tabs.sendMessage(tabId, m).catch(() => {});
+      streamTldr(msg, s, {
+        chunk: (chunk) => send({ type: "AI_CHUNK", chunk }),
+        done: (model) => send({ type: "AI_DONE", model }),
+        error: (error) => send({ type: "AI_ERROR", error }),
+      });
+      return { ok: true };
+    }
+
+    case "KEEP_TLDR": {
+      if (!(await connected())) return { ok: false, error: "Connect Lumen in settings to save pages." };
+      const item = await ensureItem(pageKey(msg.url), msg.title, msg.html);
+      const r = await cloud<{ tldr: unknown }>("PUT", `/items/${item.id}/tldr`, { text: msg.text, model: msg.model, citations: msg.citations });
+      autoSend(tabId);
+      return { ok: true, tldr: r.tldr };
     }
 
     case "OPEN_PANEL": {
@@ -384,6 +412,19 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const r = await cloudApi.updateHighlight(msg.id, { color: msg.color, note: msg.note });
       if (msg.note) autoSend(tabId);
       return { ok: true, highlight: r.highlight };
+    }
+
+    case "KEEP_ANSWER": {
+      const kept = { highlightId: msg.highlightId, parentId: msg.parentId ?? null, action: msg.action, question: msg.question, answer: msg.answer, model: msg.model };
+      if (msg.highlightId.startsWith("local_")) {
+        const url = pageKey(msg.url);
+        const answer = { ...kept, id: `local_ans_${Date.now().toString(36)}`, createdAt: Date.now() };
+        await setLocalHighlights(url, (await localHighlights(url)).map((h) => (h.id === msg.highlightId ? { ...h, answers: [...(h.answers ?? []), answer] } : h)));
+        return { ok: true, answer };
+      }
+      const r = await cloud<{ answer: unknown }>("POST", `/highlights/${msg.highlightId}/answers`, kept);
+      autoSend(tabId);
+      return { ok: true, answer: r.answer };
     }
 
     case "DELETE_HIGHLIGHT": {

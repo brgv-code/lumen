@@ -10,6 +10,8 @@ import { ShareModal } from "../../components/ShareModal";
 import type { CardData } from "../../lib/cards";
 import type { Token } from "../../lib/api";
 import { Logo, Modal, useToast } from "../../components/ui";
+import { identify, resetAnalytics } from "../../lib/analytics";
+import { Gauge } from "lucide-react";
 import { api, agentLabel } from "../../lib/api";
 import "../../styles/app.css";
 
@@ -53,7 +55,7 @@ export default function Layout() {
   };
 
   useEffect(() => {
-    api.me().then((r) => { setUser(r.user); if (!tourDone(r.user.id)) setTimeout(() => setTourOpen(true), 700); }).catch(() => nav("/login", { replace: true }));
+    api.me().then((r) => { setUser(r.user); identify(r.user); if (!tourDone(r.user.id)) setTimeout(() => setTourOpen(true), 700); }).catch(() => nav("/login", { replace: true }));
     const onPay = (e: Event) => setPaywall((e as CustomEvent<string>).detail || "This is part of Lumen Pro.");
     window.addEventListener("lumen:paywall", onPay);
     refresh();
@@ -68,13 +70,13 @@ export default function Layout() {
 
   if (!user) return <div style={{ minHeight: "100vh" }} />;
 
-  const logout = async () => { await api.logout().catch(() => {}); nav("/"); };
+  const logout = async () => { await api.logout().catch(() => {}); resetAnalytics(); nav("/"); };
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
 
   return (
     <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true), setUser, startTour: () => setTourOpen(true),
       agents, agentAction: () => (agents.length ? nav("/app/agents") : setAgentOpen(true)), share: setShareState }}>
-      <div className="shell">
+      <div className="shell ph-mask">
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
           <nav className="side__nav">
@@ -90,6 +92,7 @@ export default function Layout() {
             <div className="side__section">Connect</div>
             <NavLink to="/app/integrations" className="side__link"><span className="ico"><Plug /></span> Integrations</NavLink>
             <NavLink to="/app/settings" className="side__link"><span className="ico"><Settings /></span> Settings</NavLink>
+            {user.owner && <NavLink to="/app/owner" className="side__link"><span className="ico"><Gauge /></span> Owner</NavLink>}
           </nav>
           {collections.length > 0 && (
             <nav className="side__nav">

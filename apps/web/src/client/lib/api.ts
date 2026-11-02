@@ -1,7 +1,18 @@
-import type { AIAction, Collection, Destination, Highlight, Idea, Item, ItemWithContent, Page, Stats, User } from "@lumen/core";
+import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, Stats, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
+export interface OwnerSignup { id: string; name: string; email: string | null; plan: string; status: "trial" | "pro" | "free"; createdAt: number; trialNote: string | null; providers: string | null; items: number; highlights: number; ai: number; extension: number; agents: number; lastActive: number }
+export interface OwnerStats {
+  totals: { users: number; today: number; week: number; month: number; paying: number; trialing: number; demos_week: number };
+  active: { day: number; week: number };
+  funnel: { signedUp: number; saved: number; highlighted: number; extension: number; returned: number };
+  ai: { day: string; count: number }[];
+  aiSoftCap: number;
+  trialNotes: { note: string; n: number }[];
+  posthog: boolean;
+  signups: OwnerSignup[];
+}
 export interface Token { id: string; name: string; prefix: string; kind: string; client: string | null; calls?: number; lastTool?: string | null; lastUsedAt: number | null; createdAt: number }
 export interface Trend { id: string; topic: string; url: string; title: string; source: string; score: number; comments?: number; publishedAt?: number | null; saved?: boolean }
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
@@ -47,7 +58,8 @@ const qs = (o: Record<string, string | number | undefined | null | boolean>) => 
 };
 
 export const api = {
-  providers: () => req<{ google: boolean; github: boolean; demo: boolean }>("GET", "/auth/providers"),
+  providers: () => req<{ google: boolean; github: boolean; demo: boolean; analytics: { key: string; host: string } | null }>("GET", "/auth/providers"),
+  ownerStats: () => req<OwnerStats>("GET", "/api/v1/owner/stats"),
   demo: () => req<{ ok: true; next: string }>("POST", "/auth/demo", {}),
   logout: () => req<{ ok: true }>("POST", "/auth/logout", {}),
 
@@ -59,7 +71,8 @@ export const api = {
 
   items: (q: { status?: string; collection?: string; tag?: string; q?: string; favorite?: boolean; cursor?: string | null; limit?: number } = {}) =>
     req<Page<Item>>("GET", "/api/v1/items" + qs({ ...q, favorite: q.favorite ? 1 : undefined })),
-  item: (id: string) => req<{ item: ItemWithContent; highlights: Highlight[]; alsoSaving: number }>("GET", `/api/v1/items/${id}`),
+  item: (id: string) => req<{ item: ItemWithContent; highlights: Highlight[]; tldr: ItemTldr | null; alsoSaving: number }>("GET", `/api/v1/items/${id}`),
+  keepTldr: (itemId: string, d: { text: string; model: string | null; citations: Citation[] }) => req<{ tldr: ItemTldr }>("PUT", `/api/v1/items/${itemId}/tldr`, d),
   saveItem: (d: { url: string; collectionId?: string; tags?: string[] }) => req<{ item: Item; created: boolean }>("POST", "/api/v1/items", d),
   updateItem: (id: string, d: Partial<{ status: string; progress: number; favorite: boolean; collectionId: string | null; tags: string[]; title: string }>) =>
     req<{ item: Item }>("PATCH", `/api/v1/items/${id}`, d),
@@ -70,6 +83,8 @@ export const api = {
   highlights: (q: { color?: string; q?: string; collection?: string; notes?: boolean; cursor?: string | null } = {}) =>
     req<Page<Highlight>>("GET", "/api/v1/highlights" + qs({ ...q, notes: q.notes ? 1 : undefined })),
   updateHighlight: (id: string, d: { color?: string; note?: string | null }) => req<{ highlight: Highlight }>("PATCH", `/api/v1/highlights/${id}`, d),
+  keepAnswer: (highlightId: string, d: { action: AIAction; question: string | null; answer: string; model: string | null; parentId?: string }) =>
+    req<{ answer: HighlightAnswer }>("POST", `/api/v1/highlights/${highlightId}/answers`, d),
   deleteHighlight: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/highlights/${id}`),
 
   collections: () => req<{ data: Collection[] }>("GET", "/api/v1/collections"),
@@ -83,9 +98,9 @@ export const api = {
   createDestination: (d: { kind: string; name: string; config: Record<string, unknown>; secret?: string }) =>
     req<{ destination: Destination }>("POST", "/api/v1/destinations", d),
   deleteDestination: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/destinations/${id}`),
-  pending: (id: string) => req<{ highlightIds: string[]; markdown: string; groups: unknown[] }>("GET", `/api/v1/destinations/${id}/pending`),
-  ack: (id: string, highlightIds: string[], error?: string) => req<{ acked: number }>("POST", `/api/v1/destinations/${id}/ack`, { highlightIds, error }),
-  push: (id: string) => req<{ delivered: number }>("POST", `/api/v1/destinations/${id}/push`, {}),
+  pending: (id: string) => req<{ highlightIds: string[]; answerIds: string[]; tldrIds: string[]; counts: { highlights: number; answers: number; tldrs: number }; markdown: string; groups: unknown[] }>("GET", `/api/v1/destinations/${id}/pending`),
+  ack: (id: string, p: { highlightIds: string[]; answerIds: string[]; tldrIds: string[] }, error?: string) => req<{ acked: number }>("POST", `/api/v1/destinations/${id}/ack`, { highlightIds: p.highlightIds, answerIds: p.answerIds, tldrIds: p.tldrIds, error }),
+  push: (id: string) => req<{ delivered: number; answers: number; tldrs: number }>("POST", `/api/v1/destinations/${id}/push`, {}),
 
   ideas: () => req<{ data: Idea[] }>("GET", "/api/v1/ideas"),
   spark: () => req<{ data: Idea[] }>("POST", "/api/v1/ai/spark", {}),
@@ -123,13 +138,18 @@ export const api = {
   deleteToken: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/tokens/${id}`),
 };
 
-/** Stream an AI answer; calls onText with the growing answer. */
-export async function streamAI(
-  d: { action: AIAction; text: string; question?: string; title?: string },
-  onText: (full: string) => void,
-  signal?: AbortSignal,
-): Promise<string> {
-  const res = await fetch("/api/v1/ai/run", {
+/** Stream an AI answer; calls onText with the growing answer and resolves with the model that wrote it. */
+export function streamAI(d: { action: AIAction; text: string; question?: string; title?: string }, onText: (full: string) => void, signal?: AbortSignal) {
+  return streamRun("/api/v1/ai/run", d, onText, signal);
+}
+
+/** Stream a TL;DR of numbered paragraphs; the answer cites them as [p12]. */
+export function streamTldr(d: { title: string; paragraphs: string[] }, onText: (full: string) => void, signal?: AbortSignal) {
+  return streamRun("/api/v1/ai/tldr", d, onText, signal);
+}
+
+async function streamRun(path: string, d: object, onText: (full: string) => void, signal?: AbortSignal): Promise<{ answer: string; model: string | null }> {
+  const res = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json", "x-lumen": "1" },
     body: JSON.stringify(d),
@@ -141,6 +161,7 @@ export async function streamAI(
     if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: msg }));
     throw new ApiError(res.status, "ai", msg);
   }
+  const model = res.headers.get("x-lumen-model");
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "", full = "";
@@ -153,7 +174,7 @@ export async function streamAI(
     for (const line of lines) {
       if (!line.startsWith("data:")) continue;
       const data = line.slice(5).trim();
-      if (data === "[DONE]") return full;
+      if (data === "[DONE]") return { answer: full, model };
       try {
         const j = JSON.parse(data);
         const t = j.response ?? j.choices?.[0]?.delta?.content ?? "";
@@ -161,14 +182,14 @@ export async function streamAI(
       } catch { /* partial */ }
     }
   }
-  return full;
+  return { answer: full, model };
 }
 
 export interface ChatSource { n: number; kind: "highlight" | "item"; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null; excerpt?: string | null }
 
 /** Ask your library: streams the answer, calls onSources once. */
 export async function streamChat(
-  d: { question: string; history?: { role: string; content: string }[] },
+  d: { question: string; history?: { role: string; content: string }[]; selection?: string },
   on: { text: (full: string) => void; sources: (s: ChatSource[]) => void },
   signal?: AbortSignal,
 ): Promise<string> {

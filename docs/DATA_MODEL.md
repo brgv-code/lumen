@@ -18,6 +18,11 @@ erDiagram
   items ||--o{ item_tags : tagged
   tags ||--o{ item_tags : labels
   highlights ||--o{ deliveries : "delivered as"
+  highlights ||--o{ highlight_answers : keeps
+  highlight_answers ||--o{ answer_deliveries : "delivered as"
+  destinations ||--o{ answer_deliveries : receives
+  items ||--o| item_tldrs : "summed up by"
+  item_tldrs ||--o{ tldr_deliveries : "delivered as"
   destinations ||--o{ deliveries : receives
 ```
 
@@ -31,6 +36,10 @@ erDiagram
 | `items` | saved pages | unique `(user_id, url)`, `status`, `progress`, `content_html`, `content_text`, `reading_minutes` |
 | `tags`, `item_tags` | free tagging | unique `(user_id, name)` |
 | `highlights` | text quote selectors | `quote`, `prefix`, `suffix`, `position`, `color` (palette name or `#rrggbb`, see `packages/core/src/colors.ts`), `note` |
+| `highlight_answers` | margin answers the reader kept | `action`, `question` (for ask), `answer`, `model`, `parent_id` (the answer it followed up on, same highlight) |
+| `answer_deliveries` | the ledger for kept answers | PK `(answer_id, destination_id)`, `status`, `attempts`, `error` |
+| `item_tldrs` | the TL;DR kept for a page | unique `item_id`, `text`, `model`, `citations` JSON `[{ n, quote }]` |
+| `tldr_deliveries` | the ledger for TL;DRs | PK `(tldr_id, destination_id)` |
 | `deliveries` | the ledger | PK `(highlight_id, destination_id)`, `status`, `attempts`, `error` |
 | `activity` | glow ledger | `day` in the reader's time zone, `kind`, `glow` |
 | `ideas` | Spark output | `outline` and `source_item_ids` as JSON |
@@ -42,6 +51,15 @@ erDiagram
 
 Added in migration 0002: `items.remind_after`, `items.last_opened_at`, `users.share_signals`,
 `users.reminders`, `api_tokens.kind` (extension or agent) and `api_tokens.client`.
+
+Added in migration 0007 (LUM-1): `highlight_answers`. The migration moved answers that older
+versions wrote into `highlights.note` as `Explain: `, `Define: `, `Summarize: `, `Expand: ` or `Ask: `
+into this table and cleared those notes, so `note` holds only the reader's words.
+
+Added in migration 0008 (LUM-2): `answer_deliveries`, backfilled for answers that rode along with
+an already delivered highlight.
+
+Added in migration 0009 (LUM-3): `item_tldrs` and `tldr_deliveries`.
 
 All foreign keys cascade from `users`, so deleting an account (or purging a demo) removes
 everything in one statement. Migrations live in `apps/web/migrations`.

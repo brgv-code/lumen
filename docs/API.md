@@ -37,7 +37,8 @@ Base URL: `https://readwithlumen.app`. JSON in, JSON out. Errors are always
 | GET | `/api/v1/items` | `status` (`inbox, reading, done, archived, all`), `collection`, `tag`, `q`, `favorite=1`, `kind`, `cursor`, `limit` ≤ 100 | Keyset paginated `{ data, nextCursor }`; archived hidden unless asked |
 | GET | `/api/v1/items/lookup?url=` | | `{ item, highlights }` for a page (tracking params ignored) |
 | POST | `/api/v1/items` | `{ url, html?, title?, collectionId?, tags?, status?, kind? }` | Idempotent per URL: returns the existing item with `created: false`. With `html` (extension) the server extracts from it; without, it fetches the URL |
-| GET | `/api/v1/items/:id` | | item with `contentHtml` + highlights |
+| GET | `/api/v1/items/:id` | | item with `contentHtml` + highlights, each with its kept `answers`, and the kept `tldr` (or null) |
+| PUT | `/api/v1/items/:id/tldr` | `{ text, model?, citations? }` | keeps the page's TL;DR, replacing the one before; `citations` is `[{ n, quote: TextQuote }]` |
 | PATCH | `/api/v1/items/:id` | `{ status?, progress?, favorite?, collectionId?, tags?, title? }` | `done` sets `finished_at` and awards glow once |
 | DELETE | `/api/v1/items/:id` | | cascades highlights |
 
@@ -47,7 +48,10 @@ Base URL: `https://readwithlumen.app`. JSON in, JSON out. Errors are always
 | POST | `/api/v1/items/:id/highlights` | `{ quote, prefix, suffix, position, color, note? }` | colour: a palette name (`sun, peach, rose, grape, iris, sky, teal, mint, lime, slate`) or any `#rrggbb` (also `#rgb` or bare `rrggbb`); moves inbox items to reading |
 | GET | `/api/v1/highlights` | `color` (a name, a hex, or `custom` for every hex colour), `item`, `collection`, `notes=1`, `q`, `cursor`, `limit` ≤ 200 | each includes `item { id, title, url, siteName }` |
 | PATCH | `/api/v1/highlights/:id` | `{ color?, note? }` | first note awards glow; an unknown colour is `422 bad_color` |
-| DELETE | `/api/v1/highlights/:id` | | |
+| POST | `/api/v1/highlights/:id/answers` | `{ action, answer, question?, model?, parentId? }` | keeps a margin answer; `parentId` must be an answer on the same highlight (`422 bad_parent`) |
+| DELETE | `/api/v1/highlights/:id` | | cascades its answers |
+
+`GET /api/v1/items/lookup` also returns `answers` on each highlight.
 
 ## Collections
 | Method | Path | Body | Notes |
@@ -65,7 +69,7 @@ Base URL: `https://readwithlumen.app`. JSON in, JSON out. Errors are always
 | POST | `/api/v1/destinations` | `{ kind, name, config, secret? }` | see configs below |
 | PATCH | `/api/v1/destinations/:id` | `{ name?, config?, secret? }` | |
 | DELETE | `/api/v1/destinations/:id` | | |
-| GET | `/api/v1/destinations/:id/pending` | | `{ highlightIds, markdown, groups }`: only highlights this destination has not received |
+| GET | `/api/v1/destinations/:id/pending` | | `{ highlightIds, answerIds, tldrIds, counts, markdown, groups }`: only highlights and kept answers this destination has not received; `highlightIds` also lists the highlights of late answers, so clients that ack only highlights still deliver them |
 | POST | `/api/v1/destinations/:id/ack` | `{ highlightIds, error? }` | records delivery; idempotent |
 | POST | `/api/v1/destinations/:id/push` | | server delivery for `notion` and `webhook` |
 
@@ -76,14 +80,28 @@ Configs:
 - `webhook`: `{ url }` (https) and optional `secret` for `X-Lumen-Signature: sha256=<hmac>`.
 
 Formats: `house` = `==quote==^[note] ([title](link))`, `callout` = Obsidian `> [!quote]`, `plain` = blockquote.
+Kept answers ride under a highlight that has not reached the destination yet: a collapsed
+`> [!explain]- Explain` callout in `house` and `callout`, a `**Explain:**` paragraph in `plain`, a
+toggle block in Notion. An answer kept after its highlight was delivered follows as its own block,
+`↳ Explain on "first six words…" ([source](link))` and then the answer. New highlights end with a
+`^lumen-…` block id. A kept TL;DR goes at the top of its source block as `> [!tldr] TL;DR` when nothing from that page
+reached the destination yet, otherwise as its own `↳ TL;DR of "Title"` block; `[pN]` citations
+become `[¶N]` text fragment links. `POST /ack` takes `{ highlightIds, answerIds?, tldrIds?, error? }`;
+without `answerIds` or `tldrIds`, the answers and TL;DRs kept on those highlights' pages until now
+count as delivered. `/push` returns `{ delivered, answers, tldrs }`.
 Every link is a text fragment URL (`#:~:text=`) that scrolls to the passage.
 
 Webhook payload:
 ```json
 { "type": "highlights.created",
   "highlights": [{ "id": "hl_…", "quote": "…", "note": null,
-                   "source": { "title": "…", "url": "…", "link": "…#:~:text=…" } }] }
+                   "answers": [{ "action": "explain", "question": null, "answer": "…", "model": "…" }],
+                   "source": { "title": "…", "url": "…", "link": "…#:~:text=…" } }],
+  "answers": [{ "id": "ans_…", "highlightId": "hl_…", "action": "ask", "question": "…", "answer": "…",
+                "model": "…", "source": { "title": "…", "url": "…", "link": "…" } }] }
 ```
+Top level `answers` holds answers kept after their highlight was already delivered; `tldrs` holds
+kept TL;DRs (`id`, `itemId`, `text`, `citations`, `model`, `source`).
 
 ## Discover
 | Method | Path | Body / query | Returns |
@@ -133,7 +151,8 @@ Public: `GET /s/:id` (page with Open Graph tags and a "Read with Lumen" pill) an
 ## AI
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/api/v1/ai/run` | `{ action: explain\|summarize\|define\|simplify\|expand\|ask, text, question?, title?, context? }` | `text/event-stream`: `data: {"response":"…"}` … `data: [DONE]` |
+| POST | `/api/v1/ai/tldr` | `{ title, paragraphs: string[] }` | streamed TL;DR citing paragraphs as `[p12]`; one call up to about 40k characters, chunked then combined beyond; counts once against the quota; `X-Lumen-Model` header |
+| POST | `/api/v1/ai/run` | `{ action: explain\|summarize\|define\|simplify\|expand\|counterpoint\|ask, text, question?, title?, context? }` | `text/event-stream`: `data: {"response":"…"}` … `data: [DONE]`; the `X-Lumen-Model` header names the model that answered |
 | POST | `/api/v1/ai/chat` | `{ question, page?: { title, url, text }, selection?, history? }` | SSE: first `{"sources":[…]}` (numbered library matches), then `{"response":"…"}` chunks; answers cite sources as [n] |
 | POST | `/api/v1/ai/spark` | | `{ data: Idea[] }` from the last 30 highlights |
 | GET | `/api/v1/ideas` | | ideas not dismissed |

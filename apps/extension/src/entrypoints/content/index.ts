@@ -1,10 +1,11 @@
 // Lumen in the page: a selection toolbar that never takes over copy and paste,
 // highlights that come back when you return, and margin answers in a side card.
-import { HIGHLIGHT_COLORS, citeForClipboard, colorName, colorSwatch, colorVar, normalizeColor, type Highlight, type TextQuote } from "@lumen/core";
+import { HIGHLIGHT_COLORS, answerLabel, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
 import { WHEEL_CSS, bindWheel, wheelHTML } from "./wheel";
-import { anchorToRange, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
+import { anchorToRange, coveringQuote, describeRange, readableParagraphs, unwrapMarks, wrapRange } from "@lumen/core/dom";
+import { createSelectionBar, type BarChoice, type BarConfig, type BarSnapshot, type SelectionBar } from "@lumen/core/bar";
 import { UI_CSS, MARK_CSS } from "./styles";
-import { ICON, LABEL, LAMP } from "./icons";
+import { ICON, LAMP } from "./icons";
 import { DEFAULT_SETTINGS, type Settings } from "../../lib/types";
 import { resolveTheme } from "../../lib/theme";
 
@@ -15,7 +16,7 @@ export default defineContentScript({
   main() {
     const v = chrome.runtime.getManifest().version;
     if ((window as any).__lumen === v) return;
-    document.querySelectorAll("lumen-ui").forEach((n) => n.remove());
+    document.querySelectorAll("lumen-ui, lumen-bar").forEach((n) => n.remove());
     (window as any).__lumen = v;
     new Lumen().start();
   },
@@ -38,13 +39,19 @@ class Lumen {
   panelEl: HTMLElement | null = null;
   host!: HTMLElement;
   root!: ShadowRoot;
-  bar!: HTMLElement;
+  selectionBar!: SelectionBar;
   card!: HTMLElement;
   toastEl!: HTMLElement;
   highlights: Highlight[] = [];
-  pending: { quote: TextQuote; rect: DOMRect } | null = null;
+  pending: BarSnapshot | null = null;
   activeMark: string | null = null;
   aiText = "";
+  aiModel: string | null = null;
+  /** The card streams a TL;DR: chunks render with ¶ links instead of plain text. */
+  tldrMode = false;
+  /** This visit's TL;DR, so asking again costs no second call. */
+  tldrCache: { text: string; model: string | null } | null = null;
+  paragraphs: { text: string; quote: TextQuote; element: Element }[] = [];
   lastColor = "sun";
   recentColors: string[] = [];
 
@@ -84,29 +91,32 @@ class Lumen {
     this.host.setAttribute("data-lumen-ui", "");
     this.host.style.cssText = "all: initial; position: absolute; top: 0; left: 0; z-index: 2147483646;";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${UI_CSS}${WHEEL_CSS}</style><div class="bar" hidden></div><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
-    this.bar = this.root.querySelector(".bar")!;
+    this.root.innerHTML = `<style>${UI_CSS}${WHEEL_CSS}</style><div class="dots"></div><div class="card" hidden></div><div class="toast" hidden></div><div class="helper" hidden></div>`;
     this.card = this.root.querySelector(".card")!;
     this.toastEl = this.root.querySelector(".toast")!;
     this.helperEl = this.root.querySelector(".helper")!;
     document.documentElement.appendChild(this.host);
+    this.selectionBar = createSelectionBar({
+      scope: document.body ?? document.documentElement,
+      config: () => this.barConfig(),
+      canOpen: () => this.settings.toolbar.enabled && !this.settings.toolbar.disabledSites.includes(location.hostname),
+      onChoose: (choice, snapshot) => this.onChoose(choice, snapshot),
+    });
     chrome.storage.local.get(["lumenLastColor", "lumenRecentColors"]).then((v) => {
       this.lastColor = normalizeColor(v.lumenLastColor) ?? "sun";
       this.recentColors = Array.isArray(v.lumenRecentColors) ? v.lumenRecentColors.filter((c: unknown) => normalizeColor(c)?.startsWith("#")).slice(0, 4) : [];
     }).catch(() => {});
 
-    document.addEventListener("mouseup", (e) => this.onSelect(e), true);
-    document.addEventListener("keyup", (e) => { if (e.shiftKey || e.key === "Shift") this.onSelect(e); }, true);
-    document.addEventListener("mousedown", (e) => { if (!e.composedPath().includes(this.host)) this.hideBar(); }, true);
     document.addEventListener("click", (e) => this.onMarkClick(e), true);
-    document.addEventListener("scroll", () => this.hideBar(), { passive: true, capture: true });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { this.hideBar(); this.hideCard(); this.hidePanel(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { this.hideCard(); this.hidePanel(); } });
 
     send<{ settings: Settings }>({ type: "GET_SETTINGS" }).then((r) => { if (r?.settings) { this.settings = r.settings; this.applySettings(); } }).catch(() => {});
     chrome.storage.onChanged.addListener((ch) => {
       if (ch.lumen_settings_v2?.newValue) { this.settings = { ...DEFAULT_SETTINGS, ...ch.lumen_settings_v2.newValue }; this.applySettings(); }
     });
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applySettings());
+    let dotFrame = 0;
+    window.addEventListener("resize", () => { cancelAnimationFrame(dotFrame); dotFrame = requestAnimationFrame(() => this.placeDots()); });
     const mo = new MutationObserver(() => this.adaptMarks());
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
@@ -117,6 +127,15 @@ class Lumen {
       if (m?.type === "SHOW_PANEL") { this.showPanel(m.prompt); reply({ ok: true }); return; }
       if (m?.type === "TOGGLE_PANEL") { this.togglePanel(); reply({ ok: true }); return; }
       if (m?.type === "PANEL_CLOSE") { this.hidePanel(); reply({ ok: true }); return; }
+      if (m?.type === "GET_PARAGRAPHS") { this.paragraphs = readableParagraphs(articleRoot()); reply({ title: document.title, paragraphs: this.paragraphs.map((p) => p.text) }); return; }
+      if (m?.type === "SCROLL_TO_PARAGRAPH") { this.scrollToParagraph(Number(m.n)); reply({ ok: true }); return; }
+      if (m?.type === "OPEN_THREAD") {
+        const h = this.highlights.find((x) => x.id === m.id);
+        document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (h) this.cardFor(h, true);
+        reply({ ok: Boolean(h) });
+        return;
+      }
       if (m?.type === "SCROLL_TO") {
         const el = document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`) as HTMLElement | null;
         if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.animate([{ filter: "brightness(1)" }, { filter: "brightness(.8)" }, { filter: "brightness(1)" }], { duration: 700 }); }
@@ -161,6 +180,27 @@ class Lumen {
       if (r) for (const m of wrapRange(r, { class: "lumen-mark", "data-lumen-id": h.id, title: h.note ? `Note: ${h.note}` : "Lumen highlight" })) m.style.setProperty("--lc", colorVar(h.color));
     }
     this.adaptMarks();
+    this.placeDots();
+  }
+
+  /** A dot after the first line of each passage with kept answers; nothing until something is kept. */
+  placeDots() {
+    const layer = this.root.querySelector<HTMLElement>(".dots");
+    if (!layer) return;
+    layer.replaceChildren();
+    for (const h of this.highlights) {
+      const count = h.answers?.length ?? 0;
+      const line = count ? document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(h.id)}"]`)?.getClientRects()[0] : undefined;
+      if (!line) continue;
+      const dot = document.createElement("button");
+      dot.className = "dot";
+      dot.title = count === 1 ? "1 kept answer" : `${count} kept answers`;
+      dot.setAttribute("aria-label", dot.title);
+      dot.style.left = `${line.right + scrollX + 3}px`;
+      dot.style.top = `${line.top + scrollY + line.height / 2 - 4.5}px`;
+      dot.onclick = () => this.cardFor(h, true);
+      layer.appendChild(dot);
+    }
   }
 
   /** Light text or a dark background means a dark page: that mark becomes a tint plus underline. */
@@ -176,8 +216,7 @@ class Lumen {
 
   /** The paragraph (or nearby blocks) around the current selection, so short phrases are read in context. */
   contextFor(text: string): string | undefined {
-    const sel = window.getSelection();
-    const node = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+    const node = this.pending?.range.commonAncestorContainer ?? null;
     let el = (node && (node.nodeType === 1 ? node : node.parentElement)) as HTMLElement | null;
     while (el && el !== document.body && (el.innerText || "").length < 280) el = el.parentElement;
     const ctx = (el?.innerText || "").replace(/\s+/g, " ").trim();
@@ -187,7 +226,7 @@ class Lumen {
   /* ---------- floating panel (over the page, never resizing it) ---------- */
   showPanel(prompt?: string) {
     if (this.settings.panel === "docked") { send({ type: "OPEN_PANEL", prompt }).catch(() => {}); return; }
-    this.hideBar();
+    this.selectionBar.hide();
     if (!this.panelEl) {
       this.panelEl = document.createElement("div");
       this.panelEl.className = "fpanel";
@@ -209,77 +248,43 @@ class Lumen {
     else this.showPanel();
   }
 
-  onSelect(e: Event) {
-    if (e.composedPath().includes(this.host)) return;
-    setTimeout(() => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !sel.rangeCount) return this.hideBar();
-      const range = sel.getRangeAt(0);
-      const anchor = range.commonAncestorContainer as HTMLElement;
-      const el = anchor.nodeType === 1 ? anchor : anchor.parentElement;
-      if (el?.closest("input,textarea,[contenteditable=''],[contenteditable='true']")) return;
-      const quote = describeRange(document.body, range);
-      if (!quote || quote.quote.trim().length < 2) return this.hideBar();
-      this.pending = { quote, rect: range.getBoundingClientRect() };
-      const t = this.settings.toolbar;
-      if (!t.enabled || t.disabledSites.includes(location.hostname)) return;
-      this.showBar();
-    }, 10);
-  }
-
-  showBar() {
-    if (!this.pending) return;
-    const { rect } = this.pending;
-    const t = this.settings.toolbar;
-    const acts = t.actions.length ? t.actions : DEFAULT_SETTINGS.toolbar.actions;
-    const btn = (a: string) => a === "highlight"
-      ? `<span class="hl-group"><button data-color="${this.lastColor}" class="act" title="Highlight (${colorName(this.lastColor)})" style="--dot:${colorSwatch(this.lastColor)}">${ICON.highlight}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button><span class="flyout">${this.swatches()}</span></span>`
-      : `<button class="act" data-act="${a}" title="${LABEL[a]}">${ICON[a as keyof typeof ICON]}${t.labels ? `<span>${LABEL[a]}</span>` : ""}</button>`;
-    this.bar.className = `bar${t.labels ? " labels" : ""}`;
-    this.bar.innerHTML = acts.map(btn).join("") + `<span class="sep"></span><button class="act more" data-act="more" title="Toolbar settings">${ICON.more}</button>`;
-    this.bar.hidden = false;
-    const w = this.bar.offsetWidth || 260;
-    const x = Math.min(Math.max(rect.left + rect.width / 2 - w / 2 + scrollX, scrollX + 8), scrollX + innerWidth - w - 8);
-    const y = rect.top + scrollY - 46 < scrollY + 4 ? rect.bottom + scrollY + 10 : rect.top + scrollY - 46;
-    this.bar.style.left = `${x}px`;
-    this.bar.style.top = `${y}px`;
-    this.bar.onmousedown = (ev) => ev.preventDefault(); // keep the page selection alive
-    this.bar.onclick = (ev) => {
-      const b = (ev.target as HTMLElement).closest("button");
-      if (!b) return;
-      if (b.dataset.color) return this.highlight(b.dataset.color);
-      const q = this.pending!.quote.quote;
-      switch (b.dataset.act) {
-        case "note": return this.highlight(this.lastColor, true);
-        case "wheel": { this.hideBar(); const p = this.pending; return this.wheelCard("Highlight in any colour", this.lastColor, (c) => { this.pending = p; this.hideCard(); this.highlight(c); }); }
-        case "copy": return this.copy();
-        case "save": return this.highlight("mint");
-        case "ask": return this.openPanel(`What does this mean: “${q.slice(0, 400)}”`, q);
-        case "more": return this.moreMenu();
-        default: return this.ai(b.dataset.act as "explain" | "define" | "summarize" | "expand", q);
-      }
+  barConfig(): BarConfig {
+    const toolbar = this.settings.toolbar;
+    return {
+      actions: toolbar.actions.length ? toolbar.actions : DEFAULT_SETTINGS.toolbar.actions,
+      labels: toolbar.labels,
+      color: this.lastColor,
+      colors: [...HIGHLIGHT_COLORS, ...this.recentColors.filter((c) => !(HIGHLIGHT_COLORS as string[]).includes(c))],
+      extras: [
+        { id: "off-site", label: `Turn off on ${location.hostname}`, icon: "eyeOff" },
+        { id: "settings", label: "Customise actions…", icon: "settings" },
+        { id: "panel", label: "Open the Lumen panel", icon: "panel" },
+      ],
     };
   }
 
-  moreMenu() {
-    this.hideBar();
+  onChoose(choice: BarChoice, snapshot: BarSnapshot) {
+    this.pending = snapshot;
+    const quote = snapshot.quote.quote;
+    if (choice.kind === "highlight") return this.highlight(choice.color);
+    if (choice.kind === "any-colour") return this.wheelCard("Highlight in any colour", this.lastColor, (color) => { this.pending = snapshot; this.hideCard(); this.highlight(color); });
+    if (choice.kind === "extra") return this.onExtra(choice.id);
+    switch (choice.action) {
+      case "note": return this.highlight(this.lastColor, true);
+      case "save": return this.highlight("mint");
+      case "copy": return this.copyText(quote);
+      case "cite": return this.copy();
+      case "ask": return this.openPanel(`What does this mean: “${quote.slice(0, 400)}”`);
+      case "related": return this.openPanel(`What in my library relates to this passage: “${quote.slice(0, 400)}”`);
+      default: return this.ai(choice.action, quote, { passage: snapshot });
+    }
+  }
+
+  async onExtra(id: string) {
     const host = location.hostname;
-    this.card.hidden = false;
-    this.card.innerHTML = `
-      <div class="head"><span class="tile">${ICON.settings}</span><b>Toolbar</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
-      <div class="menu">
-        <button data-act="off-site">${ICON.eyeOff}<span>Turn off on ${host}</span></button>
-        <button data-act="settings">${ICON.settings}<span>Customise actions…</span></button>
-        <button data-act="panel">${ICON.panel}<span>Open the Lumen panel</span></button>
-      </div>`;
-    this.card.onclick = async (ev) => {
-      const b = (ev.target as HTMLElement).closest("button");
-      if (!b) return;
-      if (b.dataset.act === "close") return this.hideCard();
-      if (b.dataset.act === "off-site") { await send({ type: "SET_TOOLBAR_SITE", host, on: false }); this.hideCard(); return this.toast(`Toolbar off on ${host}. Turn it back on in settings.`); }
-      if (b.dataset.act === "settings") { send({ type: "OPEN_OPTIONS" }).catch(() => {}); return this.hideCard(); }
-      if (b.dataset.act === "panel") { this.hideCard(); return this.openPanel(); }
-    };
+    if (id === "off-site") { await send({ type: "SET_TOOLBAR_SITE", host, on: false }); return this.toast(`Toolbar off on ${host}. Turn it back on in settings.`); }
+    if (id === "settings") return send({ type: "OPEN_OPTIONS" }).catch(() => {});
+    if (id === "panel") return this.openPanel();
   }
 
   async openPanel(prompt?: string, _fallbackText?: string) {
@@ -309,7 +314,7 @@ class Lumen {
       ${this.helperMenu ? `<div class="hmenu">
         <div class="hhead"><b>Hi, I'm ${esc(h.name)}</b><span class="muted">${count ? `${count} highlight${count === 1 ? "" : "s"} here` : "Select any text to start"}</span></div>
         <button data-h="save">${ICON.save}<span>Save this page</span></button>
-        <button data-h="summary">${ICON.summarize}<span>Summarise this page</span></button>
+        <button data-h="summary">${ICON.summarize}<span>TL;DR this page</span></button>
         <button data-h="ask">${ICON.ask}<span>Ask about this page</span></button>
         <button data-h="panel">${ICON.panel}<span>Open the panel</span></button>
         <button data-h="follow">${ICON.save}<span>Follow this blog</span></button>
@@ -325,7 +330,7 @@ class Lumen {
       if (act === "toggle") { this.helperMenu = !this.helperMenu; return this.renderHelper(); }
       this.helperMenu = false; this.renderHelper();
       if (act === "save") return this.savePage();
-      if (act === "summary") { const main = (document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body; return this.ai("summarize", (main.innerText || "").slice(0, 8000)); }
+      if (act === "summary") return this.tldr();
       if (act === "ask") return this.openPanel("Summarise this page and connect it to what I have saved before.", document.title);
       if (act === "panel") return this.openPanel();
       if (act === "follow") {
@@ -337,32 +342,35 @@ class Lumen {
     };
   }
 
-  hideBar() { this.bar.hidden = true; }
   hideCard() { this.card.hidden = true; this.card.innerHTML = ""; }
 
-  async highlight(color: string, withNote = false, collectionId?: string) {
+  async highlight(color: string, withNote = false, collectionId?: string): Promise<Highlight | undefined> {
     if (!this.pending) return;
     const quote = this.pending.quote;
     this.useColor(color);
-    this.hideBar();
     window.getSelection()?.removeAllRanges();
     type AddResult = { ok: boolean; highlight?: Highlight; error?: string; local?: boolean };
     const r: AddResult = await send<AddResult>({
       type: "ADD_HIGHLIGHT", url: location.href, title: document.title, html: pageHtml(), quote, color, collectionId,
     }).catch((e): AddResult => ({ ok: false, error: String(e) }));
-    if (!r.ok || !r.highlight) return this.toast(r.error ?? "Could not save the highlight", "err");
+    if (!r.ok || !r.highlight) { this.toast(r.error ?? "Could not save the highlight", "err"); return; }
     this.highlights.push(r.highlight);
     this.paint();
     this.toast(r.local ? "Highlighted (saved in this browser)" : color === "mint" ? "Saved to your Lumen bank · +2 glow" : "Highlighted · +2 glow");
     this.renderHelper();
     if (withNote) this.noteEditor(r.highlight);
+    return r.highlight;
   }
 
   async copy(h?: Highlight) {
     const quote = h?.quote ?? this.pending?.quote.quote ?? "";
     await navigator.clipboard.writeText(citeForClipboard({ quote, note: h?.note, title: document.title, url: location.href }));
-    this.hideBar();
     this.toast("Copied with citation");
+  }
+
+  async copyText(quote: string) {
+    await navigator.clipboard.writeText(quote);
+    this.toast("Copied");
   }
 
   onMarkClick(e: MouseEvent) {
@@ -374,12 +382,13 @@ class Lumen {
     this.cardFor(h);
   }
 
-  cardFor(h: Highlight) {
+  cardFor(h: Highlight, expanded = false) {
     this.card.hidden = false;
     this.card.innerHTML = `
       <div class="head"><span class="tile">✦</span><b>Highlight</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
       <blockquote class="q" style="--lc: ${colorVar(h.color)}">${esc(h.quote)}</blockquote>
       ${h.note ? `<div class="note">✎ ${esc(h.note)}</div>` : ""}
+      ${(h.answers ?? []).map((kept) => `<details class="kept"${expanded ? " open" : ""}><summary>${kept.parentId ? "↳" : "✦"} ${answerLabel(kept.action)}${kept.question ? `: ${esc(kept.question)}` : ""}</summary><div>${esc(kept.answer)}</div></details>`).join("")}
       <div class="row">${this.swatches(h.color)}</div>
       <div class="row">
         <button class="key" data-act="note">${h.note ? "Edit note" : "Add note"}</button>
@@ -403,7 +412,7 @@ class Lumen {
         case "close": return this.hideCard();
         case "note": return this.noteEditor(h);
         case "copy": return this.copy(h);
-        case "explain": return this.ai("explain", h.quote);
+        case "explain": this.pending = null; return this.ai("explain", h.quote, { highlight: h });
         case "delete":
           await send({ type: "DELETE_HIGHLIGHT", id: h.id, url: location.href });
           this.highlights = this.highlights.filter((x) => x.id !== h.id);
@@ -443,7 +452,6 @@ class Lumen {
   }
 
   askBox(text: string) {
-    this.hideBar();
     this.card.hidden = false;
     this.card.innerHTML = `
       <div class="head"><span class="tile iris">?</span><b>Ask about this</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
@@ -452,7 +460,7 @@ class Lumen {
       <div class="row"><button class="key iris" data-act="go">Ask</button></div>`;
     const input = this.card.querySelector("input")!;
     input.focus();
-    const go = () => input.value.trim() && this.ai("ask", text, input.value.trim());
+    const go = () => input.value.trim() && this.ai("ask", text, { question: input.value.trim() });
     input.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") go(); };
     this.card.onclick = (ev) => {
       const b = (ev.target as HTMLElement).closest("button");
@@ -461,36 +469,114 @@ class Lumen {
     };
   }
 
-  async ai(action: "explain" | "define" | "summarize" | "expand" | "ask", text: string, question?: string) {
-    this.hideBar();
+  /** A margin answer. Keep is offered only when the answer belongs to a passage or a highlight. */
+  async ai(action: AIAction, text: string, target: { question?: string; passage?: BarSnapshot | null; highlight?: Highlight } = {}) {
+    this.tldrMode = false;
     this.aiText = "";
+    this.aiModel = null;
+    const canKeep = Boolean(target.passage || target.highlight);
     this.card.hidden = false;
     this.card.innerHTML = `
-      <div class="head"><span class="tile iris">✦</span><b>${action === "ask" ? "Answer" : action[0].toUpperCase() + action.slice(1)}</b><span class="sp"></span><span class="chip" data-prov></span><button class="x" data-act="close">✕</button></div>
-      <blockquote class="q">${esc((question ?? text).slice(0, 300))}</blockquote>
+      <div class="head"><span class="tile iris">✦</span><b>${answerLabel(action)}</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
+      <blockquote class="q">${esc((target.question ?? text).slice(0, 300))}</blockquote>
       <div class="answer streaming"></div>
-      <div class="row"><button class="key ghost" data-act="copy-answer">Copy answer</button><button class="key ghost" data-act="keep">Save to Lumen</button><button class="key ghost" data-act="more-panel">Ask more</button></div>`;
+      <div class="row"><button class="key ghost" data-act="copy-answer">Copy answer</button>${canKeep ? `<button class="key ghost" data-act="keep">Keep</button>` : ""}<button class="key ghost" data-act="more-panel">Ask more</button></div>
+      <div class="foot" data-model></div>`;
+    let kept = false;
     this.card.onclick = async (ev) => {
       const b = (ev.target as HTMLElement).closest("button");
       if (b?.dataset.act === "close") this.hideCard();
       if (b?.dataset.act === "copy-answer") { await navigator.clipboard.writeText(this.aiText); this.toast("Answer copied"); }
       if (b?.dataset.act === "more-panel") { this.hideCard(); this.openPanel(`Tell me more about: “${text.slice(0, 300)}”`); }
-      if (b?.dataset.act === "keep" && this.pending && this.aiText) {
-        await this.highlight("iris");
-        const h = this.highlights[this.highlights.length - 1];
-        if (h) await send({ type: "UPDATE_HIGHLIGHT", id: h.id, url: location.href, note: `${action[0].toUpperCase()}${action.slice(1)}: ${this.aiText.slice(0, 1500)}` });
-        this.toast("Saved the passage with this answer as its note");
+      if (b?.dataset.act === "keep" && this.aiText && !kept) {
+        kept = true;
+        b.setAttribute("disabled", "");
+        if (!(await this.keep(action, target))) { kept = false; b.removeAttribute("disabled"); }
       }
     };
-    const r = await send<{ provider: string }>({ type: "AI_REQUEST", action, text, question, title: document.title, context: this.contextFor(text) }).catch(() => null);
-    const chip = this.card.querySelector("[data-prov]");
-    if (chip && r) chip.textContent = ({ lumen: "Lumen", ollama: "Ollama", openai: "API", claude: "Claude" } as Record<string, string>)[r.provider] ?? r.provider;
+    await send({ type: "AI_REQUEST", action, text, question: target.question, title: document.title, context: this.contextFor(text) }).catch(() => null);
   }
 
-  onMessage(m: { type: string; chunk?: string; error?: string; cmd?: string; text?: string; tone?: string }) {
+  /** The page's TL;DR card: paragraphs numbered for the model, [pN] shown as ¶ links, Keep saves the page. */
+  async tldr() {
+    this.paragraphs = readableParagraphs(articleRoot());
+    this.tldrMode = true;
+    this.aiText = this.tldrCache?.text ?? "";
+    this.aiModel = this.tldrCache?.model ?? null;
+    this.card.hidden = false;
+    this.card.innerHTML = `
+      <div class="head"><span class="tile iris">✦</span><b>TL;DR</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
+      <div class="answer ${this.tldrCache ? "" : "streaming"}"></div>
+      <div class="row"><button class="key ghost" data-act="keep">Keep</button></div>
+      <div class="foot" data-model>${this.aiModel ? esc(modelLabel(this.aiModel)) : ""}</div>`;
+    this.renderTldr();
+    this.card.onclick = async (ev) => {
+      const target = ev.target as HTMLElement;
+      const cite = target.closest<HTMLElement>("[data-p]");
+      if (cite) return this.scrollToParagraph(Number(cite.dataset.p));
+      const b = target.closest("button");
+      if (b?.dataset.act === "close") { this.tldrMode = false; return this.hideCard(); }
+      if (b?.dataset.act === "keep" && this.aiText && !b.hasAttribute("disabled")) {
+        b.setAttribute("disabled", "");
+        const citations: Citation[] = splitCitations(this.aiText).flatMap((part) => {
+          const paragraph = typeof part === "string" ? undefined : this.paragraphs[part.n - 1];
+          return typeof part === "string" || !paragraph ? [] : [{ n: part.n, quote: paragraph.quote }];
+        });
+        type KeepResult = { ok: boolean; error?: string };
+        const r: KeepResult = await send<KeepResult>({ type: "KEEP_TLDR", url: location.href, title: document.title, html: pageHtml(), text: this.aiText, model: this.aiModel, citations })
+          .catch((e): KeepResult => ({ ok: false, error: String(e) }));
+        if (!r.ok) { b.removeAttribute("disabled"); return this.toast(r.error ?? "Could not keep the TL;DR", "err"); }
+        this.toast("Kept the TL;DR with this page");
+      }
+    };
+    if (this.tldrCache) return;
+    if (!this.paragraphs.length) return this.onMessage({ type: "AI_ERROR", error: "Lumen could not find the article text on this page." });
+    await send({ type: "AI_TLDR", title: document.title, paragraphs: this.paragraphs.map((p) => p.text) }).catch(() => null);
+  }
+
+  renderTldr() {
     const ans = this.card.querySelector<HTMLElement>(".answer");
-    if (m.type === "AI_CHUNK" && ans) { this.aiText += m.chunk; ans.textContent = this.aiText; }
-    if (m.type === "AI_DONE" && ans) ans.classList.remove("streaming");
+    if (!ans) return;
+    ans.innerHTML = splitCitations(this.aiText).map((part) => (typeof part === "string" ? esc(part).replace(/^[-*] /gm, "• ") : `<button class="cite" data-p="${part.n}" title="Paragraph ${part.n}">¶${part.n}</button>`)).join("");
+  }
+
+  scrollToParagraph(n: number) {
+    const element = this.paragraphs[n - 1]?.element;
+    if (!(element instanceof HTMLElement)) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.animate([{ backgroundColor: "rgba(138,123,255,.25)" }, { backgroundColor: "transparent" }], { duration: 1200 });
+  }
+
+  /** Attach the answer to the highlight already on the passage, or highlight it first in the last colour. */
+  async keep(action: AIAction, target: { question?: string; passage?: BarSnapshot | null; highlight?: Highlight }): Promise<boolean> {
+    let highlight = target.highlight ?? (target.passage ? coveringQuote(document.body, target.passage.quote, this.highlights) : undefined);
+    if (!highlight && target.passage) {
+      this.pending = target.passage;
+      highlight = await this.highlight(this.lastColor);
+    }
+    if (!highlight) return false;
+    const owner = highlight;
+    type KeepResult = { ok: boolean; answer?: HighlightAnswer; error?: string };
+    const r: KeepResult = await send<KeepResult>({ type: "KEEP_ANSWER", highlightId: owner.id, url: location.href, action, question: target.question ?? null, answer: this.aiText, model: this.aiModel })
+      .catch((e): KeepResult => ({ ok: false, error: String(e) }));
+    const answer = r.answer;
+    if (!r.ok || !answer) { this.toast(r.error ?? "Could not keep this answer", "err"); return false; }
+    this.highlights = this.highlights.map((h) => (h.id === owner.id ? { ...h, answers: [...(h.answers ?? []), answer] } : h));
+    this.placeDots();
+    this.toast("Kept with this highlight");
+    return true;
+  }
+
+  onMessage(m: { type: string; chunk?: string; error?: string; cmd?: string; text?: string; tone?: string; model?: string }) {
+    const ans = this.card.querySelector<HTMLElement>(".answer");
+    if (m.type === "AI_CHUNK" && ans) { this.aiText += m.chunk; if (this.tldrMode) this.renderTldr(); else ans.textContent = this.aiText; }
+    if (m.type === "AI_DONE" && ans) {
+      ans.classList.remove("streaming");
+      this.aiModel = m.model ?? null;
+      if (this.tldrMode) this.tldrCache = { text: this.aiText, model: this.aiModel };
+      const foot = this.card.querySelector<HTMLElement>("[data-model]");
+      if (foot && m.model) foot.textContent = modelLabel(m.model);
+    }
     if (m.type === "AI_ERROR" && ans) { ans.classList.remove("streaming"); ans.classList.add("err"); ans.textContent = m.error ?? "Something went wrong"; }
     if (m.type === "TOAST") this.toast(m.text ?? "", m.tone === "err" ? "err" : "ok");
     if (m.type === "CMD") {
@@ -499,7 +585,7 @@ class Lumen {
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed) {
           const quote = describeRange(document.body, sel.getRangeAt(0));
-          if (quote) { this.pending = { quote, rect: sel.getRangeAt(0).getBoundingClientRect() }; this.highlight(this.lastColor, false, (m as { collectionId?: string }).collectionId); }
+          if (quote) { this.pending = { quote, range: sel.getRangeAt(0).cloneRange() }; this.highlight(this.lastColor, false, (m as { collectionId?: string }).collectionId); }
         }
       }
       if (m.cmd === "highlight" || m.cmd === "explain") {
@@ -507,8 +593,8 @@ class Lumen {
         if (sel && !sel.isCollapsed) {
           const quote = describeRange(document.body, sel.getRangeAt(0));
           if (quote) {
-            this.pending = { quote, rect: sel.getRangeAt(0).getBoundingClientRect() };
-            m.cmd === "highlight" ? this.highlight(this.lastColor) : this.ai("explain", quote.quote);
+            this.pending = { quote, range: sel.getRangeAt(0).cloneRange() };
+            m.cmd === "highlight" ? this.highlight(this.lastColor) : this.ai("explain", quote.quote, { passage: this.pending });
           }
         }
       }
@@ -529,6 +615,11 @@ class Lumen {
     clearTimeout((this as any)._t);
     (this as any)._t = setTimeout(() => (this.toastEl.hidden = true), 2600);
   }
+}
+
+/** Where the article is: the page's main content, or the whole body. */
+function articleRoot(): Element {
+  return document.querySelector("article, main, [role=main]") ?? document.body;
 }
 
 function esc(s: string) {

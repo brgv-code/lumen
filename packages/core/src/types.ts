@@ -12,7 +12,7 @@ export type ItemKind = (typeof ITEM_KINDS)[number];
 export const DESTINATION_KINDS = ["obsidian", "notion", "markdown", "webhook"] as const;
 export type DestinationKind = (typeof DESTINATION_KINDS)[number];
 
-export const AI_ACTIONS = ["explain", "summarize", "define", "ask", "simplify", "expand"] as const;
+export const AI_ACTIONS = ["explain", "summarize", "define", "ask", "simplify", "expand", "counterpoint"] as const;
 export type AIAction = (typeof AI_ACTIONS)[number];
 
 export type HighlightFormat = "house" | "callout" | "plain";
@@ -33,6 +33,8 @@ export interface User {
   shareSignals: boolean;
   reminders: boolean;
   createdAt: number;
+  /** Only on GET /me: the account can open the owner page. */
+  owner?: boolean;
 }
 
 export interface Item {
@@ -77,6 +79,36 @@ export interface Highlight extends TextQuote {
   createdAt: number;
   updatedAt: number;
   item?: Pick<Item, "id" | "title" | "url" | "siteName">;
+  /** Margin answers the reader kept on this passage, oldest first. */
+  answers?: HighlightAnswer[];
+}
+
+/** A [p12] marker in an answer, resolved to the paragraph it names. */
+export interface Citation {
+  n: number;
+  quote: TextQuote;
+}
+
+/** The TL;DR the reader kept for a page; one per item. */
+export interface ItemTldr {
+  id: string;
+  itemId: string;
+  text: string;
+  model: string | null;
+  citations: Citation[];
+  createdAt: number;
+}
+
+export interface HighlightAnswer {
+  id: string;
+  highlightId: string;
+  /** The answer this one followed up on, in the same card. */
+  parentId: string | null;
+  action: AIAction;
+  question: string | null;
+  answer: string;
+  model: string | null;
+  createdAt: number;
 }
 
 export interface Collection {

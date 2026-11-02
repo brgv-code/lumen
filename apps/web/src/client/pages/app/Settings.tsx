@@ -6,6 +6,7 @@ import { api, type Token } from "../../lib/api";
 import { getTheme, setTheme, timeAgo } from "../../lib/hooks";
 import { Segmented, useToast } from "../../components/ui";
 import { useApp } from "./Layout";
+import { analyticsConfigured, consent, setConsent } from "../../lib/analytics";
 
 export default function Settings() {
   const { user, refresh, startTour } = useApp();
@@ -16,6 +17,8 @@ export default function Settings() {
   const [theme, setT] = useState(getTheme());
   const [tokens, setTokens] = useState<Token[]>([]);
   const [share, setShare] = useState(user.shareSignals);
+  const [phOn, setPhOn] = useState<boolean | null>(null);
+  useEffect(() => { analyticsConfigured().then((on) => setPhOn(on ? consent() === "yes" : null)); }, []);
   const [remind, setRemind] = useState(user.reminders);
   const loadTokens = () => api.tokens().then((r) => setTokens(r.data)).catch(() => {});
   useEffect(() => { loadTokens(); }, []);
@@ -56,6 +59,7 @@ export default function Settings() {
       <section className="panel stack">
         <h2>Reading and privacy</h2>
         <Toggle on={remind} label="Reminders" hint="Nudge me about articles I started and left for a day or more (dashboard and extension)." onChange={async (v) => { setRemind(v); await api.updateMe({ reminders: v }); refresh(); }} />
+        {phOn !== null && <Toggle on={phOn} label="Product analytics" hint="Let Lumen use PostHog (EU) to see which pages and buttons are used, with your reading and typing hidden in recordings. Off means nothing is loaded." onChange={async (v) => { setPhOn(v); await setConsent(v ? "yes" : "no"); }} />}
         <Toggle on={share} label="Anonymous reading signals" hint="Count my saved public links toward “readers like you” suggestions. Only links saved by two or more readers are ever shown, never who saved them, never highlights or notes." onChange={async (v) => { setShare(v); await api.updateMe({ shareSignals: v }); refresh(); }} />
       </section>
 

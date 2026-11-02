@@ -1,20 +1,21 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowRight, BookOpen, Check, Copy, FileText, Flame, Github, Highlighter, Library, Link2, Lock, MessageSquareText,
+  ArrowRight, BookOpen, Check, FileText, Flame, Github, Highlighter, Library, Link2, Lock,
   NotebookPen, Puzzle, Send, Sparkles, Webhook, Wand2, Cpu, Download, Quote, Bot, Search, KeyRound,
   Radar as RadarIcon, BellRing, Users, BarChart3, Clock,
 } from "lucide-react";
 import { SiteFooter } from "../components/SiteFooter";
+import { LandingDemo } from "../components/LandingDemo";
+import { STORE_URL } from "../lib/extension";
 import { AppIcon, Logo, Segmented, Sparkle, useToast } from "../components/ui";
 import { useReveal } from "../lib/hooks";
 import { api } from "../lib/api";
 import "../styles/landing.css";
 
-type Tab = "highlight" | "ask" | "send" | "library" | "spark" | "agents";
+type Tab = "ask" | "send" | "library" | "spark" | "agents";
 
 const TABS: { value: Tab; label: string }[] = [
-  { value: "highlight", label: "Highlight" },
   { value: "ask", label: "Ask" },
   { value: "send", label: "Send anywhere" },
   { value: "library", label: "Library" },
@@ -23,19 +24,6 @@ const TABS: { value: Tab; label: string }[] = [
 ];
 
 const FEATURE: Record<Tab, { pill: string; lead: string; pay: string; body: string; mesh: string; ticks: [ReactNode, string, string][] }> = {
-  highlight: {
-    pill: "Highlight without a mode",
-    lead: "Mark it,",
-    pay: "keep copying.",
-    body: "Select text and a small toolbar appears. Pick a colour, add a margin note, or copy the passage with a link that jumps straight back to it. Ctrl+C always works.",
-    mesh: "mesh-lamp",
-    ticks: [
-      [<Highlighter />, "Five marker colours that mean something", "ink"],
-      [<MessageSquareText />, "A margin note on every highlight", "ink"],
-      [<Copy />, "Copy with citation and a deep link", "ink"],
-      [<Lock />, "Highlights reappear when you come back", "ink"],
-    ],
-  },
   ask: {
     pill: "A reading companion",
     lead: "Ask the margin,",
@@ -105,7 +93,7 @@ const FEATURE: Record<Tab, { pill: string; lead: string; pay: string; body: stri
 
 export default function Landing() {
   const ref = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<Tab>("highlight");
+  const [tab, setTab] = useState<Tab>("ask");
   const nav = useNavigate();
   const toast = useToast();
   useReveal(ref);
@@ -134,6 +122,7 @@ export default function Landing() {
             <a href="/changelog">Changelog</a>
           </div>
           <div className="row">
+            <a href={STORE_URL} className="key key--quiet key--sm lp-nav__chrome" target="_blank" rel="noreferrer">Add to Chrome</a>
             <Link to="/login" className="key key--quiet key--sm">Log in</Link>
             <Link to="/login" className="key key--lamp key--sm">Start free</Link>
           </div>
@@ -161,28 +150,8 @@ export default function Landing() {
             <p className="small muted" style={{ marginTop: 16 }}>Free plan forever · every Pro feature for your first 7 days · no card</p>
           </div>
 
-          <div className="paper-stage reveal" style={{ ["--i" as string]: 2 }} aria-hidden="true">
-            <div className="paper">
-              <h4>Reading slowly on purpose</h4>
-              <div className="by">Lumen sample library · 4 min</div>
-              <p>
-                Most of what we call reading online is really sorting. <mark className="hl-sun">Sorting is useful. It is just not the same thing as reading.</mark>
-              </p>
-              <p>
-                Reading slowly is about letting a sentence finish its work. <mark className="hl-iris">A margin note is a conversation you can have with yourself a year later.</mark>
-              </p>
-              <p>
-                <mark className="hl-mint">Slow reading compounds.</mark> The notes from ten good articles have already turned into two drafts.
-              </p>
-            </div>
-            <div className="mini-toolbar bob" style={{ left: "16%", top: "26%", ["--delay" as string]: "-1s" }}>
-              <span className="sw swatch-sun" /><span className="sw swatch-mint" /><span className="sw swatch-iris" /><span className="sw swatch-peach" />
-              <span className="sep" />
-              <span className="act on">Explain</span><span className="act">Note</span><span className="act">Copy</span>
-            </div>
-            <span className="tag bob" style={{ ["--c" as string]: "#c45100", ["--t" as string]: "#fff3dd", right: "4%", top: "8%", ["--delay" as string]: "-2s" }}>→ Obsidian</span>
-            <span className="tag bob" style={{ ["--c" as string]: "#6d5bff", ["--t" as string]: "#f1efff", left: "0%", top: "62%", ["--delay" as string]: "-3.5s" }}>Explain ✦</span>
-            <span className="tag bob" style={{ ["--c" as string]: "#14a86f", ["--t" as string]: "#e2f7ec", right: "10%", bottom: "6%", ["--delay" as string]: "-0.5s" }}>Sent once</span>
+          <div className="reveal" style={{ ["--i" as string]: 2 }}>
+            <LandingDemo />
           </div>
         </section>
 
@@ -454,18 +423,6 @@ function Orbit() {
 }
 
 function FeatureCard({ tab }: { tab: Tab }) {
-  if (tab === "highlight")
-    return (
-      <div className="card">
-        <div className="row" style={{ marginBottom: 12 }}><span className="tile tile--sm tile--ink"><Highlighter /></span><b style={{ color: "var(--ink)" }}>New highlight</b><span className="spacer" /><span className="chip chip--mint">Saved</span></div>
-        <p style={{ fontFamily: "var(--font-read)", fontSize: 16, lineHeight: 1.6, color: "var(--ink)" }}><mark className="hl-sun">Send the highlight to the note you are already writing, not to a new inbox.</mark></p>
-        <div className="row" style={{ margin: "14px 0", gap: 8 }}>
-          {["sun", "mint", "iris", "peach", "sky"].map((c, k) => <span key={c} className={`swatch-${c}`} style={{ width: 20, height: 20, borderRadius: 99, boxShadow: k === 0 ? "0 0 0 2px var(--raised), 0 0 0 4px var(--ink)" : "none" }} />)}
-        </div>
-        <div className="well" style={{ padding: 10, fontSize: 13 }}>✎ Exactly the Web Clipper problem.</div>
-        <div className="row" style={{ marginTop: 14 }}><button className="key key--sm"><Copy size={14} /> Copy with citation</button><span className="small muted">Ctrl+C still works</span></div>
-      </div>
-    );
   if (tab === "ask")
     return (
       <div className="card" style={{ background: "var(--iris-tint)" }}>

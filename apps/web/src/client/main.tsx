@@ -6,6 +6,8 @@ import "./styles/base.css";
 import { ToastProvider } from "./components/ui";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import { ConsentBanner } from "./components/Consent";
+import { initAnalytics } from "./lib/analytics";
 
 const AppLayout = lazy(() => import("./pages/app/Layout"));
 const Home = lazy(() => import("./pages/app/Home"));
@@ -24,7 +26,10 @@ const Ask = lazy(() => import("./pages/app/Ask"));
 const Following = lazy(() => import("./pages/app/Following"));
 const Agents = lazy(() => import("./pages/app/Agents"));
 const ExtensionPage = lazy(() => import("./pages/app/ExtensionPage"));
+const Owner = lazy(() => import("./pages/app/Owner"));
 import { ProGate } from "./pages/app/ProGate";
+
+initAnalytics();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -51,9 +56,11 @@ createRoot(document.getElementById("root")!).render(
               <Route path="following" element={<Following />} />
               <Route path="agents" element={<Agents />} />
               <Route path="extension" element={<ExtensionPage />} />
+              <Route path="owner" element={<Owner />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <ConsentBanner />
         </Suspense>
       </BrowserRouter>
     </ToastProvider>
