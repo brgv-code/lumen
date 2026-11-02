@@ -20,7 +20,7 @@ import { seo, notFound } from "./seo/routes";
 import { requireUser } from "./lib/session";
 import { purgeDemos } from "./lib/seed";
 import { refreshActiveRadars } from "./lib/radar";
-import { eventFor, personProps, track } from "./lib/analytics";
+import { eventFor, trackUser } from "./lib/analytics";
 import { owner } from "./routes/owner";
 
 const app = new Hono<AppEnv>();
@@ -78,9 +78,7 @@ app.use("/api/v1/*", async (c, next) => {
   if (c.req.header("x-lumen-internal") === "1" || c.res.status >= 400) return;
   const name = eventFor(c.req.method, new URL(c.req.url).pathname);
   if (!name) return;
-  const u = c.get("user");
-  const source = c.req.header("x-lumen-via") === "mcp" ? "agent" : c.get("via") === "token" ? "extension" : "web";
-  track(c.env, c.executionCtx, u.id, name, { source, ...personProps(u) });
+  trackUser(c, name);
 });
 app.route("/api/v1", me);
 app.route("/api/v1", discover);

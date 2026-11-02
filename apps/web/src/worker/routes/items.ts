@@ -5,6 +5,7 @@ import { body, decodeCursor, encodeCursor, fail, id, isHttpUrl, now, oneOf, str 
 import { toHighlight, toItem, toTldr } from "../lib/map";
 import { withAnswers } from "../lib/answers";
 import { cleanCitations, tldrFor } from "../lib/tldr";
+import { trackUser } from "../lib/analytics";
 import { extractFromHtml, extractFromUrl } from "../lib/extract";
 import { glowStmt } from "../lib/glow";
 import { peerFilter } from "./discover";
@@ -171,11 +172,13 @@ items.put("/:id/tldr", async (c) => {
   const text = str(b.text, 6000);
   if (!text) fail(422, "bad_request", "Pass the TL;DR text.");
   const tldrId = id("tl_");
+  const citations = cleanCitations(b.citations);
   await db.batch([
     db.prepare("DELETE FROM item_tldrs WHERE item_id = ?").bind(item.id),
     db.prepare("INSERT INTO item_tldrs (id, item_id, text, model, citations, created_at) VALUES (?,?,?,?,?,?)")
-      .bind(tldrId, item.id, text, str(b.model, 100) ?? null, JSON.stringify(cleanCitations(b.citations)), now()),
+      .bind(tldrId, item.id, text, str(b.model, 100) ?? null, JSON.stringify(citations), now()),
   ]);
+  trackUser(c, "tldr_kept", { citations: citations.length });
   const row = await db.prepare("SELECT * FROM item_tldrs WHERE id = ?").bind(tldrId).first();
   return c.json({ tldr: toTldr(row!) }, 201);
 });
