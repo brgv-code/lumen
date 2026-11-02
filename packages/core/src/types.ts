@@ -111,6 +111,22 @@ export interface HighlightAnswer {
   createdAt: number;
 }
 
+export interface RecallCard {
+  id: string;
+  itemId: string;
+  itemTitle: string;
+  highlightId: string | null;
+  /** The highlighted passage the question comes from, shown after answering. */
+  quote: string | null;
+  question: string;
+  answer: string | null;
+  step: number;
+  reviews: number;
+  dueAt: number;
+  reviewedAt: number | null;
+  createdAt: number;
+}
+
 export interface Collection {
   id: string;
   name: string;
