@@ -1,6 +1,7 @@
 // Server side product events to PostHog (EU). Pseudonymous: the account id, never the email,
 // page text, highlights or notes. Off unless POSTHOG_KEY is set.
-import type { Env, SessionUser } from "../env";
+import type { Context } from "hono";
+import type { AppEnv, Env, SessionUser } from "../env";
 
 type Props = Record<string, string | number | boolean | null | undefined | Record<string, unknown>>;
 
@@ -12,6 +13,17 @@ export const analyticsHost = (env: Env) => env.POSTHOG_HOST || "https://eu.i.pos
 /** Who an event belongs to, and how they are tagged. The persistent test account is skipped. */
 export function personProps(u: Pick<SessionUser, "is_demo" | "plan">) {
   return { is_demo: u.is_demo === 1, plan: u.plan };
+}
+
+/** Where a request came from: an agent over MCP, the extension (token), or the web app (cookie). */
+export function requestSource(c: Context<AppEnv>): "agent" | "extension" | "web" {
+  return c.req.header("x-lumen-via") === "mcp" ? "agent" : c.get("via") === "token" ? "extension" : "web";
+}
+
+/** One event for the signed in user, tagged with where it came from. */
+export function trackUser(c: Context<AppEnv>, event: string, props: Props = {}) {
+  const user = c.get("user");
+  track(c.env, c.executionCtx, user.id, event, { source: requestSource(c), ...personProps(user), ...props });
 }
 
 export function track(env: Env, ctx: { waitUntil(p: Promise<unknown>): void } | undefined, distinctId: string, event: string, props: Props = {}) {

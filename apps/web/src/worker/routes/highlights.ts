@@ -3,6 +3,7 @@ import { AI_ACTIONS, normalizeColor } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, decodeCursor, encodeCursor, fail, id, now, oneOf, str } from "../lib/util";
 import { toAnswer, toHighlight } from "../lib/map";
+import { trackUser } from "../lib/analytics";
 import { glowStmt } from "../lib/glow";
 
 export const highlights = new Hono<AppEnv>();
@@ -74,6 +75,7 @@ highlights.post("/:id/answers", async (c) => {
   await db.prepare("INSERT INTO highlight_answers (id, highlight_id, parent_id, action, question, answer, model, created_at) VALUES (?,?,?,?,?,?,?,?)")
     .bind(answerId, highlight.id, parentId, action, str(b.question, 1500) ?? null, answer, str(b.model, 100) ?? null, now()).run();
   const row = await db.prepare("SELECT * FROM highlight_answers WHERE id = ?").bind(answerId).first();
+  trackUser(c, "answer_kept", { action, follow_up: Boolean(parentId) });
   return c.json({ answer: toAnswer(row!) }, 201);
 });
 

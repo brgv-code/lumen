@@ -14,6 +14,7 @@ import { body, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
 import { safeJson, toAnswer, toDestination, toTldr } from "../lib/map";
 import { listAnswers } from "../lib/answers";
 import { requirePro } from "../lib/plan";
+import { trackUser } from "../lib/analytics";
 
 export const destinations = new Hono<AppEnv>();
 
@@ -153,6 +154,7 @@ destinations.post("/:id/ack", async (c) => {
         ON CONFLICT(tldr_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
         .bind(d.id, status, b.error ?? null, t, key, ...(tldrIds ? [] : [t]), u.id)),
   ]);
+  if (status === "delivered") trackUser(c, "notes_synced", { kind: d.kind, highlights: ids.length, answers: answerIds?.length ?? null, tldrs: tldrIds?.length ?? null });
   return c.json({ acked: ids.length, answers: answerIds?.length ?? 0, tldrs: tldrIds?.length ?? 0, status });
 });
 

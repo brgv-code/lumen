@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { personProps, track } from "../lib/analytics";
+import { personProps, requestSource, track } from "../lib/analytics";
 import { AI_ACTIONS } from "@lumen/core";
 import type { AppEnv, SessionUser } from "../env";
 import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
@@ -27,7 +27,7 @@ async function spend(c: Context<AppEnv>, feature: string, preferred: string): Pr
   ]);
   const used = row.results[0]?.count ?? 0;
   const cap = aiDailyCap(user);
-  const source = c.req.header("x-lumen-via") === "mcp" ? "agent" : c.get("via") === "token" ? "extension" : "web";
+  const source = requestSource(c);
   if (used > cap) {
     track(c.env, c.executionCtx, user.id, "ai_limit_hit", { feature, cap, source, ...personProps(user) });
     fail(entitlement(user).pro ? 429 : 402, entitlement(user).pro ? "ai_quota" : "upgrade_required", `Daily limit of ${cap} hosted answers reached. Pro raises it to 500, or use Ollama or Claude on your machine for unlimited answers.`);

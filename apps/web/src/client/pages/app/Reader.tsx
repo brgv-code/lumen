@@ -9,6 +9,7 @@ import { createSelectionBar, type BarChoice, type BarSnapshot } from "@lumen/cor
 import { ArrowLeft, Archive, BookOpen, Check, Copy, ExternalLink, Heart, Sparkles, Wand2, X } from "lucide-react";
 import { api, streamAI, streamChat, streamTldr, type ChatSource } from "../../lib/api";
 import { alignMargin } from "../../lib/margin";
+import { capture } from "../../lib/analytics";
 import { useDebounced, hostOf } from "../../lib/hooks";
 import { burst, useToast } from "../../components/ui";
 import { HighlightCard } from "../../components/cards";
@@ -184,6 +185,7 @@ export default function Reader() {
 
   const onChoose = (choice: BarChoice, snapshot: BarSnapshot) => {
     const quote = snapshot.quote.quote;
+    capture("selection_bar_choice", { surface: "reader", choice: choice.kind === "action" ? choice.action : choice.kind });
     if (choice.kind === "highlight") return highlight(choice.color, snapshot.quote);
     if (choice.kind === "any-colour") {
       const box = snapshot.range.getBoundingClientRect();
@@ -208,6 +210,7 @@ export default function Reader() {
     if (!root || !item) return;
     paragraphsRef.current = readableParagraphs(root);
     const shown = tldr ?? (ai?.action === "tldr" && !ai.streaming && ai.answer ? { text: ai.answer, model: ai.model ?? null } : null);
+    capture("tldr_opened", { surface: "reader", kept: Boolean(tldr), cached: Boolean(shown) });
     if (shown) return setAi({ action: "tldr", text: item.title, answer: shown.text, model: shown.model, streaming: false, keptOn: tldr ? tldr.id : undefined });
     abortRef.current?.abort();
     const ac = new AbortController();
@@ -246,6 +249,7 @@ export default function Reader() {
   /** What an Ask box does with its text: a slash command, or a question about the passage. */
   const askFrom = (input: string, about: { text: string; passage?: BarSnapshot; keptOn?: string; lastKeptId?: string }) => {
     const slash = parseSlash(input);
+    if (slash) capture("slash_command", { surface: "answer_card", command: slash.command });
     if (slash?.command === "tldr") return runTldr();
     if (slash?.command === "related") return runRelated(slash.rest || about.text, about.passage);
     if (slash) return runAI(slash.command === "define" ? "define" : "counterpoint", slash.rest || about.text, undefined, { passage: about.passage });
@@ -255,6 +259,7 @@ export default function Reader() {
   /** A follow up asked inside a thread card, kept under its highlight as soon as it finishes. */
   const askThread = async (h: Highlight, input: string) => {
     const slash = parseSlash(input);
+    if (slash) capture("slash_command", { surface: "thread", command: slash.command });
     if (slash?.command === "tldr") return runTldr();
     if (slash?.command === "related") return runRelated(slash.rest || h.quote);
     const action: AIAction = slash ? (slash.command === "define" ? "define" : "counterpoint") : "ask";

@@ -91,11 +91,16 @@ What is sent:
   successful write in `eventFor()` (item_saved, highlight_created, collection_created,
   destination_added, blog_followed, share_created, token_created, checkout_started, ...) with
   `source` web, extension or agent, and revenue from the Stripe webhook (`subscription_started`,
-  `payment_received` with `revenue` and `currency`, `subscription_cancelled`).
+  `payment_received` with `revenue` and `currency`, `subscription_cancelled`). Reading features
+  (LUM-1 to LUM-3): `answer_kept` (action, follow_up), `tldr_kept` (citations), `notes_synced`
+  (kind and counts of highlights, answers and TL;DRs a client wrote); TL;DR requests are
+  `ai_answer` with feature `tldr`.
 - **Web app** (`client/lib/analytics.ts`), only after the visitor allows it in the banner or in
   Settings: pageviews, page leave (time on page), autocapture and session replay. The app shell has
   `ph-mask`, so library text is masked in replays; all inputs are masked. Before consent the
-  library is not even downloaded. The extension has no analytics code.
+  library is not even downloaded. Reader events: `selection_bar_choice`, `thread_opened`,
+  `slash_command` (surface, command), `tldr_opened`, and the landing demo's `landing_demo_*`.
+  The extension has no analytics code; its use shows in server events with `source` extension.
 
 Owner page: `/app/owner` for emails in the `OWNER_EMAILS` var (signups, activation, AI per day,
 trial decisions).
