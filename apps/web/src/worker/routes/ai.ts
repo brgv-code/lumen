@@ -6,7 +6,7 @@ import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
 import { CHAT_MODEL, DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
 import { retrieve, sourcesBlock } from "../lib/retrieve";
-import { LIBRARY_SYSTEM } from "@lumen/core";
+import { LIBRARY_SYSTEM, TLDR_SYSTEM, chunkParagraphs, paragraphsWithin, tldrCombinePrompt, tldrPrompt } from "@lumen/core";
 import { safeJson, toIdea } from "../lib/map";
 import { glowStmt } from "../lib/glow";
 
@@ -55,6 +55,37 @@ ai.post("/run", async (c) => {
     } as never)) as unknown as ReadableStream;
   } catch (e) {
     console.error("ai run failed", e);
+    fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment, or switch to a local model in the extension.");
+  }
+  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
+});
+
+/** TL;DR of a whole article: numbered paragraphs in, a streamed list with [pN] citations out. One call
+ *  up to TLDR_CHARS; longer articles are summarised in chunks first, then combined. Counts once. */
+ai.post("/tldr", async (c) => {
+  const b = await body<{ title?: string; paragraphs?: unknown }>(c);
+  const title = str(b.title, 300) ?? "Untitled";
+  const given = Array.isArray(b.paragraphs) ? b.paragraphs.filter((p): p is string => typeof p === "string" && p.trim().length > 0) : [];
+  const paragraphs = paragraphsWithin(given.slice(0, 2000).map((p) => p.slice(0, 4000)), 400_000);
+  if (!given.length) fail(422, "bad_request", "Pass the article's paragraphs.");
+  const model = await spend(c, "tldr", CHAT_MODEL);
+  const run = (prompt: string, stream: boolean) => c.env.AI.run(model as Parameters<Ai["run"]>[0], {
+    messages: [{ role: "system", content: TLDR_SYSTEM }, { role: "user", content: prompt }],
+    stream,
+    max_tokens: 500,
+  } as never);
+  let stream: ReadableStream;
+  try {
+    const chunks = chunkParagraphs(paragraphs);
+    if (chunks.length === 1) {
+      stream = (await run(tldrPrompt(title, paragraphs), true)) as unknown as ReadableStream;
+    } else {
+      const partials: string[] = [];
+      for (const chunk of chunks) partials.push(((await run(tldrPrompt(title, chunk.paragraphs, chunk.first), false)) as { response?: string }).response ?? "");
+      stream = (await run(tldrCombinePrompt(title, partials), true)) as unknown as ReadableStream;
+    }
+  } catch (e) {
+    console.error("tldr failed", e);
     fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment, or switch to a local model in the extension.");
   }
   return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
