@@ -95,6 +95,30 @@ stateDiagram-v2
 - A kept answer reaches notes with its highlight when the highlight is still pending for a
   destination. Answers kept after the highlight was delivered wait for answer deliveries (LUM-2).
 
+## Landing demo (LUM-4)
+The real selection bar on a sample article in the hero. Answers are written ahead of time for
+five terms and a TL;DR; nothing calls a model, needs an account or leaves the page.
+```mermaid
+stateDiagram-v2
+  [*] --> reading
+  reading --> bar_open: select text inside the sample article
+  bar_open --> reading: Escape, click outside, selection cleared
+  bar_open --> marked: Highlight, a swatch, any colour, Save
+  bar_open --> reading: Copy or Copy with citation (clipboard)
+  bar_open --> answering: Explain, Simplify, Define, Counterpoint or Expand on one of the five terms
+  bar_open --> install_prompt: an answering action on other text, or Ask, Related, Note
+  reading --> answering: TL;DR on the article
+  answering --> answered: the written answer types out (all at once under reduced motion)
+  answered --> marked: Keep paints the passage
+  answered --> reading: close
+  install_prompt --> reading: close
+  install_prompt --> [*]: Start free or Add to Chrome
+  marked --> reading
+```
+- A selection counts as a term when it overlaps one of the five underlined terms; the first one wins.
+- Marks live only in the page. A reload resets the demo.
+- Events go to PostHog only after consent, like the rest of the landing page.
+
 ## AI request
 ```mermaid
 stateDiagram-v2
