@@ -32,9 +32,9 @@ export const cloudApi = {
   deleteHighlight: (id: string) => cloud<{ ok: true }>("DELETE", `/highlights/${id}`),
   collections: () => cloud<{ data: Collection[] }>("GET", "/collections"),
   destinations: () => cloud<{ data: { id: string; kind: string; name: string; config: Record<string, string> }[] }>("GET", "/destinations"),
-  pending: (id: string) => cloud<{ highlightIds: string[]; answerIds: string[]; counts: { highlights: number; answers: number }; markdown: string }>("GET", `/destinations/${id}/pending`),
-  ack: (id: string, highlightIds: string[], answerIds: string[], error?: string) => cloud<{ acked: number }>("POST", `/destinations/${id}/ack`, { highlightIds, answerIds, error }),
-  push: (id: string) => cloud<{ delivered: number; answers: number }>("POST", `/destinations/${id}/push`, {}),
+  pending: (id: string) => cloud<{ highlightIds: string[]; answerIds: string[]; tldrIds: string[]; counts: { highlights: number; answers: number; tldrs: number }; markdown: string }>("GET", `/destinations/${id}/pending`),
+  ack: (id: string, p: { highlightIds: string[]; answerIds: string[]; tldrIds: string[] }, error?: string) => cloud<{ acked: number }>("POST", `/destinations/${id}/ack`, { highlightIds: p.highlightIds, answerIds: p.answerIds, tldrIds: p.tldrIds, error }),
+  push: (id: string) => cloud<{ delivered: number; answers: number; tldrs: number }>("POST", `/destinations/${id}/push`, {}),
 };
 
 /**
@@ -52,12 +52,12 @@ export async function syncTarget(): Promise<{ sent: number; to?: string }> {
   if (!dest) return { sent: 0 };
   if (dest.kind === "notion" || dest.kind === "webhook") {
     const r = await cloudApi.push(dest.id);
-    return { sent: r.delivered + r.answers, to: dest.name };
+    return { sent: r.delivered + r.answers + r.tldrs, to: dest.name };
   }
   if (dest.kind !== "obsidian") return { sent: 0 };
   if (!s.obsidianKey) throw new CloudError(400, "Add your Obsidian Local REST API key in Lumen settings.");
   const p = await cloudApi.pending(dest.id);
-  if (!p.highlightIds.length) return { sent: 0, to: dest.name };
+  if (!p.highlightIds.length && !p.tldrIds.length) return { sent: 0, to: dest.name };
   const base = (dest.config.baseUrl || "https://127.0.0.1:27124").replace(/\/$/, "");
   const path = String(dest.config.notePath).split("/").map(encodeURIComponent).join("/");
   const res = await fetch(`${base}/vault/${path}`, {
@@ -66,9 +66,9 @@ export async function syncTarget(): Promise<{ sent: number; to?: string }> {
     body: p.markdown,
   });
   if (!res.ok) {
-    await cloudApi.ack(dest.id, p.highlightIds, p.answerIds, `Obsidian ${res.status}`).catch(() => {});
+    await cloudApi.ack(dest.id, p, `Obsidian ${res.status}`).catch(() => {});
     throw new CloudError(res.status, `Obsidian answered ${res.status}`);
   }
-  await cloudApi.ack(dest.id, p.highlightIds, p.answerIds);
-  return { sent: p.counts.highlights + p.counts.answers, to: dest.name };
+  await cloudApi.ack(dest.id, p);
+  return { sent: p.counts.highlights + p.counts.answers + p.counts.tldrs, to: dest.name };
 }

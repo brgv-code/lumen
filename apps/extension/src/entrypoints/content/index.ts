@@ -1,8 +1,8 @@
 // Lumen in the page: a selection toolbar that never takes over copy and paste,
 // highlights that come back when you return, and margin answers in a side card.
-import { HIGHLIGHT_COLORS, answerLabel, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, type AIAction, type Highlight, type HighlightAnswer } from "@lumen/core";
+import { HIGHLIGHT_COLORS, answerLabel, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
 import { WHEEL_CSS, bindWheel, wheelHTML } from "./wheel";
-import { anchorToRange, coveringQuote, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
+import { anchorToRange, coveringQuote, describeRange, readableParagraphs, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarConfig, type BarSnapshot, type SelectionBar } from "@lumen/core/bar";
 import { UI_CSS, MARK_CSS } from "./styles";
 import { ICON, LAMP } from "./icons";
@@ -47,6 +47,11 @@ class Lumen {
   activeMark: string | null = null;
   aiText = "";
   aiModel: string | null = null;
+  /** The card streams a TL;DR: chunks render with ¶ links instead of plain text. */
+  tldrMode = false;
+  /** This visit's TL;DR, so asking again costs no second call. */
+  tldrCache: { text: string; model: string | null } | null = null;
+  paragraphs: { text: string; quote: TextQuote; element: Element }[] = [];
   lastColor = "sun";
   recentColors: string[] = [];
 
@@ -122,6 +127,8 @@ class Lumen {
       if (m?.type === "SHOW_PANEL") { this.showPanel(m.prompt); reply({ ok: true }); return; }
       if (m?.type === "TOGGLE_PANEL") { this.togglePanel(); reply({ ok: true }); return; }
       if (m?.type === "PANEL_CLOSE") { this.hidePanel(); reply({ ok: true }); return; }
+      if (m?.type === "GET_PARAGRAPHS") { this.paragraphs = readableParagraphs(articleRoot()); reply({ title: document.title, paragraphs: this.paragraphs.map((p) => p.text) }); return; }
+      if (m?.type === "SCROLL_TO_PARAGRAPH") { this.scrollToParagraph(Number(m.n)); reply({ ok: true }); return; }
       if (m?.type === "OPEN_THREAD") {
         const h = this.highlights.find((x) => x.id === m.id);
         document.querySelector(`mark.lumen-mark[data-lumen-id="${CSS.escape(m.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -307,7 +314,7 @@ class Lumen {
       ${this.helperMenu ? `<div class="hmenu">
         <div class="hhead"><b>Hi, I'm ${esc(h.name)}</b><span class="muted">${count ? `${count} highlight${count === 1 ? "" : "s"} here` : "Select any text to start"}</span></div>
         <button data-h="save">${ICON.save}<span>Save this page</span></button>
-        <button data-h="summary">${ICON.summarize}<span>Summarise this page</span></button>
+        <button data-h="summary">${ICON.summarize}<span>TL;DR this page</span></button>
         <button data-h="ask">${ICON.ask}<span>Ask about this page</span></button>
         <button data-h="panel">${ICON.panel}<span>Open the panel</span></button>
         <button data-h="follow">${ICON.save}<span>Follow this blog</span></button>
@@ -323,7 +330,7 @@ class Lumen {
       if (act === "toggle") { this.helperMenu = !this.helperMenu; return this.renderHelper(); }
       this.helperMenu = false; this.renderHelper();
       if (act === "save") return this.savePage();
-      if (act === "summary") { const main = (document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body; return this.ai("summarize", (main.innerText || "").slice(0, 8000)); }
+      if (act === "summary") return this.tldr();
       if (act === "ask") return this.openPanel("Summarise this page and connect it to what I have saved before.", document.title);
       if (act === "panel") return this.openPanel();
       if (act === "follow") {
@@ -464,6 +471,7 @@ class Lumen {
 
   /** A margin answer. Keep is offered only when the answer belongs to a passage or a highlight. */
   async ai(action: AIAction, text: string, target: { question?: string; passage?: BarSnapshot | null; highlight?: Highlight } = {}) {
+    this.tldrMode = false;
     this.aiText = "";
     this.aiModel = null;
     const canKeep = Boolean(target.passage || target.highlight);
@@ -489,6 +497,56 @@ class Lumen {
     await send({ type: "AI_REQUEST", action, text, question: target.question, title: document.title, context: this.contextFor(text) }).catch(() => null);
   }
 
+  /** The page's TL;DR card: paragraphs numbered for the model, [pN] shown as ¶ links, Keep saves the page. */
+  async tldr() {
+    this.paragraphs = readableParagraphs(articleRoot());
+    this.tldrMode = true;
+    this.aiText = this.tldrCache?.text ?? "";
+    this.aiModel = this.tldrCache?.model ?? null;
+    this.card.hidden = false;
+    this.card.innerHTML = `
+      <div class="head"><span class="tile iris">✦</span><b>TL;DR</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
+      <div class="answer ${this.tldrCache ? "" : "streaming"}"></div>
+      <div class="row"><button class="key ghost" data-act="keep">Keep</button></div>
+      <div class="foot" data-model>${this.aiModel ? esc(modelLabel(this.aiModel)) : ""}</div>`;
+    this.renderTldr();
+    this.card.onclick = async (ev) => {
+      const target = ev.target as HTMLElement;
+      const cite = target.closest<HTMLElement>("[data-p]");
+      if (cite) return this.scrollToParagraph(Number(cite.dataset.p));
+      const b = target.closest("button");
+      if (b?.dataset.act === "close") { this.tldrMode = false; return this.hideCard(); }
+      if (b?.dataset.act === "keep" && this.aiText && !b.hasAttribute("disabled")) {
+        b.setAttribute("disabled", "");
+        const citations: Citation[] = splitCitations(this.aiText).flatMap((part) => {
+          const paragraph = typeof part === "string" ? undefined : this.paragraphs[part.n - 1];
+          return typeof part === "string" || !paragraph ? [] : [{ n: part.n, quote: paragraph.quote }];
+        });
+        type KeepResult = { ok: boolean; error?: string };
+        const r: KeepResult = await send<KeepResult>({ type: "KEEP_TLDR", url: location.href, title: document.title, html: pageHtml(), text: this.aiText, model: this.aiModel, citations })
+          .catch((e): KeepResult => ({ ok: false, error: String(e) }));
+        if (!r.ok) { b.removeAttribute("disabled"); return this.toast(r.error ?? "Could not keep the TL;DR", "err"); }
+        this.toast("Kept the TL;DR with this page");
+      }
+    };
+    if (this.tldrCache) return;
+    if (!this.paragraphs.length) return this.onMessage({ type: "AI_ERROR", error: "Lumen could not find the article text on this page." });
+    await send({ type: "AI_TLDR", title: document.title, paragraphs: this.paragraphs.map((p) => p.text) }).catch(() => null);
+  }
+
+  renderTldr() {
+    const ans = this.card.querySelector<HTMLElement>(".answer");
+    if (!ans) return;
+    ans.innerHTML = splitCitations(this.aiText).map((part) => (typeof part === "string" ? esc(part).replace(/^[-*] /gm, "• ") : `<button class="cite" data-p="${part.n}" title="Paragraph ${part.n}">¶${part.n}</button>`)).join("");
+  }
+
+  scrollToParagraph(n: number) {
+    const element = this.paragraphs[n - 1]?.element;
+    if (!(element instanceof HTMLElement)) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.animate([{ backgroundColor: "rgba(138,123,255,.25)" }, { backgroundColor: "transparent" }], { duration: 1200 });
+  }
+
   /** Attach the answer to the highlight already on the passage, or highlight it first in the last colour. */
   async keep(action: AIAction, target: { question?: string; passage?: BarSnapshot | null; highlight?: Highlight }): Promise<boolean> {
     let highlight = target.highlight ?? (target.passage ? coveringQuote(document.body, target.passage.quote, this.highlights) : undefined);
@@ -511,10 +569,11 @@ class Lumen {
 
   onMessage(m: { type: string; chunk?: string; error?: string; cmd?: string; text?: string; tone?: string; model?: string }) {
     const ans = this.card.querySelector<HTMLElement>(".answer");
-    if (m.type === "AI_CHUNK" && ans) { this.aiText += m.chunk; ans.textContent = this.aiText; }
+    if (m.type === "AI_CHUNK" && ans) { this.aiText += m.chunk; if (this.tldrMode) this.renderTldr(); else ans.textContent = this.aiText; }
     if (m.type === "AI_DONE" && ans) {
       ans.classList.remove("streaming");
       this.aiModel = m.model ?? null;
+      if (this.tldrMode) this.tldrCache = { text: this.aiText, model: this.aiModel };
       const foot = this.card.querySelector<HTMLElement>("[data-model]");
       if (foot && m.model) foot.textContent = modelLabel(m.model);
     }
@@ -556,6 +615,11 @@ class Lumen {
     clearTimeout((this as any)._t);
     (this as any)._t = setTimeout(() => (this.toastEl.hidden = true), 2600);
   }
+}
+
+/** Where the article is: the page's main content, or the whole body. */
+function articleRoot(): Element {
+  return document.querySelector("article, main, [role=main]") ?? document.body;
 }
 
 function esc(s: string) {

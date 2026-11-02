@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { colorSwatch } from "@lumen/core";
+import { SLASH_HINT, colorSwatch, parseSlash, type SlashCommand } from "@lumen/core";
 import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
@@ -9,7 +9,7 @@ import { Md } from "../../lib/md";
 
 type Tab = "ask" | "page" | "you";
 interface Source { n: number; kind: string; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null }
-interface Msg { role: "user" | "assistant"; content: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean }
+interface Msg { role: "user" | "assistant"; content: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean; kind?: "tldr" }
 
 async function activeTab() {
   const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -65,13 +65,47 @@ export default function Panel() {
   }, []);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
-  const ask = async (question: string) => {
-    if (!question.trim()) return;
+  /** Streams one reply from a port into a new assistant message. */
+  const streamInto = (question: string, port: chrome.runtime.Port, kind?: Msg["kind"]) => {
+    setMsgs((l) => [...l, { role: "user", content: question }, { role: "assistant", content: "", streaming: true, kind }]);
+    setInput("");
+    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => l.map((m, k) => (k === l.length - 1 ? fn(m) : m)));
+    port.onMessage.addListener((m: { chunk?: string; done?: boolean; error?: string }) => {
+      if (m.chunk) patch((x) => ({ ...x, content: x.content + m.chunk }));
+      if (m.done) { patch((x) => ({ ...x, streaming: false })); port.disconnect(); }
+      if (m.error) { patch((x) => ({ ...x, streaming: false, error: m.error })); port.disconnect(); }
+    });
+  };
+
+  const slash = async (question: string, command: SlashCommand, rest: string): Promise<boolean> => {
+    const t = await activeTab();
+    if (command === "related") return false;
+    if (command === "tldr") {
+      const page = t?.id !== undefined ? await chrome.tabs.sendMessage(t.id, { type: "GET_PARAGRAPHS" }).catch(() => null) as { title: string; paragraphs: string[] } | null : null;
+      if (!page?.paragraphs.length) { setMsgs((l) => [...l, { role: "user", content: question }, { role: "assistant", content: "", error: "Can't read this page (browser pages and built in PDFs)." }]); setInput(""); return true; }
+      const port = chrome.runtime.connect({ name: "lumen-tldr" });
+      streamInto(question, port, "tldr");
+      port.postMessage({ title: page.title, paragraphs: page.paragraphs });
+      return true;
+    }
+    const text = rest || (await readPage(t))?.selection || "";
+    if (!text) return false;
+    const port = chrome.runtime.connect({ name: "lumen-ai" });
+    streamInto(question, port);
+    port.postMessage({ action: command === "define" ? "define" : "counterpoint", text, title: t?.title ?? "" });
+    return true;
+  };
+
+  const ask = async (input: string) => {
+    if (!input.trim()) return;
+    const command = parseSlash(input);
+    if (command && (await slash(input, command.command, command.rest))) return;
+    const question = command?.command === "related" ? `What in my library relates to this passage: “${(command.rest || input).slice(0, 400)}”` : input;
     const t = await activeTab();
     const ctx = usePage ? await readPage(t) : null;
     if (usePage) setCtxInfo(ctx ?? "none");
     const history = msgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content }));
-    setMsgs((l) => [...l, { role: "user", content: question }, { role: "assistant", content: "", streaming: true }]);
+    setMsgs((l) => [...l, { role: "user", content: input }, { role: "assistant", content: "", streaming: true }]);
     setInput("");
     const port = chrome.runtime.connect({ name: "lumen-chat" });
     const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => l.map((m, k) => (k === l.length - 1 ? fn(m) : m)));
@@ -130,7 +164,8 @@ export default function Panel() {
             ) : (
               <div key={k} className="stack" style={{ gap: 6 }}>
                 <div className="bubble ai" style={m.error ? { color: "var(--peach)" } : undefined}>
-                  {m.error ? m.error : <Md text={m.content} onCite={(n) => { const src = m.sources?.find((x) => x.n === n); if (src) openInLumen(`/app/read/${src.itemId}${src.kind === "highlight" ? `#${src.id}` : ""}`); }} />}
+                  {m.error ? m.error : <Md text={m.content} onCite={(n) => { const src = m.sources?.find((x) => x.n === n); if (src) openInLumen(`/app/read/${src.itemId}${src.kind === "highlight" ? `#${src.id}` : ""}`); }}
+                    onParagraph={m.kind === "tldr" ? async (n) => { const t = await activeTab(); if (t?.id !== undefined) chrome.tabs.sendMessage(t.id, { type: "SCROLL_TO_PARAGRAPH", n }).catch(() => {}); } : undefined} />}
                   {m.streaming && <span className="caret-i">▍</span>}
                 </div>
                 {m.upgrade && <button className="key lamp" style={{ height: 32 }} onClick={() => openInLumen("/app/upgrade")}>See Pro</button>}
@@ -211,6 +246,7 @@ export default function Panel() {
                 : <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Reading: <b style={{ color: "var(--ink)", fontWeight: 500 }}>{ctxInfo.title}</b>{ctxInfo.selection ? " · your selection" : ""}</span>}
             </div>
           )}
+          {input.startsWith("/") && <div className="small muted">{SLASH_HINT}</div>}
           <textarea rows={2} placeholder="Ask about this page or anything you have saved…" value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }} />
           <div className="row small muted">

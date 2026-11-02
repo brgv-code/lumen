@@ -1,4 +1,4 @@
-import { BAR_ACTIONS, BAR_SETTINGS_VERSION, DEFAULT_BAR_ACTIONS, type AIAction, type BarAction, type Collection, type Highlight, type Item, type TextQuote } from "@lumen/core";
+import { BAR_ACTIONS, BAR_SETTINGS_VERSION, DEFAULT_BAR_ACTIONS, type AIAction, type BarAction, type Citation, type Collection, type Highlight, type Item, type TextQuote } from "@lumen/core";
 
 export type Provider = "lumen" | "ollama" | "openai" | "claude";
 
@@ -76,6 +76,8 @@ export type Msg =
   | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; quote: TextQuote; color: string; note?: string; collectionId?: string }
   | { type: "UPDATE_HIGHLIGHT"; id: string; url: string; color?: string; note?: string | null }
   | { type: "DELETE_HIGHLIGHT"; id: string; url: string }
+  | { type: "AI_TLDR"; title: string; paragraphs: string[] }
+  | { type: "KEEP_TLDR"; url: string; title: string; html: string; text: string; model: string | null; citations: Citation[] }
   | { type: "KEEP_ANSWER"; highlightId: string; url: string; action: AIAction; question: string | null; answer: string; model: string | null; parentId?: string }
   | { type: "GET_COLLECTIONS" }
   | { type: "SET_TARGET"; collectionId: string }
