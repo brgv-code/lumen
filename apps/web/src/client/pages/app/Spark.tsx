@@ -31,8 +31,6 @@ export default function Spark() {
         lead="What your reading"
         pay="keeps circling."
         sub="Spark reads only your own highlights and notes, then suggests the posts, threads and talks they point at."
-        mesh="mesh-peach"
-        tiles={[["tile--peach", <Sparkles />], ["tile--iris", <Sparkles />], ["tile--lamp", <Bookmark />], ["tile--sun", <Copy />]]}
         actions={<button className="key key--iris key--sm" onClick={run} disabled={busy}><Sparkles size={15} /> {busy ? "Noticing…" : "Find new ideas"}</button>}
       />
       {ideas.data && ideas.data.data.length === 0 ? (

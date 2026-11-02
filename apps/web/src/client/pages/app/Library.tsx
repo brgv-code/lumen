@@ -56,8 +56,6 @@ export default function LibraryPage() {
         lead={collection ? collection.emoji : "Everything you saved,"}
         pay={collection ? collection.name : "ready to read."}
         sub={collection?.description ?? "Inbox, reading, done: progress is tracked as you scroll, and every page opens in a calm reader."}
-        mesh="mesh-sky"
-        tiles={[["tile--sky", <LibIcon />], ["tile--lamp", <Plus />], ["tile--mint", <Send />], ["tile--ink", <Download />]]}
         actions={<>
           <button className="key key--lamp key--sm" onClick={openSave}><Plus size={15} /> Save a link</button>
           {collection && <a className="key key--ghost key--sm" href={`/api/v1/collections/${collection.id}/export.md?format=house`}><Download size={15} /> Export .md</a>}

@@ -36,8 +36,6 @@ export default function Settings() {
         lead="Make it"
         pay="yours."
         sub="Profile, reminders, privacy, theme, tokens and your data."
-        mesh="mesh-lamp"
-        tiles={[["tile--ink", <Moon />], ["tile--lamp", <KeyRound />], ["tile--mint", <Download />], ["tile--iris", <LogOut />]]}
       />
 
       <form className="panel stack" onSubmit={save}>

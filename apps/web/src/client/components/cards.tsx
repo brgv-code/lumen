@@ -9,11 +9,8 @@ import { hostOf, timeAgo } from "../lib/hooks";
 import { useToast } from "./ui";
 import { capture } from "../lib/analytics";
 
-const LETTER_BG = ["var(--key-lamp)", "var(--key-iris)", "linear-gradient(180deg,#3fd39a,#0f9a63)", "linear-gradient(180deg,#5b9bff,#2563eb)", "linear-gradient(180deg,#ff8a6b,#e24c2b)"];
 export function SiteLetter({ url }: { url: string }) {
-  const h = hostOf(url);
-  const n = [...h].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return <span className="letter" style={{ background: LETTER_BG[n % LETTER_BG.length] }}>{h.slice(0, 1).toUpperCase()}</span>;
+  return <span className="letter">{hostOf(url).slice(0, 1).toUpperCase()}</span>;
 }
 
 const STATUS_CHIP: Record<string, [string, string]> = {

@@ -27,7 +27,6 @@ export default function ExtensionPage() {
     <div className="page">
       <PageHero pill={<><Puzzle size={13} /> Extension</>} lead="Lumen on" pay="every page."
         sub={ext ? `Installed${ext.connected ? " and connected" : ""} · v${ext.version}${outdated ? ` · v${latest} is available` : ""}` : "Highlight, ask and save on any site, without leaving it."}
-        mesh="mesh-sky" tiles={[["tile--sky", <Puzzle />], ["tile--lamp", <Highlighter />], ["tile--iris", <PanelRight />], ["tile--mint", <Heart />]]}
         actions={<>
           {ext && <button className="key key--ghost key--sm" onClick={() => extension.openOptions()}><Gear size={14} /> Extension settings</button>}
           {STORE_URL

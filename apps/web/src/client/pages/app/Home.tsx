@@ -34,7 +34,6 @@ export default function Home() {
         lead={`${greeting()}, ${first}.`}
         pay={goal >= 1 ? "Your lamp is glowing." : stats && stats.streak > 0 ? "Keep the lamp lit." : "Light the lamp today."}
         sub={<>{stats ? <>{stats.streak} day streak · {stats.counts.inbox} waiting in your inbox</> : " "}</>}
-        actions={<button className="key key--lamp key--sm" onClick={openSave}><Plus size={14} /> Save a link</button>}
       /></div>
 
       {isNew && (

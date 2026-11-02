@@ -164,7 +164,7 @@ export default function Layout() {
                 <Bot size={15} /> <span className="hide-sm">{agents.length === 1 ? agentLabel(agents[0]) : `${agents.length} agents`}</span>
               </button>
             ) : (
-              <button className="key key--iris key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
+              <button className="key key--ghost key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
             )}
             <button className="key key--sm" data-tour="save" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
           </div>
