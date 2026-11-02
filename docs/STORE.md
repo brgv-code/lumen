@@ -11,14 +11,15 @@ open either at that viewport size and take a screenshot.
 2. The store assigned the id `hohicfgangllelfkhnbghegnbepjfkkk` on the first upload. It is the default for
    `STORE_EXTENSION_ID` in `apps/web/src/client/lib/extension.ts` (dashboard connect and ping;
    `VITE_EXTENSION_STORE_ID` overrides it) and `STORE_ID` in `apps/native-host/install.sh`
-   (Claude helper). Once the listing is public, set `VITE_EXTENSION_STORE_URL` and redeploy: the
-   Extension page then shows "Add to Chrome" instead of the zip.
+   (Claude helper). The public listing, https://chromewebstore.google.com/detail/lumen/hohicfgangllelfkhnbghegnbepjfkkk
+   (approved 2026-11-02), is the default for `STORE_URL` in the same file, so the Extension page,
+   Integrations and the landing demo show "Add to Chrome" (`VITE_EXTENSION_STORE_URL` overrides it).
 3. Later updates: bump the version in `apps/extension/wxt.config.ts` and `EXTENSION_VERSION` in
    `apps/web/src/worker/index.ts`, build, upload the new zip.
 
 ## Store listing
 
-**Name:** Lumen
+**Name:** Lumen: Highlight, Ask and Sync to your notes (renamed in 2.7.0; was "Lumen")
 
 **Summary** (manifest description, 132 characters max):
 Highlight, ask and send what you read to Obsidian, Notion or markdown.

@@ -8,6 +8,8 @@ app you already use: Obsidian, Notion, a markdown file or a webhook.
 
 **Live preview:** https://readwithlumen.app (press "Explore the demo" for a sandbox account)
 
+**Chrome extension:** [Lumen on the Chrome Web Store](https://chromewebstore.google.com/detail/lumen/hohicfgangllelfkhnbghegnbepjfkkk) (short link: https://readwithlumen.app/chrome)
+
 Free plan forever for reading, highlighting and syncing; every new account gets 7 days of Pro
 (Spark, Radar, agents over MCP, analytics, Notion and webhooks).
 

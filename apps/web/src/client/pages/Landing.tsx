@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { SiteFooter } from "../components/SiteFooter";
 import { LandingDemo } from "../components/LandingDemo";
+import { STORE_URL } from "../lib/extension";
 import { AppIcon, Logo, Segmented, Sparkle, useToast } from "../components/ui";
 import { useReveal } from "../lib/hooks";
 import { api } from "../lib/api";
@@ -121,6 +122,7 @@ export default function Landing() {
             <a href="/changelog">Changelog</a>
           </div>
           <div className="row">
+            <a href={STORE_URL} className="key key--quiet key--sm lp-nav__chrome" target="_blank" rel="noreferrer">Add to Chrome</a>
             <Link to="/login" className="key key--quiet key--sm">Log in</Link>
             <Link to="/login" className="key key--lamp key--sm">Start free</Link>
           </div>

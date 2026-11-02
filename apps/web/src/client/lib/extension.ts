@@ -4,8 +4,8 @@
 export const DEV_EXTENSION_ID = "ffjconacpmnbadoeegamifkellcddfja";
 /** The Chrome Web Store build's id (assigned by the store). VITE_EXTENSION_STORE_ID overrides it. */
 export const STORE_EXTENSION_ID: string = import.meta.env.VITE_EXTENSION_STORE_ID || "hohicfgangllelfkhnbghegnbepjfkkk";
-/** The listing, once published: VITE_EXTENSION_STORE_URL. Until then the dashboard offers the zip. */
-export const STORE_URL: string = import.meta.env.VITE_EXTENSION_STORE_URL ?? "";
+/** The public Chrome Web Store listing (approved 2026-11-02). VITE_EXTENSION_STORE_URL overrides it. */
+export const STORE_URL: string = import.meta.env.VITE_EXTENSION_STORE_URL || "https://chromewebstore.google.com/detail/lumen/hohicfgangllelfkhnbghegnbepjfkkk";
 const IDS = [STORE_EXTENSION_ID, DEV_EXTENSION_ID].filter(Boolean);
 
 type Runtime = { sendMessage: (id: string, msg: unknown, cb: (r: any) => void) => void; lastError?: unknown };

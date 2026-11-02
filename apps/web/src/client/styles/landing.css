@@ -34,6 +34,10 @@
   .lp-nav__links { display: none; }
   .lp-nav__in { justify-content: space-between; }
 }
+/* phones: Log in and Start free are enough room */
+@media (max-width: 560px) {
+  .lp-nav__chrome { display: none; }
+}
 
 /* hero */
 .lp-hero {

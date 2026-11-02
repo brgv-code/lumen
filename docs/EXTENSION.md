@@ -1,8 +1,10 @@
 # The extension
 
-Chrome, Brave, Edge and Arc (Manifest V3, built with WXT). Load `apps/extension/.output/chrome-mv3`
-unpacked until it is in the Chrome Web Store. The unpacked build has a fixed id
-(`ffjconacpmnbadoeegamifkellcddfja`) so the dashboard can connect it in one click.
+Chrome, Brave, Edge and Arc (Manifest V3, built with WXT). Install it from the
+[Chrome Web Store](https://chromewebstore.google.com/detail/lumen/hohicfgangllelfkhnbghegnbepjfkkk)
+(short link: https://readwithlumen.app/chrome). For development, load `apps/extension/.output/chrome-mv3`
+unpacked: that build has a fixed id (`ffjconacpmnbadoeegamifkellcddfja`) so the dashboard can
+connect it in one click.
 
 ## Design: one job per surface
 Reading should not mean leaving the page. Every surface does one thing, the way the best reading
