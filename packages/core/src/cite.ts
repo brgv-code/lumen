@@ -6,7 +6,16 @@ interface CiteInput {
   note?: string | null;
   title: string;
   url: string;
-  answers?: { action: AIAction; question: string | null; answer: string }[];
+  answers?: KeptInput[];
+  /** Obsidian block id written after the passage, so later versions can insert answers in place. */
+  blockId?: string;
+}
+
+interface KeptInput { action: AIAction; question: string | null; answer: string }
+
+/** A stable Obsidian block id for a highlight: letters, digits and dashes only. */
+export function blockIdFor(highlightId: string): string {
+  return `lumen-${highlightId.replace(/^hl_/, "").replace(/[^a-z0-9]/gi, "").slice(0, 10)}`;
 }
 
 /** A link that scrolls to and marks the passage in Chromium, Safari and Firefox. */
@@ -46,18 +55,27 @@ export function citeAsPlainText(h: CiteInput): string {
  * - plain:   a markdown blockquote
  */
 export function formatHighlight(h: CiteInput, format: HighlightFormat): string {
-  const answers = formatAnswers(h.answers ?? [], format);
-  return answers ? `${formatPassage(h, format)}\n\n${answers}` : formatPassage(h, format);
+  return [formatPassage(h, format), ...(h.answers ?? []).map((kept) => formatAnswer(kept, format))].join("\n\n");
 }
 
-/** Kept answers under their highlight: collapsed callouts in Obsidian formats, bold paragraphs in plain. */
-function formatAnswers(answers: NonNullable<CiteInput["answers"]>, format: HighlightFormat): string {
-  return answers.map((kept) => {
-    const heading = kept.question ? `${answerLabel(kept.action)}: ${kept.question.trim()}` : answerLabel(kept.action);
-    const body = kept.answer.trim();
-    if (format === "plain") return `**${heading}:** ${body}`;
-    return [`> [!${kept.action}]- ${heading}`, ...body.split("\n").map((line) => (line ? `> ${line}` : ">"))].join("\n");
-  }).join("\n\n");
+/** One kept answer: a collapsed callout in Obsidian formats, a bold paragraph in plain. */
+function formatAnswer(kept: KeptInput, format: HighlightFormat): string {
+  const heading = kept.question ? `${answerLabel(kept.action)}: ${kept.question.trim()}` : answerLabel(kept.action);
+  const body = kept.answer.trim();
+  if (format === "plain") return `**${heading}:** ${body}`;
+  return [`> [!${kept.action}]- ${heading}`, ...body.split("\n").map((line) => (line ? `> ${line}` : ">"))].join("\n");
+}
+
+/** "↳ Explain on "first six words…"": names the passage a late answer belongs to. */
+export function lateAnswerHeading(quote: string, action: AIAction): string {
+  const words = quote.replace(/\s+/g, " ").trim().split(" ");
+  return `↳ ${answerLabel(action)} on "${words.slice(0, 6).join(" ")}${words.length > 6 ? "…" : ""}"`;
+}
+
+/** An answer kept after its highlight reached the note: its own block, pointing back at the passage. */
+export function formatLateAnswer(h: Pick<CiteInput, "quote" | "url">, kept: KeptInput, format: HighlightFormat): string {
+  const pointer = `${lateAnswerHeading(h.quote, kept.action)} ([source](${textFragmentUrl(h.url, h.quote)}))`;
+  return `${pointer}${format === "plain" ? "\n\n" : "\n"}${formatAnswer(kept, format)}`;
 }
 
 function formatPassage(h: CiteInput, format: HighlightFormat): string {
@@ -66,30 +84,33 @@ function formatPassage(h: CiteInput, format: HighlightFormat): string {
   switch (format) {
     case "house": {
       const note = h.note ? `^[${h.note.replace(/\]/g, ")").trim()}]` : "";
-      return `==${quote.replace(/==/g, "= =")}==${note} ([${escapeMd(h.title)}](${link}))`;
+      return `==${quote.replace(/==/g, "= =")}==${note} ([${escapeMd(h.title)}](${link}))${h.blockId ? ` ^${h.blockId}` : ""}`;
     }
     case "callout":
       return [
         `> [!quote] [${escapeMd(h.title)}](${link})`,
         `> ${quote}`,
         ...(h.note ? [">", `> **Note:** ${h.note.trim()}`] : []),
+        ...(h.blockId ? ["", `^${h.blockId}`] : []),
       ].join("\n");
     case "plain":
     default:
-      return [`> ${quote}`, `> [${escapeMd(h.title)}](${link})`, ...(h.note ? ["", h.note.trim()] : [])].join("\n");
+      return [`> ${quote}`, `> [${escapeMd(h.title)}](${link})`, ...(h.blockId ? ["", `^${h.blockId}`] : []), ...(h.note ? ["", h.note.trim()] : [])].join("\n");
   }
 }
 
-/** A heading block written once per source, followed by its highlights. */
+/** A heading block written once per source, followed by its new highlights, then answers kept late. */
 export function formatSourceBlock(
   source: { title: string; url: string; siteName?: string | null },
   highlights: CiteInput[],
   format: HighlightFormat,
   when = new Date(),
+  late: { highlight: Pick<CiteInput, "quote" | "url">; answer: KeptInput }[] = [],
 ): string {
   const day = when.toISOString().slice(0, 10);
   const head = `\n## ${escapeMd(source.title)}\n${source.siteName ? `${source.siteName} · ` : ""}[source](${source.url}) · clipped ${day}\n`;
-  return head + "\n" + highlights.map((h) => formatHighlight(h, format)).join("\n\n") + "\n";
+  const blocks = [...highlights.map((h) => formatHighlight(h, format)), ...late.map((entry) => formatLateAnswer(entry.highlight, entry.answer, format))];
+  return head + "\n" + blocks.join("\n\n") + "\n";
 }
 
 function escapeMd(s: string): string {
