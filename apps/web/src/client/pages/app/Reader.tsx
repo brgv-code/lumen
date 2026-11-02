@@ -203,7 +203,8 @@ export default function Reader() {
     if (!scope) return;
     const bar = createSelectionBar({
       scope,
-      config: () => ({ actions: DEFAULT_BAR_ACTIONS, labels: true, color: lastColor(), colors: [...HIGHLIGHT_COLORS, ...recentColors()], extras: [] }),
+      // Words next to the icons only where the wider bar fits.
+      config: () => ({ actions: DEFAULT_BAR_ACTIONS, labels: window.innerWidth >= 560, color: lastColor(), colors: [...HIGHLIGHT_COLORS, ...recentColors()], extras: [] }),
       onChoose: (choice, snapshot) => chooseRef.current(choice, snapshot),
     });
     return () => bar.destroy();
