@@ -13,6 +13,7 @@ import { Logo, Modal, useToast } from "../../components/ui";
 import { identify, resetAnalytics } from "../../lib/analytics";
 import { Gauge } from "lucide-react";
 import { api, agentLabel } from "../../lib/api";
+import { getLabs, saveLabs } from "../../lib/hooks";
 import "../../styles/app.css";
 
 interface Ctx {
@@ -28,6 +29,8 @@ interface Ctx {
   /** Opens the agents page when one is connected, otherwise the connect flow. */
   agentAction: () => void;
   share: (s: { data: CardData; refId?: string; title: string }) => void;
+  labs: boolean;
+  setLabs: (on: boolean) => void;
 }
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
@@ -41,6 +44,7 @@ export default function Layout() {
   const [paywall, setPaywall] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [follows, setFollows] = useState(0);
+  const [labs, setLabsState] = useState(getLabs);
   const [agents, setAgents] = useState<Token[]>([]);
   const [shareState, setShareState] = useState<{ data: CardData; refId?: string; title: string } | null>(null);
   const nav = useNavigate();
@@ -75,7 +79,8 @@ export default function Layout() {
 
   return (
     <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true), setUser, startTour: () => setTourOpen(true),
-      agents, agentAction: () => (agents.length ? nav("/app/agents") : setAgentOpen(true)), share: setShareState }}>
+      agents, agentAction: () => (agents.length ? nav("/app/agents") : setAgentOpen(true)), share: setShareState,
+      labs, setLabs: (on) => { saveLabs(on); setLabsState(on); } }}>
       <div className="shell ph-mask">
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
@@ -84,11 +89,14 @@ export default function Layout() {
             <NavLink to="/app/library" className="side__link" data-tour="nav-library"><span className="ico"><Library /></span> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
             <NavLink to="/app/highlights" className="side__link" data-tour="nav-highlights"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
             <NavLink to="/app/collections" className="side__link" data-tour="nav-collections"><span className="ico"><FolderHeart /></span> Collections</NavLink>
-            <NavLink to="/app/following" className="side__link" data-tour="nav-following"><span className="ico"><Heart /></span> Following {follows > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{follows}</span>}</NavLink>
-            <NavLink to="/app/ask" className="side__link" data-tour="nav-ask"><span className="ico"><MessageCircle /></span> Ask</NavLink>
-            <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
-            <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
-            <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+            {labs && (<>
+              <div className="side__section">Labs</div>
+              <NavLink to="/app/following" className="side__link" data-tour="nav-following"><span className="ico"><Heart /></span> Following {follows > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{follows}</span>}</NavLink>
+              <NavLink to="/app/ask" className="side__link" data-tour="nav-ask"><span className="ico"><MessageCircle /></span> Ask</NavLink>
+              <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+              <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+              <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+            </>)}
             <div className="side__section">Connect</div>
             <NavLink to="/app/integrations" className="side__link"><span className="ico"><Plug /></span> Integrations</NavLink>
             <NavLink to="/app/settings" className="side__link"><span className="ico"><Settings /></span> Settings</NavLink>
@@ -114,7 +122,7 @@ export default function Layout() {
               </div>
               <span className="small muted">{user.planStatus === "pro" ? "Thank you for keeping the lamp lit." : user.planStatus === "trial" ? "Every feature unlocked. See what stays free." : "Unlock Spark, Radar, agents and analytics."}</span>
             </NavLink>
-            {stats && (
+            {labs && stats && (
               <div className="glowcard">
                 <div className="row">
                   <span className="tile tile--sm tile--lamp" style={stats.glowToday > 0 ? { animation: "glow 3s ease-in-out infinite" } : undefined}><Flame /></span>
@@ -167,7 +175,7 @@ export default function Layout() {
           <NavLink end to="/app"><Home size={19} />Home</NavLink>
           <NavLink to="/app/library"><Library size={19} />Library</NavLink>
           <NavLink to="/app/highlights"><Highlighter size={19} />Highlights</NavLink>
-          <NavLink to="/app/radar"><Radar size={19} />Radar</NavLink>
+          <NavLink to="/app/collections"><FolderHeart size={19} />Collections</NavLink>
           <NavLink to="/app/settings"><Settings size={19} />More</NavLink>
         </nav>
       </div>

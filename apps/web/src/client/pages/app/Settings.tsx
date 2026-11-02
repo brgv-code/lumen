@@ -9,7 +9,7 @@ import { useApp } from "./Layout";
 import { analyticsConfigured, consent, setConsent } from "../../lib/analytics";
 
 export default function Settings() {
-  const { user, refresh, startTour } = useApp();
+  const { user, refresh, startTour, labs, setLabs } = useApp();
   const toast = useToast();
   const nav = useNavigate();
   const [name, setName] = useState(user.name);
@@ -46,7 +46,7 @@ export default function Settings() {
           <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field"><span>Email</span><input className="input" value={user.email ?? (user.isDemo ? "demo sandbox" : "not shared")} disabled /></label>
         </div>
-        <label className="field"><span>Daily glow goal: {goal}</span><input type="range" min={5} max={100} step={5} value={goal} onChange={(e) => setGoal(Number(e.target.value))} style={{ accentColor: "var(--lamp)" }} /></label>
+        {labs && <label className="field"><span>Daily glow goal: {goal}</span><input type="range" min={5} max={100} step={5} value={goal} onChange={(e) => setGoal(Number(e.target.value))} style={{ accentColor: "var(--lamp)" }} /></label>}
         <div><button className="key key--sm">Save profile</button></div>
       </form>
 
@@ -66,6 +66,11 @@ export default function Settings() {
       <section className="panel stack">
         <div className="row"><span className="tile tile--sm tile--ink"><Moon /></span><h2>Appearance</h2></div>
         <Segmented label="Theme" size="sm" value={theme} onChange={(v) => { setT(v); setTheme(v); }} options={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+      </section>
+
+      <section className="panel stack">
+        <h2>Labs</h2>
+        <Toggle on={labs} label="Show Labs" hint="Following, Ask, Radar, Spark, Analytics and glow points in the sidebar. Off keeps Lumen to reading, highlights and notes." onChange={setLabs} />
       </section>
 
       <section className="panel stack">
