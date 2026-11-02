@@ -19,6 +19,8 @@ export interface BarConfig {
   /** The colour the highlight button uses: the last one picked. */
   color: string;
   colors: readonly string[];
+  /** Offer the any colour swatch; off where the host has no colour wheel. Defaults to on. */
+  anyColour?: boolean;
   /** Host specific items under the separator in More (site settings, panel). */
   extras: readonly MenuExtra[];
 }
@@ -34,6 +36,8 @@ export interface BarOptions {
   scope: HTMLElement;
   config: () => BarConfig;
   onChoose: (choice: BarChoice, snapshot: BarSnapshot) => void;
+  /** Called each time the bar opens on a new selection. */
+  onOpen?: (snapshot: BarSnapshot) => void;
   /** Host veto, for example when the reader turned the bar off on this site. */
   canOpen?: () => boolean;
   mount?: HTMLElement;
@@ -182,14 +186,16 @@ export function createSelectionBar(options: BarOptions): SelectionBar {
       swatch.style.setProperty("background", colorSwatch(color));
       flyout.appendChild(swatch);
     }
-    const wheel = doc.createElement("button");
-    wheel.type = "button";
-    wheel.className = "sw wheel";
-    wheel.tabIndex = -1;
-    wheel.dataset.anyColour = "";
-    wheel.title = "Any colour";
-    wheel.setAttribute("aria-label", wheel.title);
-    flyout.appendChild(wheel);
+    if (config.anyColour !== false) {
+      const wheel = doc.createElement("button");
+      wheel.type = "button";
+      wheel.className = "sw wheel";
+      wheel.tabIndex = -1;
+      wheel.dataset.anyColour = "";
+      wheel.title = "Any colour";
+      wheel.setAttribute("aria-label", wheel.title);
+      flyout.appendChild(wheel);
+    }
     group.append(main, flyout);
     return group;
   }
@@ -315,6 +321,7 @@ export function createSelectionBar(options: BarOptions): SelectionBar {
     if (topLayer && !host.matches(":popover-open")) host.showPopover();
     position();
     animateIn();
+    options.onOpen?.(next);
   }
 
   function hide() {

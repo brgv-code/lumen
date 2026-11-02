@@ -112,6 +112,11 @@ test("labels show words next to the icons", () => {
   assert.equal(find('[data-act="simplify"] span').textContent, "Simplify");
 });
 
+test("the any colour swatch can be left out", () => {
+  const { find } = setup({ anyColour: false });
+  assert.equal(find(".flyout").querySelector(".wheel"), null);
+});
+
 test("destroy removes the host", () => {
   const { bar, document } = setup();
   bar.destroy();
