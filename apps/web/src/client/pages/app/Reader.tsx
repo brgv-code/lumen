@@ -8,6 +8,7 @@ import { anchorToRange, coveringQuote, unwrapMarks, wrapRange } from "@lumen/cor
 import { createSelectionBar, type BarChoice, type BarSnapshot } from "@lumen/core/bar";
 import { ArrowLeft, Archive, BookOpen, Check, Copy, ExternalLink, Heart, Sparkles, Wand2, X } from "lucide-react";
 import { api, streamAI, streamChat, type ChatSource } from "../../lib/api";
+import { alignMargin } from "../../lib/margin";
 import { useDebounced, hostOf } from "../../lib/hooks";
 import { burst, useToast } from "../../components/ui";
 import { HighlightCard } from "../../components/cards";
@@ -42,6 +43,10 @@ export default function Reader() {
   const [missing, setMissing] = useState(false);
   const [alsoSaving, setAlsoSaving] = useState(0);
   const [wheelAt, setWheelAt] = useState<{ x: number; y: number; snapshot: BarSnapshot } | null>(null);
+  const [threadAsk, setThreadAsk] = useState<{ highlightId: string; question: string; answer: string; streaming: boolean } | null>(null);
+  const marginRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<ResizeObserver | null>(null);
+  const aiQuoteRef = useRef<TextQuote | null>(null);
   const [ai, setAi] = useState<AIState | null>(null);
   const [ask, setAsk] = useState("");
   const [progress, setProgress] = useState(0);
@@ -145,11 +150,11 @@ export default function Reader() {
     }
   };
 
-  const runRelated = async (text: string) => {
+  const runRelated = async (text: string, passage: BarSnapshot) => {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    setAi({ action: "related", text, answer: "", streaming: true });
+    setAi({ action: "related", text, answer: "", streaming: true, passage });
     try {
       const answer = await streamChat({ question: `What in my library relates to this passage: “${text.slice(0, 400)}”`, selection: text }, {
         text: (t) => setAi((s) => (s ? { ...s, answer: t } : s)),
@@ -187,13 +192,46 @@ export default function Reader() {
       case "save": return highlight("mint", snapshot.quote);
       case "copy": return copyText(quote, false);
       case "cite": return copyText(quote, true);
-      case "related": return runRelated(quote);
+      case "related": return runRelated(quote, snapshot);
       case "ask":
         abortRef.current?.abort();
         return setAi({ action: "ask", text: quote, answer: "", streaming: false, passage: snapshot, asking: true });
       default: return runAI(choice.action, quote, undefined, { passage: snapshot });
     }
   };
+  /** A follow up asked inside a thread card, kept under its highlight as soon as it finishes. */
+  const askThread = async (h: Highlight, question: string) => {
+    setThreadAsk({ highlightId: h.id, question, answer: "", streaming: true });
+    try {
+      const { answer, model } = await streamAI({ action: "ask", text: h.quote, question, title: item?.title }, (t) => setThreadAsk((s) => (s ? { ...s, answer: t } : s)));
+      const r = await api.keepAnswer(h.id, { action: "ask", question, answer, model, parentId: h.answers?.at(-1)?.id });
+      setHls((l) => l.map((x) => (x.id === h.id ? { ...x, answers: [...(x.answers ?? []), r.answer] } : x)));
+    } catch (e) { toast((e as Error).message, "err"); }
+    finally { setThreadAsk(null); }
+  };
+
+  aiQuoteRef.current = ai?.passage?.quote ?? null;
+  useLayoutEffect(() => {
+    const margin = marginRef.current;
+    const body = bodyRef.current;
+    if (!margin || !body) return;
+    for (const card of margin.querySelectorAll(":scope > [data-anchor]")) resizeRef.current?.observe(card);
+    alignMargin(margin, body, aiQuoteRef.current);
+  }, [hls, ai, threadAsk, html]);
+
+  // Cards grow while answers stream and the article reflows as fonts and images load.
+  useEffect(() => {
+    const margin = marginRef.current;
+    const body = bodyRef.current;
+    if (!margin || !body) return;
+    const observer = new ResizeObserver(() => alignMargin(margin, body, aiQuoteRef.current));
+    observer.observe(body);
+    // Layout effects run first on mount, so the cards already rendered need observing here.
+    for (const card of margin.querySelectorAll(":scope > [data-anchor]")) observer.observe(card);
+    resizeRef.current = observer;
+    return () => { observer.disconnect(); resizeRef.current = null; };
+  }, [html]);
+
   // The bar lives outside React; it always calls the latest handler.
   const chooseRef = useRef(onChoose);
   chooseRef.current = onChoose;
@@ -274,62 +312,63 @@ export default function Reader() {
         </article>
 
         <aside className="rail">
-          {ai ? (
-            <section className="card" style={{ padding: 16, background: "var(--iris-tint)" }}>
-              <div className="row" style={{ marginBottom: 10 }}>
-                <span className="tile tile--sm tile--iris"><Sparkles /></span>
-                <b style={{ color: "var(--ink)" }}>{ai.action === "related" ? BAR_LABEL.related : answerLabel(ai.action)}</b>
-                <span className="spacer" />
-                <button className="icon-btn" aria-label="Close" onClick={() => { abortRef.current?.abort(); setAi(null); }}><X size={15} /></button>
-              </div>
-              <div className="card-flat" style={{ padding: 10, marginBottom: 8 }}>
-                <div className="eyebrow">{ai.question ? "You asked" : "Passage"}</div>
-                <div style={{ fontFamily: "var(--font-read)", fontSize: 14.5, color: "var(--ink)", maxHeight: 90, overflow: "hidden" }}>{ai.question ?? ai.text}</div>
-              </div>
-              {!ai.asking && (
-                <div className="card-flat" style={{ padding: 12 }}>
-                  {ai.error ? <p className="small" style={{ color: "var(--peach)" }}>{ai.error}</p> : <p className={`ai-answer ${ai.streaming ? "caret" : ""}`}>{ai.answer}</p>}
-                  {ai.sources && ai.sources.length > 0 && (
-                    <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                      {ai.sources.map((source) => <li key={source.n}><Link to={`/app/read/${source.itemId}`}>{source.title}</Link></li>)}
-                    </ol>
-                  )}
-                </div>
-              )}
-              <form className="row" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); if (ask.trim()) { runAI("ask", ai.text, ask.trim(), { passage: ai.passage, keptOn: ai.keptOn, lastKeptId: ai.lastKeptId }); setAsk(""); } }}>
-                <input className="input" style={{ height: 36 }} autoFocus={ai.asking} placeholder={ai.asking ? "What do you want to know?" : "Ask a follow up…"} value={ask} onChange={(e) => setAsk(e.target.value)} />
-                <button className="key key--iris key--sm">Ask</button>
-              </form>
-              {!ai.streaming && ai.answer && (
-                <div className="row" style={{ marginTop: 6, gap: 4 }}>
-                  <button className="key key--quiet key--sm" onClick={async () => { await navigator.clipboard.writeText(ai.answer); toast("Answer copied"); }}><Copy size={14} /> Copy answer</button>
-                  {ai.passage && ai.action !== "related" && !ai.keptOn && <button className="key key--quiet key--sm" onClick={keep}>Keep</button>}
-                </div>
-              )}
-              {!ai.streaming && ai.model && <div className="small muted" style={{ marginTop: 6 }}>{modelLabel(ai.model)}</div>}
-            </section>
-          ) : (
+          {!ai && (
             <section className="panel" style={{ padding: 16 }}>
               <div className="row"><span className="tile tile--sm tile--ink"><Wand2 /></span><div><div style={{ color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>Select any passage</div><div className="small muted">Highlight it, add a note, or ask about it.</div></div></div>
             </section>
           )}
 
-          <section className="panel" style={{ padding: 16 }}>
-            <div className="row" style={{ marginBottom: 12 }}><h2 style={{ fontSize: 15 }}>Highlights</h2><span className="chip">{hls.length}</span><span className="spacer" />
-              {hls.length > 0 && <button className="key key--quiet key--sm" onClick={async () => { await navigator.clipboard.writeText(hls.map((h) => citeForClipboard({ quote: h.quote, note: h.note, title: item.title, url: item.url })).join("\n\n")); toast(`Copied ${hls.length} highlights`); }}><Copy size={14} /> All</button>}
-            </div>
-            <div className="stack" style={{ gap: 10 }}>
-              {[...hls].sort((a, b) => a.position - b.position).map((h) => (
-                <div key={h.id} id={`card-${h.id}`}>
-                  <HighlightCard h={h} title={item.title} url={item.url}
-                    onColor={async (color) => { const r = await api.updateHighlight(h.id, { color }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); }}
-                    onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast(<>Note kept <span className="muted">+3 glow</span></>, "glow"); refresh(); }}
-                    onDelete={async () => { await api.deleteHighlight(h.id); setHls((l) => l.filter((x) => x.id !== h.id)); refresh(); }} />
+          <div className="row" style={{ padding: "0 4px" }}><h2 style={{ fontSize: 15 }}>Highlights</h2><span className="chip">{hls.length}</span><span className="spacer" />
+            {hls.length > 0 && <button className="key key--quiet key--sm" onClick={async () => { await navigator.clipboard.writeText(hls.map((h) => citeForClipboard({ quote: h.quote, note: h.note, title: item.title, url: item.url })).join("\n\n")); toast(`Copied ${hls.length} highlights`); }}><Copy size={14} /> All</button>}
+          </div>
+          <div className="margin" ref={marginRef}>
+            {ai && (
+              <section className="card" data-anchor="ai" style={{ padding: 16, background: "var(--iris-tint)" }}>
+                <div className="row" style={{ marginBottom: 10 }}>
+                  <span className="tile tile--sm tile--iris"><Sparkles /></span>
+                  <b style={{ color: "var(--ink)" }}>{ai.action === "related" ? BAR_LABEL.related : answerLabel(ai.action)}</b>
+                  <span className="spacer" />
+                  <button className="icon-btn" aria-label="Close" onClick={() => { abortRef.current?.abort(); setAi(null); }}><X size={15} /></button>
                 </div>
-              ))}
-              {hls.length === 0 && <p className="small muted">Nothing marked yet. Select a sentence that matters.</p>}
-            </div>
-          </section>
+                <div className="card-flat" style={{ padding: 10, marginBottom: 8 }}>
+                  <div className="eyebrow">{ai.question ? "You asked" : "Passage"}</div>
+                  <div style={{ fontFamily: "var(--font-read)", fontSize: 14.5, color: "var(--ink)", maxHeight: 90, overflow: "hidden" }}>{ai.question ?? ai.text}</div>
+                </div>
+                {!ai.asking && (
+                  <div className="card-flat" style={{ padding: 12 }}>
+                    {ai.error ? <p className="small" style={{ color: "var(--peach)" }}>{ai.error}</p> : <p className={`ai-answer ${ai.streaming ? "caret" : ""}`}>{ai.answer}</p>}
+                    {ai.sources && ai.sources.length > 0 && (
+                      <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                        {ai.sources.map((source) => <li key={source.n}><Link to={`/app/read/${source.itemId}`}>{source.title}</Link></li>)}
+                      </ol>
+                    )}
+                  </div>
+                )}
+                <form className="row" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); if (ask.trim()) { runAI("ask", ai.text, ask.trim(), { passage: ai.passage, keptOn: ai.keptOn, lastKeptId: ai.lastKeptId }); setAsk(""); } }}>
+                  <input className="input" style={{ height: 36 }} autoFocus={ai.asking} placeholder={ai.asking ? "What do you want to know?" : "Ask a follow up…"} value={ask} onChange={(e) => setAsk(e.target.value)} />
+                  <button className="key key--iris key--sm">Ask</button>
+                </form>
+                {!ai.streaming && ai.answer && (
+                  <div className="row" style={{ marginTop: 6, gap: 4 }}>
+                    <button className="key key--quiet key--sm" onClick={async () => { await navigator.clipboard.writeText(ai.answer); toast("Answer copied"); }}><Copy size={14} /> Copy answer</button>
+                    {ai.passage && ai.action !== "related" && !ai.keptOn && <button className="key key--quiet key--sm" onClick={keep}>Keep</button>}
+                  </div>
+                )}
+                {!ai.streaming && ai.model && <div className="small muted" style={{ marginTop: 6 }}>{modelLabel(ai.model)}</div>}
+              </section>
+            )}
+            {[...hls].sort((a, b) => a.position - b.position).map((h) => (
+              <div key={h.id} id={`card-${h.id}`} data-anchor={`hl:${h.id}`}>
+                <HighlightCard h={h} title={item.title} url={item.url}
+                  onColor={async (color) => { const r = await api.updateHighlight(h.id, { color }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); }}
+                  onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast(<>Note kept <span className="muted">+3 glow</span></>, "glow"); refresh(); }}
+                  onDelete={async () => { await api.deleteHighlight(h.id); setHls((l) => l.filter((x) => x.id !== h.id)); refresh(); }}
+                  onFollowUp={(question) => askThread(h, question)}
+                  followUp={threadAsk?.highlightId === h.id ? threadAsk : undefined} />
+              </div>
+            ))}
+            {hls.length === 0 && <p className="small muted">Nothing marked yet. Select a sentence that matters.</p>}
+          </div>
         </aside>
       </div>
 

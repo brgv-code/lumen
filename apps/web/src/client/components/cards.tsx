@@ -58,11 +58,18 @@ export function ItemCard({ item, onFavorite, onDelete }: { item: Item; onFavorit
   );
 }
 
-export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
+export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFollowUp, followUp }: {
   h: Highlight; title: string; url: string;
   onDelete?: () => void; onNote?: (note: string | null) => void; onColor?: (c: string) => void;
+  /** Ask in the thread; the answer is kept under this highlight. */
+  onFollowUp?: (question: string) => void;
+  /** The follow up being answered right now. */
+  followUp?: { question: string; answer: string; streaming: boolean };
 }) {
   const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [question, setQuestion] = useState("");
+  const answers = h.answers ?? [];
   const { share, user } = useApp();
   const shareIt = () => share({ title: `“${h.quote.slice(0, 80)}”`, refId: h.id, data: { kind: "highlight", quote: h.quote, note: h.note, title, url, site: h.item?.siteName ?? null, color: h.color, owner: user.name.replace(/\s*\((demo|test)\)$/, "") } });
   const copy = async () => {
@@ -75,12 +82,33 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor }: {
       {onNote ? (
         <NoteEditor value={h.note} onSave={onNote} />
       ) : h.note ? <div className="note">✎ {h.note}</div> : null}
-      {(h.answers ?? []).map((kept) => (
-        <details key={kept.id} className="kept">
-          <summary>✦ {answerLabel(kept.action)}{kept.question ? `: ${kept.question}` : ""}</summary>
-          <p>{kept.answer}</p>
-        </details>
-      ))}
+      {answers.length > 0 && (
+        <button className="chip chip--iris thread__toggle" aria-expanded={open || Boolean(followUp)} onClick={() => setOpen(!open)}>
+          {answers.length === 1 ? "1 answer" : `${answers.length} answers`}
+        </button>
+      )}
+      {(open || followUp) && (
+        <div className="thread">
+          {answers.map((kept) => (
+            <div key={kept.id} className="thread__item">
+              <div className="thread__label">{kept.parentId ? "↳" : "✦"} {answerLabel(kept.action)}{kept.question ? `: ${kept.question}` : ""}</div>
+              <p>{kept.answer}</p>
+            </div>
+          ))}
+          {followUp && (
+            <div className="thread__item">
+              <div className="thread__label">↳ {answerLabel("ask")}: {followUp.question}</div>
+              <p className={followUp.streaming ? "caret" : ""}>{followUp.answer}</p>
+            </div>
+          )}
+          {onFollowUp && (
+            <form className="row" onSubmit={(e) => { e.preventDefault(); if (question.trim() && !followUp) { onFollowUp(question.trim()); setQuestion(""); } }}>
+              <input className="input" style={{ height: 34 }} placeholder="Ask a follow up…" value={question} onChange={(e) => setQuestion(e.target.value)} />
+              <button className="key key--iris key--sm" disabled={Boolean(followUp)}>Ask</button>
+            </form>
+          )}
+        </div>
+      )}
       <div className="row small muted" style={{ gap: 6 }}>
         <Link to={`/app/read/${h.itemId}#${h.id}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "50%", color: "var(--ink-2)", fontWeight: 500 }}>{title}</Link>
         <span style={{ whiteSpace: "nowrap" }}>· {timeAgo(h.createdAt)}</span>

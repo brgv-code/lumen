@@ -31,6 +31,41 @@ stateDiagram-v2
 Moving an item to a collection with a different destination makes its highlights pending for
 that destination only; they stay delivered for the old one.
 
+## Answer delivery (per destination, LUM-2)
+A kept answer reaches each destination once. `answer_deliveries` is the ledger, like `deliveries`
+for highlights.
+```mermaid
+stateDiagram-v2
+  [*] --> rides_along: kept while its highlight is still pending here
+  [*] --> late: kept after its highlight was delivered here
+  rides_along --> delivered: written under its highlight, acked with it
+  late --> delivered: written as its own "↳ Explain on …" block, acked
+  rides_along --> failed: write failed
+  late --> failed: write failed
+  failed --> delivered: retry succeeds
+  delivered --> delivered: re-ack is a no-op
+  delivered --> [*]: answer or highlight deleted (cascade)
+```
+- Highlights written from now on carry a `^lumen-…` block id, so a later version can insert
+  late answers in place instead of appending them.
+- Clients that only ack highlight ids (extension 2.6 and older) also deliver the answers that
+  were kept on those highlights before the ack.
+
+## Margin thread (LUM-2)
+A highlight with kept answers is a thread: the passage, the reader's note, then each answer and
+its follow ups in order.
+```mermaid
+stateDiagram-v2
+  [*] --> hidden: no kept answers on the passage
+  hidden --> shown: first answer kept
+  shown --> open: click the thread (web rail card, extension dot or panel row)
+  open --> asking: follow up typed
+  asking --> open: answer streamed and kept into the thread
+  open --> shown: close
+  shown --> hidden: last answer removed
+```
+Nothing appears on a page until something is kept there.
+
 ## Session
 ```mermaid
 stateDiagram-v2
