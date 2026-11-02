@@ -8,7 +8,7 @@ export function PageHero({ pill, lead, pay, sub, mesh = "mesh-lamp", tiles, chil
   pay: string;
   sub?: ReactNode;
   mesh?: "mesh-lamp" | "mesh-iris" | "mesh-mint" | "mesh-sky" | "mesh-peach";
-  tiles: [string, ReactNode][]; // [tile class, icon]
+  tiles?: [string, ReactNode][]; // [tile class, icon]
   children?: ReactNode; // optional floating card in the art panel
   actions?: ReactNode;
 }) {
@@ -26,14 +26,14 @@ export function PageHero({ pill, lead, pay, sub, mesh = "mesh-lamp", tiles, chil
         {sub && <div className="page-hero__sub">{sub}</div>}
         {actions && <div className="row" style={{ flexWrap: "wrap", marginTop: 14 }}>{actions}</div>}
       </div>
-      <div className={`page-hero__art halftone ${mesh}`} aria-hidden="true">
+      {tiles && <div className={`page-hero__art halftone ${mesh}`} aria-hidden="true">
         {tiles.slice(0, 4).map(([cls, icon], k) => (
           <span key={k} className="page-hero__float" style={{ left: spots[k].left, top: spots[k].top, ["--r" as string]: spots[k].r }}>
             <span className={`tile ${spots[k].size} ${cls} bob`} style={{ ["--delay" as string]: spots[k].d }}>{icon}</span>
           </span>
         ))}
         {children && <div className="page-hero__card">{children}</div>}
-      </div>
+      </div>}
     </section>
   );
 }

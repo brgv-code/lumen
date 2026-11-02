@@ -439,6 +439,7 @@
   align-items: stretch;
   position: relative;
 }
+.page-hero:not(:has(.page-hero__art)) { grid-template-columns: 1fr; min-height: 0; }
 .page-hero__copy { padding: 14px 10px 10px 14px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
 .page-hero h1 { font-size: clamp(28px, 3.3vw, 42px); letter-spacing: -0.04em; line-height: 1.05; margin-top: 14px; }
 .page-hero__sub { margin-top: 10px; color: var(--ink-2); font-size: 15px; max-width: 560px; }

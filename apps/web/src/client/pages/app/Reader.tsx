@@ -37,7 +37,7 @@ type KeptAnswer = Pick<HighlightAnswer, "action" | "question" | "answer" | "mode
 export default function Reader() {
   const { id = "" } = useParams();
   const { hash } = useLocation();
-  const { collections, refresh } = useApp();
+  const { collections, refresh, labs } = useApp();
   const toast = useToast();
   const [item, setItem] = useState<ItemWithContent | null>(null);
   const [hls, setHls] = useState<Highlight[]>([]);
@@ -120,7 +120,7 @@ export default function Reader() {
       const r = await api.addHighlight(item.id, { ...quote, color });
       setHls((l) => [...l, r.highlight]);
       if (item.status === "inbox") setItem({ ...item, status: "reading" });
-      toast(<>Highlighted <span className="muted">+2 glow</span></>, "glow");
+      toast("Highlighted");
       refresh();
       if (withNote) setTimeout(() => document.querySelector<HTMLButtonElement>(`#card-${r.highlight.id} .key--quiet`)?.click(), 80);
       return r.highlight;
@@ -318,7 +318,7 @@ export default function Reader() {
     refresh();
     if (status === "done") {
       if (ev) burst(ev.clientX, ev.clientY);
-      toast(<>Finished. Lovely reading. <span className="muted">+10 glow</span></>, "glow");
+      toast("Finished. Lovely reading.");
     } else if (status === "archived") toast("Archived");
   };
 
@@ -357,7 +357,7 @@ export default function Reader() {
               <span className="chip">{item.siteName || hostOf(item.url)}</span>
               {item.author && <span>{item.author}</span>}
               <span>· {item.readingMinutes} min read</span>
-              {alsoSaving > 0 && <span className="chip chip--mint">{alsoSaving} readers like you saved this</span>}
+              {labs && alsoSaving > 0 && <span className="chip chip--mint">{alsoSaving} readers like you saved this</span>}
             </div>
             <h1>{item.title}</h1>
           </header>
@@ -437,7 +437,7 @@ export default function Reader() {
               <div key={h.id} id={`card-${h.id}`} data-anchor={`hl:${h.id}`}>
                 <HighlightCard h={h} title={item.title} url={item.url}
                   onColor={async (color) => { const r = await api.updateHighlight(h.id, { color }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); }}
-                  onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast(<>Note kept <span className="muted">+3 glow</span></>, "glow"); refresh(); }}
+                  onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast("Note kept"); refresh(); }}
                   onDelete={async () => { await api.deleteHighlight(h.id); setHls((l) => l.filter((x) => x.id !== h.id)); refresh(); }}
                   onFollowUp={(question) => askThread(h, question)}
                   followUp={threadAsk?.highlightId === h.id ? threadAsk : undefined} />

@@ -18,7 +18,6 @@ export interface Trend { id: string; topic: string; url: string; title: string; 
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
 export interface Reminder { item: Item; minutesLeft: number; idleDays: number }
 export interface Radar { topics: { name: string; source: string; muted: number }[]; trends: Trend[]; lastRunAt: number | null; refreshed: boolean }
-export interface Similar { url: string; title: string; site_name: string | null; excerpt: string | null; reading_minutes: number | null; readers: number }
 export interface Analytics {
   heatmap: { day: string; glow: number }[];
   weeks: { week: string; minutes: number; words: number; items: number }[];
@@ -118,7 +117,6 @@ export const api = {
   muteTopic: (name: string) => req<{ ok: true }>("DELETE", `/api/v1/topics/${encodeURIComponent(name)}`),
   saveTrend: (id: string) => req<{ item: Item; created: boolean }>("POST", `/api/v1/trends/${id}/save`, {}),
   dismissTrend: (id: string) => req<{ ok: true }>("POST", `/api/v1/trends/${id}/dismiss`, {}),
-  similar: () => req<{ data: Similar[]; optedOut: boolean }>("GET", "/api/v1/similar"),
   analytics: () => req<Analytics>("GET", "/api/v1/analytics"),
   following: () => req<{ feeds: FollowedFeed[]; unseenTotal: number; refreshing: boolean }>("GET", "/api/v1/following"),
   follow: (url: string) => req<{ feed: FollowedFeed; created: boolean }>("POST", "/api/v1/following", { url }),

@@ -183,7 +183,7 @@ export default function Layout() {
       {shareState && <ShareModal data={shareState.data} refId={shareState.refId} title={shareState.title} onClose={() => setShareState(null)} />}
       <PaywallModal message={paywall} onClose={() => setPaywall(null)} />
       <Tour open={tourOpen} steps={APP_TOUR} name={user.name.replace(/\s*\((demo|test)\)$/, "").split(" ")[0]} onClose={() => { setTourOpen(false); markTour(user.id); }} />
-      <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast(<>Saved. <span className="muted">+1 glow</span></>, "glow"); nav(`/app/read/${id}`); }} />
+      <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast("Saved"); nav(`/app/read/${id}`); }} />
     </AppCtx.Provider>
   );
 }
