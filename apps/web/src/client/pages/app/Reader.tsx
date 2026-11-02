@@ -444,7 +444,7 @@ export default function Reader() {
             )}
             {[...hls].sort((a, b) => a.position - b.position).map((h) => (
               <div key={h.id} id={`card-${h.id}`} data-anchor={`hl:${h.id}`}>
-                <HighlightCard h={h} title={item.title} url={item.url}
+                <HighlightCard compact h={h} title={item.title} url={item.url}
                   onColor={async (color) => { const r = await api.updateHighlight(h.id, { color }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); }}
                   onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast("Note kept"); refresh(); }}
                   onDelete={async () => { await api.deleteHighlight(h.id); setHls((l) => l.filter((x) => x.id !== h.id)); refresh(); }}

@@ -411,6 +411,10 @@
 /* overflow guards */
 .rail > *, .hl-card, .item-card, .panel { min-width: 0; }
 .hl-card > .row { flex-wrap: wrap; row-gap: 4px; }
+.hl-card__tools { display: inline-flex; align-items: center; gap: 6px; transition: opacity 160ms ease; }
+.hl-card--compact .hl-card__tools { opacity: 0; }
+.hl-card--compact:hover .hl-card__tools, .hl-card--compact:focus-within .hl-card__tools { opacity: 1; }
+@media (hover: none) { .hl-card--compact .hl-card__tools { opacity: 1; } }
 .thread__toggle { justify-self: start; border: 0; cursor: pointer; }
 .thread { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--iris-tint); font-size: 13.5px; color: var(--ink-2); }
 .thread__label { font-weight: 600; color: var(--ink); }
