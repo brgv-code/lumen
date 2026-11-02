@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import DOMPurify from "dompurify";
-import type { AIAction, Highlight, HighlightAnswer, ItemWithContent, TextQuote } from "@lumen/core";
-import { BAR_LABEL, DEFAULT_BAR_ACTIONS, answerLabel, citeForClipboard, HIGHLIGHT_COLORS, colorVar, modelLabel } from "@lumen/core";
+import type { AIAction, Citation, Highlight, HighlightAnswer, ItemTldr, ItemWithContent, TextQuote } from "@lumen/core";
+import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, HIGHLIGHT_COLORS, colorVar, modelLabel, parseSlash, splitCitations } from "@lumen/core";
 import { ColorWheel, recentColors, rememberColor, lastColor, setLastColor } from "../../components/ColorPicker";
-import { anchorToRange, coveringQuote, unwrapMarks, wrapRange } from "@lumen/core/dom";
+import { anchorToRange, coveringQuote, readableParagraphs, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarSnapshot } from "@lumen/core/bar";
 import { ArrowLeft, Archive, BookOpen, Check, Copy, ExternalLink, Heart, Sparkles, Wand2, X } from "lucide-react";
-import { api, streamAI, streamChat, type ChatSource } from "../../lib/api";
+import { api, streamAI, streamChat, streamTldr, type ChatSource } from "../../lib/api";
 import { alignMargin } from "../../lib/margin";
 import { useDebounced, hostOf } from "../../lib/hooks";
 import { burst, useToast } from "../../components/ui";
@@ -15,7 +15,7 @@ import { HighlightCard } from "../../components/cards";
 import { useApp } from "./Layout";
 
 interface AIState {
-  action: AIAction | "related";
+  action: AIAction | "related" | "tldr";
   text: string;
   answer: string;
   streaming: boolean;
@@ -43,7 +43,9 @@ export default function Reader() {
   const [missing, setMissing] = useState(false);
   const [alsoSaving, setAlsoSaving] = useState(0);
   const [wheelAt, setWheelAt] = useState<{ x: number; y: number; snapshot: BarSnapshot } | null>(null);
-  const [threadAsk, setThreadAsk] = useState<{ highlightId: string; question: string; answer: string; streaming: boolean } | null>(null);
+  const [threadAsk, setThreadAsk] = useState<{ highlightId: string; action: AIAction; question: string | null; answer: string; streaming: boolean } | null>(null);
+  const [tldr, setTldr] = useState<ItemTldr | null>(null);
+  const paragraphsRef = useRef<ReturnType<typeof readableParagraphs>>([]);
   const marginRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<ResizeObserver | null>(null);
   const aiQuoteRef = useRef<TextQuote | null>(null);
@@ -56,7 +58,8 @@ export default function Reader() {
 
   useEffect(() => {
     setItem(null); setHls([]); setMissing(false); setAi(null);
-    api.item(id).then((r) => { setItem(r.item); setHls(r.highlights); setAlsoSaving(r.alsoSaving ?? 0); }).catch(() => setMissing(true));
+    setTldr(null);
+    api.item(id).then((r) => { setItem(r.item); setHls(r.highlights); setTldr(r.tldr); setAlsoSaving(r.alsoSaving ?? 0); }).catch(() => setMissing(true));
     window.scrollTo(0, 0);
   }, [id]);
 
@@ -150,7 +153,7 @@ export default function Reader() {
     }
   };
 
-  const runRelated = async (text: string, passage: BarSnapshot) => {
+  const runRelated = async (text: string, passage?: BarSnapshot) => {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -169,7 +172,7 @@ export default function Reader() {
 
   /** Attach to the highlight already on the passage, or highlight it first in the last colour. */
   const keep = async () => {
-    if (!ai || ai.action === "related" || !ai.passage || ai.streaming || !ai.answer || ai.keptOn) return;
+    if (!ai || ai.action === "related" || ai.action === "tldr" || !ai.passage || ai.streaming || !ai.answer || ai.keptOn) return;
     const root = bodyRef.current;
     const owner = (root ? coveringQuote(root, ai.passage.quote, hls) : undefined) ?? (await highlight(lastColor(), ai.passage.quote));
     if (!owner) return;
@@ -199,18 +202,73 @@ export default function Reader() {
       default: return runAI(choice.action, quote, undefined, { passage: snapshot });
     }
   };
-  /** A follow up asked inside a thread card, kept under its highlight as soon as it finishes. */
-  const askThread = async (h: Highlight, question: string) => {
-    setThreadAsk({ highlightId: h.id, question, answer: "", streaming: true });
+  /** The article's TL;DR: the kept one if there is one, otherwise streamed and cited by paragraph. */
+  const runTldr = async () => {
+    const root = bodyRef.current;
+    if (!root || !item) return;
+    paragraphsRef.current = readableParagraphs(root);
+    const shown = tldr ?? (ai?.action === "tldr" && !ai.streaming && ai.answer ? { text: ai.answer, model: ai.model ?? null } : null);
+    if (shown) return setAi({ action: "tldr", text: item.title, answer: shown.text, model: shown.model, streaming: false, keptOn: tldr ? tldr.id : undefined });
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setAi({ action: "tldr", text: item.title, answer: "", streaming: true });
     try {
-      const { answer, model } = await streamAI({ action: "ask", text: h.quote, question, title: item?.title }, (t) => setThreadAsk((s) => (s ? { ...s, answer: t } : s)));
-      const r = await api.keepAnswer(h.id, { action: "ask", question, answer, model, parentId: h.answers?.at(-1)?.id });
+      const { answer, model } = await streamTldr({ title: item.title, paragraphs: paragraphsRef.current.map((p) => p.text) }, (t) => setAi((s) => (s ? { ...s, answer: t } : s)), ac.signal);
+      setAi((s) => (s ? { ...s, answer: answer || s.answer, model, streaming: false } : s));
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setAi((s) => (s ? { ...s, streaming: false, error: (e as Error).message } : s));
+    }
+  };
+
+  const keepTldr = async () => {
+    if (!item || !ai || ai.action !== "tldr" || !ai.answer) return;
+    const citations: Citation[] = splitCitations(ai.answer).flatMap((part) => {
+      const paragraph = typeof part === "string" ? undefined : paragraphsRef.current[part.n - 1];
+      return typeof part === "string" || !paragraph ? [] : [{ n: part.n, quote: paragraph.quote }];
+    });
+    try {
+      const r = await api.keepTldr(item.id, { text: ai.answer, model: ai.model ?? null, citations });
+      setTldr(r.tldr);
+      setAi((s) => (s ? { ...s, keptOn: r.tldr.id } : s));
+      toast("Kept the TL;DR with this page");
+    } catch (e) { toast((e as Error).message, "err"); }
+  };
+
+  const scrollToParagraph = (n: number) => {
+    const element = paragraphsRef.current[n - 1]?.element;
+    if (!(element instanceof HTMLElement)) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.animate([{ backgroundColor: "var(--iris-tint)" }, { backgroundColor: "transparent" }], { duration: 1200 });
+  };
+
+  /** What an Ask box does with its text: a slash command, or a question about the passage. */
+  const askFrom = (input: string, about: { text: string; passage?: BarSnapshot; keptOn?: string; lastKeptId?: string }) => {
+    const slash = parseSlash(input);
+    if (slash?.command === "tldr") return runTldr();
+    if (slash?.command === "related") return runRelated(slash.rest || about.text, about.passage);
+    if (slash) return runAI(slash.command === "define" ? "define" : "counterpoint", slash.rest || about.text, undefined, { passage: about.passage });
+    return runAI("ask", about.text, input, { passage: about.passage, keptOn: about.keptOn, lastKeptId: about.lastKeptId });
+  };
+
+  /** A follow up asked inside a thread card, kept under its highlight as soon as it finishes. */
+  const askThread = async (h: Highlight, input: string) => {
+    const slash = parseSlash(input);
+    if (slash?.command === "tldr") return runTldr();
+    if (slash?.command === "related") return runRelated(slash.rest || h.quote);
+    const action: AIAction = slash ? (slash.command === "define" ? "define" : "counterpoint") : "ask";
+    const question = slash ? null : input;
+    setThreadAsk({ highlightId: h.id, action, question, answer: "", streaming: true });
+    try {
+      const { answer, model } = await streamAI({ action, text: slash?.rest || h.quote, question: question ?? undefined, title: item?.title }, (t) => setThreadAsk((s) => (s ? { ...s, answer: t } : s)));
+      const r = await api.keepAnswer(h.id, { action, question, answer, model, parentId: h.answers?.at(-1)?.id });
       setHls((l) => l.map((x) => (x.id === h.id ? { ...x, answers: [...(x.answers ?? []), r.answer] } : x)));
     } catch (e) { toast((e as Error).message, "err"); }
     finally { setThreadAsk(null); }
   };
 
-  aiQuoteRef.current = ai?.passage?.quote ?? null;
+  aiQuoteRef.current = ai?.action === "tldr" ? paragraphsRef.current[0]?.quote ?? null : ai?.passage?.quote ?? null;
   useLayoutEffect(() => {
     const margin = marginRef.current;
     const body = bodyRef.current;
@@ -284,6 +342,7 @@ export default function Reader() {
         ) : (
           <button className="key key--lamp key--sm" onClick={(e) => setStatus("done", e)}><Check size={15} /> Mark as done</button>
         )}
+        {html && <button className="key key--quiet key--sm" onClick={runTldr}>TL;DR</button>}
       </div>
 
       <div className="reader">
@@ -326,17 +385,25 @@ export default function Reader() {
               <section className="card" data-anchor="ai" style={{ padding: 16, background: "var(--iris-tint)" }}>
                 <div className="row" style={{ marginBottom: 10 }}>
                   <span className="tile tile--sm tile--iris"><Sparkles /></span>
-                  <b style={{ color: "var(--ink)" }}>{ai.action === "related" ? BAR_LABEL.related : answerLabel(ai.action)}</b>
+                  <b style={{ color: "var(--ink)" }}>{ai.action === "tldr" ? "TL;DR" : ai.action === "related" ? BAR_LABEL.related : answerLabel(ai.action)}</b>
                   <span className="spacer" />
                   <button className="icon-btn" aria-label="Close" onClick={() => { abortRef.current?.abort(); setAi(null); }}><X size={15} /></button>
                 </div>
-                <div className="card-flat" style={{ padding: 10, marginBottom: 8 }}>
-                  <div className="eyebrow">{ai.question ? "You asked" : "Passage"}</div>
-                  <div style={{ fontFamily: "var(--font-read)", fontSize: 14.5, color: "var(--ink)", maxHeight: 90, overflow: "hidden" }}>{ai.question ?? ai.text}</div>
-                </div>
+                {ai.action !== "tldr" && (
+                  <div className="card-flat" style={{ padding: 10, marginBottom: 8 }}>
+                    <div className="eyebrow">{ai.question ? "You asked" : "Passage"}</div>
+                    <div style={{ fontFamily: "var(--font-read)", fontSize: 14.5, color: "var(--ink)", maxHeight: 90, overflow: "hidden" }}>{ai.question ?? ai.text}</div>
+                  </div>
+                )}
                 {!ai.asking && (
                   <div className="card-flat" style={{ padding: 12 }}>
-                    {ai.error ? <p className="small" style={{ color: "var(--peach)" }}>{ai.error}</p> : <p className={`ai-answer ${ai.streaming ? "caret" : ""}`}>{ai.answer}</p>}
+                    {ai.error ? <p className="small" style={{ color: "var(--peach)" }}>{ai.error}</p> : (
+                      <p className={`ai-answer ${ai.streaming ? "caret" : ""}`}>
+                        {ai.action === "tldr"
+                          ? splitCitations(ai.answer).map((part, index) => (typeof part === "string" ? part.replace(/^[-*] /gm, "• ") : <button key={index} className="cite" title={`Paragraph ${part.n}`} onClick={() => scrollToParagraph(part.n)}>¶{part.n}</button>))
+                          : ai.answer}
+                      </p>
+                    )}
                     {ai.sources && ai.sources.length > 0 && (
                       <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
                         {ai.sources.map((source) => <li key={source.n}><Link to={`/app/read/${source.itemId}`}>{source.title}</Link></li>)}
@@ -344,14 +411,18 @@ export default function Reader() {
                     )}
                   </div>
                 )}
-                <form className="row" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); if (ask.trim()) { runAI("ask", ai.text, ask.trim(), { passage: ai.passage, keptOn: ai.keptOn, lastKeptId: ai.lastKeptId }); setAsk(""); } }}>
-                  <input className="input" style={{ height: 36 }} autoFocus={ai.asking} placeholder={ai.asking ? "What do you want to know?" : "Ask a follow up…"} value={ask} onChange={(e) => setAsk(e.target.value)} />
-                  <button className="key key--iris key--sm">Ask</button>
-                </form>
+                {ai.action !== "tldr" && (
+                  <form className="row" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); if (ask.trim()) { askFrom(ask.trim(), { text: ai.text, passage: ai.passage, keptOn: ai.keptOn, lastKeptId: ai.lastKeptId }); setAsk(""); } }}>
+                    <input className="input" style={{ height: 36 }} autoFocus={ai.asking} placeholder={ai.asking ? "What do you want to know?" : "Ask a follow up…"} value={ask} onChange={(e) => setAsk(e.target.value)} />
+                    <button className="key key--iris key--sm">Ask</button>
+                  </form>
+                )}
+                {ai.action !== "tldr" && ask.startsWith("/") && <div className="small muted" style={{ marginTop: 6 }}>{SLASH_HINT}</div>}
                 {!ai.streaming && ai.answer && (
                   <div className="row" style={{ marginTop: 6, gap: 4 }}>
                     <button className="key key--quiet key--sm" onClick={async () => { await navigator.clipboard.writeText(ai.answer); toast("Answer copied"); }}><Copy size={14} /> Copy answer</button>
-                    {ai.passage && ai.action !== "related" && !ai.keptOn && <button className="key key--quiet key--sm" onClick={keep}>Keep</button>}
+                    {ai.passage && ai.action !== "related" && ai.action !== "tldr" && !ai.keptOn && <button className="key key--quiet key--sm" onClick={keep}>Keep</button>}
+                    {ai.action === "tldr" && !ai.keptOn && <button className="key key--quiet key--sm" onClick={keepTldr}>Keep</button>}
                   </div>
                 )}
                 {!ai.streaming && ai.model && <div className="small muted" style={{ marginTop: 6 }}>{modelLabel(ai.model)}</div>}

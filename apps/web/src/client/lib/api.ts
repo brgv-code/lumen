@@ -1,4 +1,4 @@
-import type { AIAction, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemWithContent, Page, Stats, User } from "@lumen/core";
+import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, Stats, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
@@ -71,7 +71,8 @@ export const api = {
 
   items: (q: { status?: string; collection?: string; tag?: string; q?: string; favorite?: boolean; cursor?: string | null; limit?: number } = {}) =>
     req<Page<Item>>("GET", "/api/v1/items" + qs({ ...q, favorite: q.favorite ? 1 : undefined })),
-  item: (id: string) => req<{ item: ItemWithContent; highlights: Highlight[]; alsoSaving: number }>("GET", `/api/v1/items/${id}`),
+  item: (id: string) => req<{ item: ItemWithContent; highlights: Highlight[]; tldr: ItemTldr | null; alsoSaving: number }>("GET", `/api/v1/items/${id}`),
+  keepTldr: (itemId: string, d: { text: string; model: string | null; citations: Citation[] }) => req<{ tldr: ItemTldr }>("PUT", `/api/v1/items/${itemId}/tldr`, d),
   saveItem: (d: { url: string; collectionId?: string; tags?: string[] }) => req<{ item: Item; created: boolean }>("POST", "/api/v1/items", d),
   updateItem: (id: string, d: Partial<{ status: string; progress: number; favorite: boolean; collectionId: string | null; tags: string[]; title: string }>) =>
     req<{ item: Item }>("PATCH", `/api/v1/items/${id}`, d),
@@ -97,9 +98,9 @@ export const api = {
   createDestination: (d: { kind: string; name: string; config: Record<string, unknown>; secret?: string }) =>
     req<{ destination: Destination }>("POST", "/api/v1/destinations", d),
   deleteDestination: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/destinations/${id}`),
-  pending: (id: string) => req<{ highlightIds: string[]; answerIds: string[]; counts: { highlights: number; answers: number }; markdown: string; groups: unknown[] }>("GET", `/api/v1/destinations/${id}/pending`),
-  ack: (id: string, highlightIds: string[], answerIds: string[], error?: string) => req<{ acked: number }>("POST", `/api/v1/destinations/${id}/ack`, { highlightIds, answerIds, error }),
-  push: (id: string) => req<{ delivered: number; answers: number }>("POST", `/api/v1/destinations/${id}/push`, {}),
+  pending: (id: string) => req<{ highlightIds: string[]; answerIds: string[]; tldrIds: string[]; counts: { highlights: number; answers: number; tldrs: number }; markdown: string; groups: unknown[] }>("GET", `/api/v1/destinations/${id}/pending`),
+  ack: (id: string, p: { highlightIds: string[]; answerIds: string[]; tldrIds: string[] }, error?: string) => req<{ acked: number }>("POST", `/api/v1/destinations/${id}/ack`, { highlightIds: p.highlightIds, answerIds: p.answerIds, tldrIds: p.tldrIds, error }),
+  push: (id: string) => req<{ delivered: number; answers: number; tldrs: number }>("POST", `/api/v1/destinations/${id}/push`, {}),
 
   ideas: () => req<{ data: Idea[] }>("GET", "/api/v1/ideas"),
   spark: () => req<{ data: Idea[] }>("POST", "/api/v1/ai/spark", {}),
@@ -138,12 +139,17 @@ export const api = {
 };
 
 /** Stream an AI answer; calls onText with the growing answer and resolves with the model that wrote it. */
-export async function streamAI(
-  d: { action: AIAction; text: string; question?: string; title?: string },
-  onText: (full: string) => void,
-  signal?: AbortSignal,
-): Promise<{ answer: string; model: string | null }> {
-  const res = await fetch("/api/v1/ai/run", {
+export function streamAI(d: { action: AIAction; text: string; question?: string; title?: string }, onText: (full: string) => void, signal?: AbortSignal) {
+  return streamRun("/api/v1/ai/run", d, onText, signal);
+}
+
+/** Stream a TL;DR of numbered paragraphs; the answer cites them as [p12]. */
+export function streamTldr(d: { title: string; paragraphs: string[] }, onText: (full: string) => void, signal?: AbortSignal) {
+  return streamRun("/api/v1/ai/tldr", d, onText, signal);
+}
+
+async function streamRun(path: string, d: object, onText: (full: string) => void, signal?: AbortSignal): Promise<{ answer: string; model: string | null }> {
+  const res = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json", "x-lumen": "1" },
     body: JSON.stringify(d),

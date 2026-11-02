@@ -66,6 +66,33 @@ stateDiagram-v2
 ```
 Nothing appears on a page until something is kept there.
 
+## TL;DR (LUM-3)
+Only on request, never on save. One per page; keeping a new one replaces the old.
+```mermaid
+stateDiagram-v2
+  [*] --> requested: TL;DR from the page helper, the reader, or /tldr in an Ask box
+  requested --> shown: already made this visit (no second call, no second quota use)
+  requested --> streaming: paragraphs numbered [p1] … in the prompt only
+  streaming --> streaming: over about 40k characters, chunks are summarised first, then combined
+  streaming --> shown: done; [p12] becomes a ¶12 link to that paragraph
+  streaming --> failed: quota, provider or network error
+  shown --> kept: Keep (saves the page first if it is not in the library)
+  shown --> gone: page left without keeping
+  kept --> delivered: per destination, through its own ledger
+```
+- Delivered at the top of the source block as `> [!tldr]` when nothing from that page reached the
+  destination yet; otherwise as its own block. ¶ links become text fragment links in the note.
+- The hosted model counts one answer against the daily quota however many chunks it takes.
+
+## Slash commands in Ask boxes (LUM-3)
+| Typed | Does |
+|---|---|
+| `/tldr` | TL;DR of the page or article |
+| `/define [term]` | Define the term, or the passage the box is about |
+| `/counter [text]` | Counterpoint to the text, or the passage the box is about |
+| `/related [text]` | What in your library relates to it |
+Anything else is a normal question.
+
 ## Session
 ```mermaid
 stateDiagram-v2

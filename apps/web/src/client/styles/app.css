@@ -558,3 +558,5 @@
 .hl-filter > button[aria-pressed="true"]:not(.cp-sw) { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
 .toolbar .cp-pop .key { height: 34px; padding: 0 14px; color: #fff; background: linear-gradient(180deg, var(--lamp-hi), var(--lamp-lo)); box-shadow: 0 8px 16px -8px rgb(255 106 26 / 0.7); }
 .toolbar .cp-pop .key:hover { color: #fff; filter: brightness(1.05); }
+/* TL;DR citations: ¶12 jumps to the paragraph */
+.ai-answer .cite { border: 0; cursor: pointer; padding: 0 5px; margin: 0 1px; border-radius: 6px; font: 600 11.5px var(--font-ui); color: var(--ink); background: var(--iris-tint); }

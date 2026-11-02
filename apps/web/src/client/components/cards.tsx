@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import type { Highlight, Item } from "@lumen/core";
-import { answerLabel, citeForClipboard } from "@lumen/core";
+import type { AIAction, Highlight, Item } from "@lumen/core";
+import { SLASH_HINT, answerLabel, citeForClipboard } from "@lumen/core";
 import { Copy, ExternalLink, Heart, Trash2, Highlighter, Share2 } from "lucide-react";
 import { useApp } from "../pages/app/Layout";
 import { ColorMenu } from "./ColorPicker";
@@ -64,7 +64,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFoll
   /** Ask in the thread; the answer is kept under this highlight. */
   onFollowUp?: (question: string) => void;
   /** The follow up being answered right now. */
-  followUp?: { question: string; answer: string; streaming: boolean };
+  followUp?: { action: AIAction; question: string | null; answer: string; streaming: boolean };
 }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -97,7 +97,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFoll
           ))}
           {followUp && (
             <div className="thread__item">
-              <div className="thread__label">↳ {answerLabel("ask")}: {followUp.question}</div>
+              <div className="thread__label">↳ {answerLabel(followUp.action)}{followUp.question ? `: ${followUp.question}` : ""}</div>
               <p className={followUp.streaming ? "caret" : ""}>{followUp.answer}</p>
             </div>
           )}
@@ -107,6 +107,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFoll
               <button className="key key--iris key--sm" disabled={Boolean(followUp)}>Ask</button>
             </form>
           )}
+          {onFollowUp && question.startsWith("/") && <div className="small muted">{SLASH_HINT}</div>}
         </div>
       )}
       <div className="row small muted" style={{ gap: 6 }}>
