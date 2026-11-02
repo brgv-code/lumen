@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import type { AIAction, Citation, Highlight, HighlightAnswer, ItemTldr, ItemWithContent, TextQuote } from "@lumen/core";
 import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, HIGHLIGHT_COLORS, colorVar, modelLabel, parseSlash, splitCitations } from "@lumen/core";
@@ -38,6 +38,7 @@ export default function Reader() {
   const { id = "" } = useParams();
   const { hash } = useLocation();
   const { collections, refresh, labs } = useApp();
+  const nav = useNavigate();
   const toast = useToast();
   const [item, setItem] = useState<ItemWithContent | null>(null);
   const [hls, setHls] = useState<Highlight[]>([]);
@@ -319,6 +320,14 @@ export default function Reader() {
     if (status === "done") {
       if (ev) burst(ev.clientX, ev.clientY);
       toast("Finished. Lovely reading.");
+      // Recall needs highlights; without any, finishing stays a quiet toast.
+      if (hls.length) {
+        try {
+          await api.createRecall(item.id);
+          refresh();
+          nav(`/app/recall?item=${item.id}`);
+        } catch (e) { toast((e as Error).message, "err"); }
+      }
     } else if (status === "archived") toast("Archived");
   };
 

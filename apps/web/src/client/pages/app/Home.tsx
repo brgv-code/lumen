@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PageHero } from "../../components/PageHero";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Clock, Flame, Highlighter, Plus, Sparkles, BellRing } from "lucide-react";
+import { ArrowRight, BookCheck, BookOpen, Clock, Flame, Highlighter, Plus, Sparkles, BellRing } from "lucide-react";
 import { useApp } from "./Layout";
 import { useAsync, hostOf } from "../../lib/hooks";
 import { api, agentLabel } from "../../lib/api";
@@ -15,7 +15,7 @@ function greeting() {
 }
 
 export default function Home() {
-  const { user, stats, openSave, agents, agentAction } = useApp();
+  const { user, stats, openSave, agents, agentAction, recallDue } = useApp();
   const agentName = agents[0] ? agentLabel(agents[0]) : "your agent";
   const toast = useToast();
   const nav = useNavigate();
@@ -45,6 +45,17 @@ export default function Home() {
             <button className="item-card" style={{ border: 0, textAlign: "left", font: "inherit", cursor: "pointer" }} onClick={agentAction}><span className={`chip ${agents.length ? "chip--mint" : ""}`}>{agents.length ? "✓" : "3"}</span><h3>{agents.length ? "Agent connected" : "Connect your agent"}</h3><p className="excerpt">{agents.length ? `${agentName} can read your library.` : "Let Claude read your library with you."}</p></button>
           </div>
         </section>
+      )}
+
+      {recallDue > 0 && (
+        <Link to="/app/recall" className="card row pop" style={{ padding: "14px 16px" }}>
+          <span className="tile tile--sm tile--mint"><BookCheck /></span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ color: "var(--ink)", fontWeight: 600, fontSize: 14.5 }}>{recallDue} {recallDue === 1 ? "question" : "questions"} to recall</div>
+            <div className="small muted">Say back what you read, in your own words. A minute or two.</div>
+          </div>
+          <span className="key key--sm">Start <ArrowRight size={14} /></span>
+        </Link>
       )}
 
       {reminders.data && reminders.data.data.length > 0 && (

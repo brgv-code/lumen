@@ -1,4 +1,4 @@
-import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, Stats, User } from "@lumen/core";
+import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, RecallCard, Stats, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
@@ -107,6 +107,10 @@ export const api = {
 
   tokens: () => req<{ data: Token[] }>("GET", "/api/v1/tokens"),
   createToken: (name: string, kind: "extension" | "agent" = "extension") => req<{ id: string; token: string }>("POST", "/api/v1/tokens", { name, kind }),
+
+  recall: (itemId?: string) => req<{ data: RecallCard[]; total: number; due: number; nextDueAt: number | null }>("GET", "/api/v1/recall" + qs({ item: itemId })),
+  createRecall: (itemId: string) => req<{ data: RecallCard[]; created: boolean }>("POST", `/api/v1/recall/items/${itemId}`, {}),
+  reviewRecall: (id: string, grade: "again" | "good", answer?: string) => req<{ card: RecallCard }>("POST", `/api/v1/recall/${id}/review`, { grade, answer }),
 
   reads: (period: "daily" | "weekly") => req<Reads>("GET", `/api/v1/reads?period=${period}`),
   reminders: () => req<{ data: Reminder[] }>("GET", "/api/v1/reminders"),
