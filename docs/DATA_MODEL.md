@@ -23,6 +23,8 @@ erDiagram
   destinations ||--o{ answer_deliveries : receives
   items ||--o| item_tldrs : "summed up by"
   item_tldrs ||--o{ tldr_deliveries : "delivered as"
+  items ||--o{ recall_cards : "recalled by"
+  highlights ||--o{ recall_cards : "asked about"
   destinations ||--o{ deliveries : receives
 ```
 
@@ -40,6 +42,7 @@ erDiagram
 | `answer_deliveries` | the ledger for kept answers | PK `(answer_id, destination_id)`, `status`, `attempts`, `error` |
 | `item_tldrs` | the TL;DR kept for a page | unique `item_id`, `text`, `model`, `citations` JSON `[{ n, quote }]` |
 | `tldr_deliveries` | the ledger for TL;DRs | PK `(tldr_id, destination_id)` |
+| `recall_cards` | questions the reader answers after finishing a page | `question`, `answer` (latest, their words), `step` (remembered in a row), `due_at`, `highlight_id` (set null if the highlight goes), `model` (null for the no-model cue questions) |
 | `deliveries` | the ledger | PK `(highlight_id, destination_id)`, `status`, `attempts`, `error` |
 | `activity` | glow ledger | `day` in the reader's time zone, `kind`, `glow` |
 | `ideas` | Spark output | `outline` and `source_item_ids` as JSON |
@@ -60,6 +63,8 @@ Added in migration 0008 (LUM-2): `answer_deliveries`, backfilled for answers tha
 an already delivered highlight.
 
 Added in migration 0009 (LUM-3): `item_tldrs` and `tldr_deliveries`.
+
+Added in migration 0010: `recall_cards`.
 
 All foreign keys cascade from `users`, so deleting an account (or purging a demo) removes
 everything in one statement. Migrations live in `apps/web/migrations`.
