@@ -2,13 +2,13 @@
 //   Free forever: library, reader, highlights and notes, collections, the extension, Obsidian and
 //   markdown destinations, daily reads, reminders, readers like you, export, your own models.
 //   Pro (7 day trial for everyone): Spark, Radar, agents over MCP, analytics, Notion and webhook
-//   destinations, and more hosted AI answers.
+//   destinations, PDFs, and more hosted AI answers.
 import type { Context } from "hono";
 import type { AppEnv, SessionUser } from "../env";
 import { fail, now } from "./util";
 
 export const TRIAL_DAYS = 7;
-export type ProFeature = "spark" | "radar" | "agents" | "analytics" | "notion" | "webhook";
+export type ProFeature = "spark" | "radar" | "agents" | "analytics" | "notion" | "webhook" | "pdf";
 
 export const FEATURE_LABEL: Record<ProFeature, string> = {
   spark: "Spark writing ideas",
@@ -17,6 +17,7 @@ export const FEATURE_LABEL: Record<ProFeature, string> = {
   analytics: "Analytics",
   notion: "Notion sync",
   webhook: "Webhooks",
+  pdf: "Reading PDFs",
 };
 
 export function trialEndsAt(u: Pick<SessionUser, "created_at"> & { trial_ends_at?: number | null }) {

@@ -9,3 +9,4 @@ export * from "./toolbar.ts";
 export * from "./icons.ts";
 export * from "./slash.ts";
 export * from "./recall.ts";
+export * from "./pdf.ts";

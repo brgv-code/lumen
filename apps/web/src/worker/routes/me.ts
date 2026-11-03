@@ -5,6 +5,7 @@ import { body, dayIn, fail, now, oneOf, str } from "../lib/util";
 import { toUser } from "../lib/map";
 import { isOwner } from "./owner";
 import { newApiToken, destroySession } from "../lib/session";
+import { deleteUserFiles } from "../lib/files";
 
 export const me = new Hono<AppEnv>();
 
@@ -101,6 +102,7 @@ me.get("/export", async (c) => {
 me.delete("/me", async (c) => {
   if (c.get("via") !== "cookie") fail(403, "cookie_only", "Delete your account from the dashboard.");
   await c.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(c.get("user").id).run();
+  await deleteUserFiles(c.env.FILES, c.get("user").id);
   await destroySession(c);
   return c.json({ ok: true });
 });

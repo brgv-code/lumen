@@ -13,6 +13,7 @@ import { capture } from "../../lib/analytics";
 import { useDebounced, hostOf } from "../../lib/hooks";
 import { burst, useToast } from "../../components/ui";
 import { HighlightCard } from "../../components/cards";
+import { PdfBody } from "../../components/PdfBody";
 import { useApp } from "./Layout";
 
 interface AIState {
@@ -331,6 +332,9 @@ export default function Reader() {
     } else if (status === "archived") toast("Archived");
   };
 
+  // A PDF opens its stored copy; a local upload without one has nothing to open.
+  const originalHref = !item?.pdf ? item?.url : item.pdf.locked || (!item.pdf.hasFile && item.url.startsWith(`${location.origin}/app/read/`)) ? null : `/api/v1/items/${item.id}/file`;
+
   if (missing) return <div className="panel"><h2>That page is not in your library.</h2><Link to="/app/library" className="key key--sm" style={{ marginTop: 12 }}>Back to library</Link></div>;
   if (!item) return <div className="reader"><div className="article"><div className="skeleton" style={{ height: 40, maxWidth: 520, margin: "0 auto 20px" }} />{[0, 1, 2, 3, 4].map((k) => <div key={k} className="skeleton" style={{ height: 18, maxWidth: 680, margin: "12px auto" }} />)}</div></div>;
 
@@ -350,7 +354,7 @@ export default function Reader() {
           <Heart size={17} fill={item.favorite ? "currentColor" : "none"} />
         </button>
         <button className="icon-btn" aria-label="Archive" onClick={() => setStatus("archived")}><Archive size={17} /></button>
-        <a className="icon-btn" href={item.url} target="_blank" rel="noreferrer" aria-label="Open original"><ExternalLink size={17} /></a>
+        {originalHref && <a className="icon-btn" href={originalHref} target="_blank" rel="noreferrer" aria-label="Open original"><ExternalLink size={17} /></a>}
         {item.status === "done" ? (
           <span className="chip chip--mint" style={{ height: 34, padding: "0 14px" }}><Check size={14} /> Finished</span>
         ) : (
@@ -366,12 +370,15 @@ export default function Reader() {
               <span className="chip">{item.siteName || hostOf(item.url)}</span>
               {item.author && <span>{item.author}</span>}
               <span>· {item.readingMinutes} min read</span>
+              {item.pdf?.pages && <span>· {item.pdf.pages} pages</span>}
               {labs && alsoSaving > 0 && <span className="chip chip--mint">{alsoSaving} readers like you saved this</span>}
             </div>
             <h1>{item.title}</h1>
           </header>
           {html ? (
             <div ref={bodyRef} className="article__body" onClick={onBodyClick} dangerouslySetInnerHTML={{ __html: html }} />
+          ) : item.pdf ? (
+            <div className="article__body"><PdfBody itemId={item.id} pdf={item.pdf} onText={(result) => setItem({ ...item, ...result })} /></div>
           ) : (
             <div className="article__body">
               <div className="surface gridlines" style={{ padding: 32, textAlign: "center", fontFamily: "var(--font-ui)", fontSize: 15 }}>

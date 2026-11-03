@@ -324,6 +324,9 @@
   margin: 0 auto;
 }
 .article__body p { margin: 0 0 1.1em; }
+/* PDF text view: a quiet page marker, drawn by CSS so it never ends up inside a quote. */
+.article__body section[data-page]::before { content: "Page " attr(data-page); display: block; margin: 2em 0 0.8em; font: 500 12px/1 var(--font-ui); letter-spacing: 0.04em; color: var(--ink-3); }
+.article__body section[data-page]:first-child::before { margin-top: 0; }
 .article__body h1, .article__body h2, .article__body h3 { font-family: var(--font-ui); margin: 1.6em 0 0.6em; }
 .article__body img { max-width: 100%; height: auto; border-radius: 14px; margin: 1em 0; }
 .article__body a { color: var(--sky); text-decoration: underline; text-underline-offset: 3px; }

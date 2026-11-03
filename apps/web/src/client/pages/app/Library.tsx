@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHero } from "../../components/PageHero";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Item } from "@lumen/core";
-import { Download, Library as LibIcon, Plus, Send, Pencil, Share2 } from "lucide-react";
+import { Download, FileUp, Library as LibIcon, Plus, Send, Pencil, Share2 } from "lucide-react";
 import { CollectionEditor } from "../../components/CollectionEditor";
 import { Empty, Segmented, useToast } from "../../components/ui";
 import { ItemCard } from "../../components/cards";
 import { api } from "../../lib/api";
+import { addLocalPdf } from "../../lib/pdf";
 import { useApp } from "./Layout";
 
 type Status = "active" | "inbox" | "reading" | "done" | "favorites" | "archived";
@@ -23,6 +24,9 @@ export default function LibraryPage() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const collection = collections.find((c) => c.id === collectionId);
+  const nav = useNavigate();
+  const pdfInput = useRef<HTMLInputElement>(null);
+  const [addingPdf, setAddingPdf] = useState(false);
 
   const load = async (more = false) => {
     const r = await api.items({
@@ -49,6 +53,22 @@ export default function LibraryPage() {
     await api.deleteItem(it.id).then(() => { refresh(); toast("Removed from library"); }).catch(() => toast("Could not delete", "err"));
   };
 
+  const pickPdf = () => {
+    if (!user.pro) return window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: "Reading PDFs is part of Lumen Pro. Your 7 day trial has ended." }));
+    pdfInput.current?.click();
+  };
+  const addPdf = async (file: File | undefined) => {
+    if (!file) return;
+    setAddingPdf(true);
+    try {
+      const { item, fileStored } = await addLocalPdf(file);
+      refresh();
+      if (!fileStored) toast("Saved the text. The original file did not upload.", "err");
+      nav(`/app/read/${item.id}`);
+    } catch (e) { toast((e as Error).message, "err"); }
+    finally { setAddingPdf(false); if (pdfInput.current) pdfInput.current.value = ""; }
+  };
+
   return (
     <div className="page">
       <PageHero
@@ -58,6 +78,8 @@ export default function LibraryPage() {
         sub={collection?.description ?? "Inbox, reading, done: progress is tracked as you scroll, and every page opens in a calm reader."}
         actions={<>
           <button className="key key--lamp key--sm" onClick={openSave}><Plus size={15} /> Save a link</button>
+          <button className="key key--ghost key--sm" onClick={pickPdf} disabled={addingPdf}><FileUp size={15} /> {addingPdf ? "Reading PDF…" : "Add a PDF"}</button>
+          <input ref={pdfInput} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => addPdf(e.target.files?.[0])} />
           {collection && <a className="key key--ghost key--sm" href={`/api/v1/collections/${collection.id}/export.md?format=house`}><Download size={15} /> Export .md</a>}
           {collection && <Link className="key key--ghost key--sm" to="/app/integrations"><Send size={15} /> {collection.destinationId ? "Destination set" : "Send to a note"}</Link>}
           {collection && <button className="key key--ghost key--sm" onClick={() => setEditing(true)}><Pencil size={14} /> Edit</button>}
