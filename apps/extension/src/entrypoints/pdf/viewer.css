@@ -1,0 +1,13 @@
+html, body { height: 100%; }
+body { overflow: hidden; }
+.pdfbar { position: fixed; inset: 0 0 auto; height: 48px; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+  background: var(--surface); box-shadow: inset 0 -1px 0 var(--hair); }
+.pdfbar__title { min-width: 0; color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdfbar .key { height: 30px; padding: 0 10px; flex: none; }
+/* pdf.js needs its scroll container positioned absolutely. */
+#viewerContainer { position: absolute; inset: 48px 0 0; overflow: auto; }
+.pdfstate { position: absolute; inset: 48px 0 0; display: grid; place-items: center; padding: 16px; }
+.pdfstate[hidden] { display: none; }
+.pdfstate .surface { max-width: 420px; text-align: center; }
+/* Marks sit in pdf.js spans that are scaled to the drawn glyphs; padding would shift them off the text. */
+.textLayer mark.lumen-mark { padding: 0; border-radius: 0; }

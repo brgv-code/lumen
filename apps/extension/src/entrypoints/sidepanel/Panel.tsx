@@ -4,7 +4,7 @@ import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
 import { Picker } from "../popup/Picker";
-import { readPage, type PageContext } from "../../lib/page";
+import { asPage, readPage, type PageContext } from "../../lib/page";
 import { Md } from "../../lib/md";
 
 type Tab = "ask" | "page" | "you";
@@ -13,7 +13,7 @@ interface Msg { role: "user" | "assistant"; content: string; sources?: Source[];
 
 async function activeTab() {
   const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  return t;
+  return t && asPage(t);
 }
 
 const params = new URLSearchParams(location.search);

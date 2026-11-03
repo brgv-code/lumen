@@ -216,6 +216,7 @@ export default function Options() {
             <h1 style={{ fontSize: 28 }}><span className="lead">Gentle</span> reminders</h1>
             <div className="surface stack">
               <div className="row"><span style={{ flex: 1 }}>Remind me about articles I started and left (at most once a day per article)</span><button className="switch" role="switch" aria-checked={s.reminders} onClick={() => { const n = { ...s, reminders: !s.reminders }; setS(n); save(n); }}><span /></button></div>
+              <div className="row"><span style={{ flex: 1 }}>Open PDFs in Lumen's viewer, so the toolbar and highlights work on them (Lumen Pro)</span><button className="switch" role="switch" aria-checked={s.pdfViewer} onClick={() => { const n = { ...s, pdfViewer: !s.pdfViewer }; setS(n); save(n); }}><span /></button></div>
               <div className="small muted">Shortcuts: Alt+Shift+H highlight · Alt+Shift+S save page · Alt+Shift+L open the panel. Change them at chrome://extensions/shortcuts.</div>
             </div>
           </>

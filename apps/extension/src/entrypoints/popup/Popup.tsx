@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Collection } from "@lumen/core";
 import { send } from "../../lib/msg";
+import { asPage, viewedPdf } from "../../lib/page";
 import type { PageState, Settings } from "../../lib/types";
 import { Picker } from "./Picker";
 
@@ -8,6 +9,7 @@ import { Picker } from "./Picker";
 export default function Popup() {
   const [s, setS] = useState<Settings | null>(null);
   const [tab, setTab] = useState<chrome.tabs.Tab | null>(null);
+  const [isPdf, setIsPdf] = useState(false);
   const [page, setPage] = useState<PageState | null>(null);
   const [cols, setCols] = useState<Collection[]>([]);
   const [tags, setTags] = useState("");
@@ -21,7 +23,9 @@ export default function Popup() {
     (async () => {
       const r = await send<{ settings: Settings }>({ type: "GET_SETTINGS" });
       setS(r.settings);
-      const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const t = active && asPage(active);
+      setIsPdf(Boolean(active && viewedPdf(active.url)));
       setTab(t ?? null);
       if (t?.url?.startsWith("http")) {
         const p = await send<PageState>({ type: "PAGE_STATE", url: t.url });
@@ -48,7 +52,7 @@ export default function Popup() {
     setState("saving");
     const html = await chrome.tabs.sendMessage(tab.id, { type: "GET_HTML" }).catch(() => "") as string;
     const r = await send<{ ok: boolean; error?: string; existed?: boolean }>({
-      type: "SAVE_PAGE_TO", url: tab.url, title: tab.title ?? "", html: html || "", collectionId: collectionId || undefined,
+      type: "SAVE_PAGE_TO", url: tab.url, title: tab.title ?? "", html: html || "", kind: isPdf ? "pdf" : undefined, collectionId: collectionId || undefined,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
     });
     if (!r.ok) { setState("error"); setMsg(r.error ?? "Could not save"); return; }
