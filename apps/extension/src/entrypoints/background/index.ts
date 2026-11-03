@@ -2,6 +2,7 @@ import type { AIAction, Highlight } from "@lumen/core";
 import { streamAnswer, streamTldr, testProvider } from "../../lib/ai";
 import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
+import { pdfViewerUrl, viewedPdf } from "../../lib/page";
 import type { Msg, PageState } from "../../lib/types";
 
 export default defineBackground(() => {
@@ -23,6 +24,7 @@ export default defineBackground(() => {
         await saveSettings({ token: msg.token, apiBase: origin });
         buildMenus();
         refreshMarkedIndex().catch(() => {});
+        refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error));
         return reply({ ok: true });
       }
       reply({ ok: false });
@@ -57,8 +59,15 @@ export default defineBackground(() => {
     }
   });
 
+  chrome.webRequest.onHeadersReceived.addListener(
+    (details) => { openInViewer(details).catch((error) => console.warn("Lumen could not open the PDF viewer", error)); },
+    { urls: ["http://*/*", "https://*/*"], types: ["main_frame"] },
+    ["responseHeaders"],
+  );
+
   chrome.runtime.onInstalled.addListener((d) => {
     buildMenus();
+    refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error));
     injectIntoOpenTabs();
     if (d.reason === "install") chrome.runtime.openOptionsPage();
     refreshMarkedIndex().catch(() => {});
@@ -80,7 +89,7 @@ export default defineBackground(() => {
   chrome.alarms.create("lumen-index", { periodInMinutes: 30 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === "lumen-reminders") checkReminders().catch(() => {});
-    if (a.name === "lumen-menus") buildMenus();
+    if (a.name === "lumen-menus") { buildMenus(); refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error)); }
     if (a.name === "lumen-follow") checkNewPosts().catch(() => {});
     if (a.name === "lumen-index") refreshMarkedIndex().catch(() => {});
   });
@@ -161,13 +170,15 @@ async function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.T
   if (!tab?.id) return;
   const id = String(info.menuItemId);
   const tabMsg = (m: object) => chrome.tabs.sendMessage(tab.id!, m).catch(() => {});
+  // In Lumen's PDF viewer the page is the PDF, not the viewer.
+  const pageUrl = viewedPdf(tab.url) ?? tab.url;
   if (id === "panel" || id === "ask") {
     const prompt = id === "ask" && info.selectionText ? `What does this mean: “${info.selectionText}”` : undefined;
     return openPanelFor(tab, prompt);
   }
   if (id === "save-page") return tabMsg({ type: "CMD", cmd: "save" });
-  if (id === "follow" && tab.url) {
-    const r = await cloud<{ feed: { title: string }; created: boolean }>("POST", "/following", { url: tab.url }).catch((e) => ({ error: (e as Error).message }));
+  if (id === "follow" && pageUrl) {
+    const r = await cloud<{ feed: { title: string }; created: boolean }>("POST", "/following", { url: pageUrl }).catch((e) => ({ error: (e as Error).message }));
     return tabMsg({ type: "TOAST", text: "error" in r ? r.error : r.created ? `Following ${r.feed.title}. You'll hear when it publishes.` : `Already following ${r.feed.title}`, tone: "error" in r ? "err" : "ok" });
   }
   if (id === "highlight") return tabMsg({ type: "CMD", cmd: "highlight" });
@@ -177,7 +188,7 @@ async function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.T
     return tabMsg({ type: "TOAST", text: "error" in r ? "Could not save the link" : "Link saved to Lumen · +1 glow" });
   }
   if (id === "helper") {
-    const host = tab.url ? new URL(tab.url).hostname : "";
+    const host = pageUrl ? new URL(pageUrl).hostname : "";
     const s = await getSettings();
     const shown = s.helper.mode === "everywhere" ? !s.helper.hiddenOn.includes(host) : s.helper.sites.includes(host);
     await setHelperSite(host, !shown);
@@ -268,17 +279,50 @@ async function addToMarkedIndex(url: string) {
   await chrome.storage.local.set({ [INDEX_KEY]: { urls: [...set], at: Date.now() } });
 }
 
+/* ---------------- PDFs open in Lumen's viewer ----------------
+   The browser's own PDF viewer keeps its text from extensions, so the toolbar cannot work there. */
+const PLAN_KEY = "lumen_plan";
+// PDFs the reader sent back to the browser's viewer this session.
+const BYPASS_KEY = "lumen_pdf_bypass";
+
+async function refreshPlan(): Promise<boolean> {
+  if (!(await connected())) { await chrome.storage.local.remove(PLAN_KEY); return false; }
+  const { user } = await cloudApi.me();
+  await chrome.storage.local.set({ [PLAN_KEY]: { pro: user.pro, at: Date.now() } });
+  return user.pro;
+}
+
+async function isPro(): Promise<boolean> {
+  const saved = (await chrome.storage.local.get(PLAN_KEY))[PLAN_KEY] as { pro: boolean } | undefined;
+  return saved ? saved.pro : refreshPlan();
+}
+
+function isPdfResponse(headers: chrome.webRequest.HttpHeader[] = []): boolean {
+  const header = (name: string) => headers.find((entry) => entry.name.toLowerCase() === name)?.value?.toLowerCase() ?? "";
+  // A PDF sent as a download stays a download.
+  return header("content-type").includes("application/pdf") && !header("content-disposition").startsWith("attachment");
+}
+
+async function openInViewer(details: chrome.webRequest.WebResponseHeadersDetails) {
+  if (details.tabId < 0 || details.method !== "GET" || details.statusCode >= 400 || !isPdfResponse(details.responseHeaders)) return;
+  const settings = await getSettings();
+  if (!settings.token || !settings.pdfViewer || !(await isPro())) return;
+  const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
+  if (bypassed.includes(details.url)) return;
+  await chrome.tabs.update(details.tabId, { url: pdfViewerUrl(details.url) });
+}
+
 /* ---------------- messages ---------------- */
 
 async function connected() {
   return Boolean((await getSettings()).token);
 }
 
-async function ensureItem(url: string, title: string, html: string, collectionId?: string) {
+async function ensureItem(url: string, title: string, html: string, collectionId?: string, kind?: "pdf") {
   const found = await cloudApi.lookup(url);
   if (found.item) return found.item;
   const s = await getSettings();
-  const r = await cloudApi.save({ url, title, html, collectionId: collectionId ?? (s.targetCollectionId || undefined) });
+  const r = await cloudApi.save({ url, title, html, kind, collectionId: collectionId ?? (s.targetCollectionId || undefined) });
   return r.item;
 }
 
@@ -320,7 +364,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
 
     case "KEEP_TLDR": {
       if (!(await connected())) return { ok: false, error: "Connect Lumen in settings to save pages." };
-      const item = await ensureItem(pageKey(msg.url), msg.title, msg.html);
+      const item = await ensureItem(pageKey(msg.url), msg.title, msg.html, undefined, msg.kind);
       const r = await cloud<{ tldr: unknown }>("PUT", `/items/${item.id}/tldr`, { text: msg.text, model: msg.model, citations: msg.citations });
       autoSend(tabId);
       return { ok: true, tldr: r.tldr };
@@ -371,7 +415,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
 
     case "SAVE_PAGE": {
       if (!(await connected())) return { ok: false, error: "Connect Lumen in settings to save pages." };
-      const item = await ensureItem(pageKey(msg.url), msg.title, msg.html);
+      const item = await ensureItem(pageKey(msg.url), msg.title, msg.html, undefined, msg.kind);
       return { ok: true, item };
     }
 
@@ -383,7 +427,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         const r = await cloud<{ item: unknown }>("PATCH", `/items/${found.item.id}`, { collectionId: msg.collectionId ?? null, ...(msg.tags?.length ? { tags: msg.tags } : {}) });
         return { ok: true, item: r.item, existed: true };
       }
-      const r = await cloud<{ item: unknown }>("POST", "/items", { url, title: msg.title, html: msg.html, collectionId: msg.collectionId, tags: msg.tags });
+      const r = await cloud<{ item: unknown }>("POST", "/items", { url, title: msg.title, html: msg.html, kind: msg.kind, collectionId: msg.collectionId, tags: msg.tags });
       return { ok: true, item: r.item };
     }
 
@@ -395,7 +439,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         await setLocalHighlights(url, [...(await localHighlights(url)), h]);
         return { ok: true, highlight: h, local: true };
       }
-      const item = await ensureItem(url, msg.title, msg.html, msg.collectionId);
+      const item = await ensureItem(url, msg.title, msg.html, msg.collectionId, msg.kind);
       const r = await cloudApi.addHighlight(item.id, { ...msg.quote, color: msg.color, note: msg.note });
       addToMarkedIndex(pageKey(item.url ?? url)).catch(() => {});
       autoSend(tabId);
@@ -465,7 +509,10 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "SAVE_SETTINGS": {
       const settings = await saveSettings(msg.settings);
       if ("token" in msg.settings || "helper" in msg.settings) buildMenus();
-      if ("token" in msg.settings || "apiBase" in msg.settings) refreshMarkedIndex().catch(() => {});
+      if ("token" in msg.settings || "apiBase" in msg.settings) {
+        refreshMarkedIndex().catch(() => {});
+        refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error));
+      }
       return { ok: true, settings };
     }
 
@@ -517,6 +564,12 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "OPEN_OPTIONS":
       await chrome.runtime.openOptionsPage();
       return { ok: true };
+
+    case "PDF_BYPASS": {
+      const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
+      await chrome.storage.session.set({ [BYPASS_KEY]: [...new Set([...bypassed, msg.url])] });
+      return { ok: true };
+    }
 
     case "OPEN_DASHBOARD": {
       const s = await getSettings();

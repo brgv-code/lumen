@@ -1,5 +1,5 @@
 // Browser side of PDFs: every check and all parsing happen here, the worker only stores.
-import { PDF_MAX_BYTES, PDF_MAX_PAGES, isPdfBytes, pdfParagraphs, type Item, type PdfInfo, type PdfRun } from "@lumen/core";
+import { PDF_MAX_BYTES, PDF_MAX_PAGES, isPdfBytes, pdfParagraphs, pdfRuns, pdfTitle, type Item, type PdfInfo, type PdfRun } from "@lumen/core";
 import { api } from "./api";
 
 export interface ParsedPdf {
@@ -37,24 +37,17 @@ export async function parsePdf(file: ArrayBuffer): Promise<ParseResult> {
     for (let number = 1; number <= doc.numPages; number++) {
       const page = await doc.getPage(number);
       const content = await page.getTextContent();
-      runs.push(content.items.flatMap((entry) => ("str" in entry ? [{ text: entry.str, y: entry.transform[5], height: entry.height || Math.abs(entry.transform[3]), endsLine: entry.hasEOL }] : [])));
+      runs.push(pdfRuns(content.items));
       page.cleanup();
     }
     const { info } = await doc.getMetadata();
-    return { ok: true, pdf: { sha256, bytes: file.byteLength, pageCount: doc.numPages, pages: pdfParagraphs(runs), title: titleFrom(info) } };
+    return { ok: true, pdf: { sha256, bytes: file.byteLength, pageCount: doc.numPages, pages: pdfParagraphs(runs), title: pdfTitle(info) } };
   } catch (error) {
     console.warn("pdf.js could not read the file", error);
     return { ok: false, problem: "unreadable" };
   } finally {
     await task.destroy();
   }
-}
-
-/** The PDF's own Title, when the producer filled it with something better than a file name. */
-function titleFrom(info: unknown): string | null {
-  if (!info || typeof info !== "object" || !("Title" in info) || typeof info.Title !== "string") return null;
-  const title = info.Title.trim();
-  return title && !/\.(pdf|docx?|tex)$/i.test(title) ? title : null;
 }
 
 async function sha256Hex(file: ArrayBuffer): Promise<string> {

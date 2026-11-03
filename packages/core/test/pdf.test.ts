@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PDF_MAX_BYTES, isPdfBytes, pdfArticle, pdfParagraphs, type PdfRun } from "../src/pdf.ts";
+import { PDF_MAX_BYTES, isPdfBytes, pdfArticle, pdfParagraphs, pdfRuns, type PdfRun } from "../src/pdf.ts";
 
 const build = (pages: PdfRun[][]) => pdfArticle(pdfParagraphs(pages));
 
@@ -75,4 +75,16 @@ test("isPdfBytes checks the %PDF- signature, not the name", () => {
   assert.equal(isPdfBytes(new TextEncoder().encode("<!doctype html>")), false);
   assert.equal(isPdfBytes(new Uint8Array(2)), false);
   assert.equal(PDF_MAX_BYTES, 25 * 1024 * 1024);
+});
+
+test("pdf.js text items become runs, marked content tags are skipped", () => {
+  const runs = pdfRuns([
+    { type: "beginMarkedContent" },
+    { str: "Attention", transform: [12, 0, 0, 12, 72, 700], height: 0, hasEOL: true },
+    { str: "is all", transform: [10, 0, 0, 10, 72, 686], height: 10, hasEOL: false },
+  ]);
+  assert.deepEqual(runs, [
+    { text: "Attention", y: 700, height: 12, endsLine: true },
+    { text: "is all", y: 686, height: 10, endsLine: false },
+  ]);
 });
