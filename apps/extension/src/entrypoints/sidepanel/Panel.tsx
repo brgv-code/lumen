@@ -25,6 +25,12 @@ async function closeFloat() {
   if (t?.id !== undefined) chrome.tabs.sendMessage(t.id, { type: "PANEL_CLOSE" }).catch(() => {});
 }
 
+/** Hides the floating panel but keeps it alive behind the Lumi lamp, so the chat survives. */
+async function minimizeFloat() {
+  const t = await activeTab();
+  if (t?.id !== undefined) chrome.tabs.sendMessage(t.id, { type: "PANEL_MINIMIZE" }).catch(() => {});
+}
+
 export default function Panel() {
   const [tab, setTab] = useState<Tab>("ask");
   const [s, setS] = useState<Settings | null>(null);
@@ -282,6 +288,11 @@ function Header() {
       <span className="mono muted" style={{ fontSize: 10.5 }}>v{chrome.runtime.getManifest().version}</span>
       <span className="sp" />
       <button className="icon-btn" title="Settings" onClick={() => chrome.runtime.openOptionsPage()}>⚙</button>
+      {FLOAT && (
+        <button className="icon-btn" title="Minimise" aria-label="Minimise" onClick={minimizeFloat}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14" /></svg>
+        </button>
+      )}
       {FLOAT && <button className="icon-btn" title="Close (Esc)" onClick={closeFloat}>✕</button>}
     </div>
   );
