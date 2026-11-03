@@ -136,6 +136,13 @@ kept TL;DRs (`id`, `itemId`, `text`, `citations`, `model`, `source`).
 
 Feeds are checked by Cron every 6 hours (oldest first) and whenever Following is opened.
 
+## Recall
+| Method | Path | Body / query | Notes |
+|---|---|---|---|
+| GET | `/api/v1/recall` | `?item=` | `{ data, total, due, nextDueAt }`: cards due now (up to 30), or every card for one item |
+| POST | `/api/v1/recall/items/:itemId` | | writes 2 or 3 questions from the item's highlights once (201), then returns the same cards; 422 `no_highlights` without highlights. Counts against the AI quota; out of quota or without a model, each passage becomes a cue question instead |
+| POST | `/api/v1/recall/:id/review` | `{ grade: again\|good, answer? }` | stores the answer and reschedules: good waits 1, 3, 7, 16, 35, then 90 days; again comes back tomorrow. The first answer also fills the highlight's note when it is empty |
+
 ## Shares
 | Method | Path | Body / query | Notes |
 |---|---|---|---|

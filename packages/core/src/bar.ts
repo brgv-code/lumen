@@ -288,6 +288,14 @@ export function createSelectionBar(options: BarOptions): SelectionBar {
     if (!spot) return;
     bar.style.setProperty("left", `${spot.left}px`);
     bar.style.setProperty("top", `${spot.top}px`);
+    // The colours open above the bar, centred on its button; near an edge of the window that would put them off screen.
+    const flyout = bar.querySelector<HTMLElement>(".flyout");
+    const anchor = flyout?.parentElement?.getBoundingClientRect();
+    if (!flyout || !anchor) return;
+    bar.classList.toggle("flyout-down", spot.top < flyout.offsetHeight + GAP);
+    const left = anchor.left + anchor.width / 2 - flyout.offsetWidth / 2;
+    const shift = Math.max(GAP - left, Math.min(0, win.innerWidth - GAP - (left + flyout.offsetWidth)));
+    flyout.style.setProperty("--shift", `${shift}px`);
   }
 
   function follow() {
@@ -448,11 +456,13 @@ button { font: inherit; cursor: pointer; border: 0; margin: 0; }
 .more[aria-expanded="true"] { background: rgba(255,255,255,.12); color: #fff; }
 .hl-group { position: relative; display: inline-flex; }
 .hl-group > .act::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 6px; height: 6px; border-radius: 99px; background: var(--dot, #ffd34d); box-shadow: 0 0 0 1.5px #121215; }
-.flyout { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%) scale(.9); opacity: 0; pointer-events: none;
+.flyout { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(calc(-50% + var(--shift, 0px))) scale(.9); opacity: 0; pointer-events: none;
   display: grid; grid-template-columns: repeat(8, 18px); gap: 7px; padding: 8px 10px; border-radius: 16px; background: rgba(18,18,21,.96); box-shadow: 0 10px 20px -10px rgba(0,0,0,.6);
   transition: opacity 140ms ease, transform 160ms cubic-bezier(.34,1.56,.64,1); }
-.hl-group:hover .flyout, .hl-group:focus-within .flyout { opacity: 1; transform: translateX(-50%) scale(1); pointer-events: auto; }
+.hl-group:hover .flyout, .hl-group:focus-within .flyout { opacity: 1; transform: translateX(calc(-50% + var(--shift, 0px))) scale(1); pointer-events: auto; }
 .flyout::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
+.bar.flyout-down .flyout { bottom: auto; top: calc(100% + 6px); }
+.bar.flyout-down .flyout::after { top: auto; bottom: 100%; }
 .sw { width: 18px; height: 18px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); transition: transform 140ms cubic-bezier(.34,1.56,.64,1); }
 .sw:hover { transform: scale(1.2); }
 .sw.wheel { position: relative; background: conic-gradient(#ff4d4d, #ffd34d, #3fd39a, #2cc6d4, #5b9bff, #bb7bff, #ff6fa5, #ff4d4d); }

@@ -2,6 +2,8 @@ export interface Env {
   DB: D1Database;
   AI: Ai;
   ASSETS: Fetcher;
+  /** Uploaded files (PDFs), keyed `pdf/<userId>/<itemId>`. */
+  FILES: R2Bucket;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GITHUB_CLIENT_ID?: string;

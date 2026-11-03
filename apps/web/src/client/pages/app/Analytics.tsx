@@ -24,8 +24,6 @@ export default function Analytics() {
         lead="Your reading,"
         pay="at a glance."
         sub="Twelve weeks of attention: what you finish, what you read about, and when."
-        mesh="mesh-iris"
-        tiles={[["tile--iris", <BarChart3 />], ["tile--lamp", <Clock />], ["tile--mint", <CheckCircle2 />], ["tile--sky", <BookOpen />]]}
         actions={stats ? <button className="key key--ghost key--sm" onClick={() => share({ title: `${stats.streak} day reading streak`, refId: "progress", data: { kind: "progress", owner: user.name.replace(/\s*\((demo|test)\)$/, ""), streak: stats.streak, best: stats.bestStreak, glowTotal: stats.glowTotal, level: stats.level.name, done: stats.counts.done, highlights: stats.counts.highlights, week: stats.week } })}>Share my progress</button> : undefined}
       />
 

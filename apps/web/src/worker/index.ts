@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import type { AppEnv, Env } from "./env";
 import { auth } from "./routes/auth";
 import { items } from "./routes/items";
+import { pdf } from "./routes/pdf";
 import { highlights } from "./routes/highlights";
 import { collections } from "./routes/collections";
 import { destinations } from "./routes/destinations";
@@ -22,6 +23,7 @@ import { purgeDemos } from "./lib/seed";
 import { refreshActiveRadars } from "./lib/radar";
 import { eventFor, trackUser } from "./lib/analytics";
 import { owner } from "./routes/owner";
+import { recall } from "./routes/recall";
 
 const app = new Hono<AppEnv>();
 let ctxRef: ExecutionContext | undefined;
@@ -82,6 +84,7 @@ app.use("/api/v1/*", async (c, next) => {
 });
 app.route("/api/v1", me);
 app.route("/api/v1", discover);
+app.route("/api/v1/items", pdf);
 app.route("/api/v1/items", items);
 app.route("/api/v1/highlights", highlights);
 app.route("/api/v1/collections", collections);
@@ -92,6 +95,7 @@ app.route("/api/v1/billing", billing);
 app.route("/api/v1/following", following);
 app.route("/api/v1/shares", shares);
 app.route("/api/v1/owner", owner);
+app.route("/api/v1/recall", recall);
 
 app.all("/api/*", (c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 

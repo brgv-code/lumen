@@ -14,7 +14,7 @@ interface Sample {
   collection: "essay" | "list" | "design";
   tags: string[];
   paragraphs: string[];
-  highlights: { quote: string; color: string; note?: string }[];
+  highlights: { quote: string; color: string; note?: string; recall?: string }[];
 }
 
 const SAMPLES: Sample[] = [
@@ -57,8 +57,8 @@ const SAMPLES: Sample[] = [
       "Duplicates are the quiet killer. If clipping the same page twice writes every passage twice, people stop clipping. The tool has to remember what it already sent.",
     ],
     highlights: [
-      { quote: "Send the highlight to the note you are already writing, not to a new inbox.", color: "sun", note: "Exactly the Web Clipper problem." },
-      { quote: "The tool has to remember what it already sent.", color: "peach", note: "Delivery ledger." },
+      { quote: "Send the highlight to the note you are already writing, not to a new inbox.", color: "sun", note: "Exactly the Web Clipper problem.", recall: "Why should a highlight land in the note you are already writing, not a new inbox?" },
+      { quote: "The tool has to remember what it already sent.", color: "peach", note: "Delivery ledger.", recall: "Why do duplicate clips make people stop clipping?" },
     ],
   },
   {
@@ -192,6 +192,11 @@ export async function seedDemo(db: D1Database, opts: { isDemo?: number; name?: s
       const at = created + (k + 1) * 120_000;
       stmts.push(db.prepare("INSERT INTO highlights (id, user_id, item_id, quote, prefix, suffix, position, color, note, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
         .bind(hid, userId, itemId, sel.quote, sel.prefix, sel.suffix, sel.position, h.color, h.note ?? null, at, at));
+      // questions waiting in Recall, so the demo opens on the reading loop's last step
+      if (h.recall) {
+        stmts.push(db.prepare("INSERT INTO recall_cards (id, user_id, item_id, highlight_id, question, due_at, created_at) VALUES (?,?,?,?,?,?,?)")
+          .bind(id("rc_"), userId, itemId, hid, h.recall, t - 3600_000, at));
+      }
       // the first essay highlight was already sent to the vault: shows the ledger at work
       if (s.slug === "why-highlights-rot") {
         stmts.push(db.prepare("INSERT INTO deliveries (highlight_id, destination_id, delivered_at) VALUES (?,?,?)").bind(hid, obsidian, at + 1000));

@@ -75,8 +75,6 @@ export default function Integrations() {
         lead="Everything Lumen"
         pay="connects to."
         sub="Notes apps receive your highlights, agents read your library, the extension brings Lumen to every page, and models answer your questions."
-        mesh="mesh-mint"
-        tiles={[["tile--iris", <NotebookPen />], ["tile--ink", <Bot />], ["tile--sky", <Puzzle />], ["tile--lamp", <Cpu />]]}
       />
 
       <Segmented label="Integrations" value={tab} onChange={setTab} options={[

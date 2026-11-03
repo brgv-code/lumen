@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { Collection, Stats, User } from "@lumen/core";
-import { Home, Library, Highlighter, FolderHeart, Sparkles, Plug, Settings, Search, Plus, Flame, LogOut, Puzzle, Radar, BarChart3, Bot } from "lucide-react";
+import { Home, Library, Highlighter, BookCheck, FolderHeart, Sparkles, Plug, Settings, Search, Plus, Flame, LogOut, Puzzle, Radar, BarChart3, Bot } from "lucide-react";
 import { ConnectAgent } from "../../components/ConnectAgent";
 import { PaywallModal, ProChip } from "../../components/Pro";
 import { Tour, APP_TOUR, tourDone, markTour } from "../../components/Tour";
@@ -13,6 +13,7 @@ import { Logo, Modal, useToast } from "../../components/ui";
 import { identify, resetAnalytics } from "../../lib/analytics";
 import { Gauge } from "lucide-react";
 import { api, agentLabel } from "../../lib/api";
+import { getLabs, saveLabs } from "../../lib/hooks";
 import "../../styles/app.css";
 
 interface Ctx {
@@ -25,9 +26,12 @@ interface Ctx {
   setUser: (u: User) => void;
   startTour: () => void;
   agents: Token[];
+  recallDue: number;
   /** Opens the agents page when one is connected, otherwise the connect flow. */
   agentAction: () => void;
   share: (s: { data: CardData; refId?: string; title: string }) => void;
+  labs: boolean;
+  setLabs: (on: boolean) => void;
 }
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
@@ -41,6 +45,8 @@ export default function Layout() {
   const [paywall, setPaywall] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [follows, setFollows] = useState(0);
+  const [labs, setLabsState] = useState(getLabs);
+  const [recallDue, setRecallDue] = useState(0);
   const [agents, setAgents] = useState<Token[]>([]);
   const [shareState, setShareState] = useState<{ data: CardData; refId?: string; title: string } | null>(null);
   const nav = useNavigate();
@@ -52,6 +58,7 @@ export default function Layout() {
     api.following().then((r) => setFollows(r.unseenTotal)).catch(() => {});
     api.tokens().then((r) => setAgents(r.data.filter((t) => t.kind === "agent"))).catch(() => {});
     api.collections().then((r) => setCollections(r.data)).catch(() => {});
+    api.recall().then((r) => setRecallDue(r.due)).catch(() => {});
   };
 
   useEffect(() => {
@@ -75,7 +82,8 @@ export default function Layout() {
 
   return (
     <AppCtx.Provider value={{ user, stats, collections, refresh, openSave: () => setSaveOpen(true), openAgent: () => setAgentOpen(true), setUser, startTour: () => setTourOpen(true),
-      agents, agentAction: () => (agents.length ? nav("/app/agents") : setAgentOpen(true)), share: setShareState }}>
+      agents, recallDue, agentAction: () => (agents.length ? nav("/app/agents") : setAgentOpen(true)), share: setShareState,
+      labs, setLabs: (on) => { saveLabs(on); setLabsState(on); } }}>
       <div className="shell ph-mask">
         <aside className="side">
           <NavLink to="/" style={{ padding: "4px 8px" }}><Logo size={26} /></NavLink>
@@ -83,12 +91,16 @@ export default function Layout() {
             <NavLink end to="/app" className="side__link"><span className="ico"><Home /></span> Home</NavLink>
             <NavLink to="/app/library" className="side__link" data-tour="nav-library"><span className="ico"><Library /></span> Library {stats && <span className="count">{stats.counts.inbox + stats.counts.reading}</span>}</NavLink>
             <NavLink to="/app/highlights" className="side__link" data-tour="nav-highlights"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
+            <NavLink to="/app/recall" className="side__link" data-tour="nav-recall"><span className="ico"><BookCheck /></span> Recall {recallDue > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{recallDue}</span>}</NavLink>
             <NavLink to="/app/collections" className="side__link" data-tour="nav-collections"><span className="ico"><FolderHeart /></span> Collections</NavLink>
-            <NavLink to="/app/following" className="side__link" data-tour="nav-following"><span className="ico"><Heart /></span> Following {follows > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{follows}</span>}</NavLink>
-            <NavLink to="/app/ask" className="side__link" data-tour="nav-ask"><span className="ico"><MessageCircle /></span> Ask</NavLink>
-            <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
-            <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
-            <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+            {labs && (<>
+              <div className="side__section">Labs</div>
+              <NavLink to="/app/following" className="side__link" data-tour="nav-following"><span className="ico"><Heart /></span> Following {follows > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{follows}</span>}</NavLink>
+              <NavLink to="/app/ask" className="side__link" data-tour="nav-ask"><span className="ico"><MessageCircle /></span> Ask</NavLink>
+              <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+              <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+              <NavLink to="/app/analytics" className="side__link"><span className="ico"><BarChart3 /></span> Analytics {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
+            </>)}
             <div className="side__section">Connect</div>
             <NavLink to="/app/integrations" className="side__link"><span className="ico"><Plug /></span> Integrations</NavLink>
             <NavLink to="/app/settings" className="side__link"><span className="ico"><Settings /></span> Settings</NavLink>
@@ -114,7 +126,7 @@ export default function Layout() {
               </div>
               <span className="small muted">{user.planStatus === "pro" ? "Thank you for keeping the lamp lit." : user.planStatus === "trial" ? "Every feature unlocked. See what stays free." : "Unlock Spark, Radar, agents and analytics."}</span>
             </NavLink>
-            {stats && (
+            {labs && stats && (
               <div className="glowcard">
                 <div className="row">
                   <span className="tile tile--sm tile--lamp" style={stats.glowToday > 0 ? { animation: "glow 3s ease-in-out infinite" } : undefined}><Flame /></span>
@@ -156,7 +168,7 @@ export default function Layout() {
                 <Bot size={15} /> <span className="hide-sm">{agents.length === 1 ? agentLabel(agents[0]) : `${agents.length} agents`}</span>
               </button>
             ) : (
-              <button className="key key--iris key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
+              <button className="key key--ghost key--sm" data-tour="agent" onClick={() => setAgentOpen(true)}><Bot size={15} /> <span className="hide-sm">Connect agent</span></button>
             )}
             <button className="key key--sm" data-tour="save" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
           </div>
@@ -167,7 +179,7 @@ export default function Layout() {
           <NavLink end to="/app"><Home size={19} />Home</NavLink>
           <NavLink to="/app/library"><Library size={19} />Library</NavLink>
           <NavLink to="/app/highlights"><Highlighter size={19} />Highlights</NavLink>
-          <NavLink to="/app/radar"><Radar size={19} />Radar</NavLink>
+          <NavLink to="/app/recall"><BookCheck size={19} />Recall</NavLink>
           <NavLink to="/app/settings"><Settings size={19} />More</NavLink>
         </nav>
       </div>
@@ -175,7 +187,7 @@ export default function Layout() {
       {shareState && <ShareModal data={shareState.data} refId={shareState.refId} title={shareState.title} onClose={() => setShareState(null)} />}
       <PaywallModal message={paywall} onClose={() => setPaywall(null)} />
       <Tour open={tourOpen} steps={APP_TOUR} name={user.name.replace(/\s*\((demo|test)\)$/, "").split(" ")[0]} onClose={() => { setTourOpen(false); markTour(user.id); }} />
-      <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast(<>Saved. <span className="muted">+1 glow</span></>, "glow"); nav(`/app/read/${id}`); }} />
+      <SaveModal open={saveOpen} onClose={() => setSaveOpen(false)} collections={collections} onSaved={(id) => { refresh(); toast("Saved"); nav(`/app/read/${id}`); }} />
     </AppCtx.Provider>
   );
 }

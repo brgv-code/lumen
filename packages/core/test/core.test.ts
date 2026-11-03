@@ -19,6 +19,32 @@ test("matchQuote survives whitespace changes", () => {
   assert.equal(text.slice(r![0], r![1]), "lamp was off");
 });
 
+// The PDF viewer's text keeps line ends and hyphens; the text view joins them. Each must find the other's quotes.
+test("matchQuote finds a text view quote in PDF page text", () => {
+  const page = "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable. The dominant sequence transduc-\ntion models are based on complex recurrent networks.\nThe best performing models also connect the encoder and decoder.";
+  const hit = matchQuote(page, { quote: "sequence transduction models are based", prefix: "", suffix: "", position: 0 });
+  assert.ok(hit);
+  assert.equal(page.slice(hit[0], hit[1]), "sequence transduc-\ntion models are based");
+  const across = matchQuote(page, { quote: "recurrent networks.The best performing", prefix: "", suffix: "", position: 0 });
+  assert.ok(across);
+  assert.equal(page.slice(across[0], across[1]), "recurrent networks.\nThe best performing");
+});
+
+test("matchQuote finds a PDF quote in the text view, using context to pick the occurrence", () => {
+  const view = "The model reads the input.Then the model writes the output.Later, the model writes the summary.";
+  const second = matchQuote(view, { quote: "the model\nwrites the", prefix: "output.\nLater, ", suffix: " summary.", position: 999 });
+  assert.ok(second);
+  assert.equal(view.slice(second[0], second[1]), "the model writes the");
+  assert.equal(second[0], view.lastIndexOf("the model writes the"));
+  const joined = matchQuote(view, { quote: "input. Then the model writes", prefix: "", suffix: "", position: 0 });
+  assert.ok(joined);
+  assert.equal(view.slice(joined[0], joined[1]), "input.Then the model writes");
+});
+
+test("matchQuote does not match a short quote only by squeezing out spaces", () => {
+  assert.equal(matchQuote("a ton of bricks", { quote: "aton", prefix: "", suffix: "", position: 0 }), null);
+});
+
 test("text fragment links", () => {
   assert.equal(textFragmentUrl("https://a.b/x#y", "short quote"), "https://a.b/x#:~:text=short%20quote");
   const long = "one two three four five six seven eight nine ten eleven twelve";

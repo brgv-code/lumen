@@ -61,6 +61,13 @@ export function hostOf(url: string) {
 export function getTheme(): "light" | "dark" | "system" {
   try { const t = localStorage.getItem("lumen-theme"); return t === "light" || t === "dark" ? t : "system"; } catch { return "system"; }
 }
+/** Labs keeps the side features (Following, Ask, Radar, Spark, Analytics, glow) out of the main nav. */
+export function getLabs(): boolean {
+  try { return localStorage.getItem("lumen-labs") === "on"; } catch { return false; }
+}
+export function saveLabs(on: boolean) {
+  try { if (on) localStorage.setItem("lumen-labs", "on"); else localStorage.removeItem("lumen-labs"); } catch { /* private mode */ }
+}
 export function setTheme(t: "light" | "dark" | "system") {
   try { if (t === "system") localStorage.removeItem("lumen-theme"); else localStorage.setItem("lumen-theme", t); } catch { /* */ }
   if (t === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;

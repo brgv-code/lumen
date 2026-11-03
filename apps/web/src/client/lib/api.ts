@@ -1,4 +1,4 @@
-import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, Stats, User } from "@lumen/core";
+import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, PdfInfo, RecallCard, Stats, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
@@ -18,7 +18,6 @@ export interface Trend { id: string; topic: string; url: string; title: string; 
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
 export interface Reminder { item: Item; minutesLeft: number; idleDays: number }
 export interface Radar { topics: { name: string; source: string; muted: number }[]; trends: Trend[]; lastRunAt: number | null; refreshed: boolean }
-export interface Similar { url: string; title: string; site_name: string | null; excerpt: string | null; reading_minutes: number | null; readers: number }
 export interface Analytics {
   heatmap: { day: string; glow: number }[];
   weeks: { week: string; minutes: number; words: number; items: number }[];
@@ -40,14 +39,28 @@ async function req<T>(method: string, path: string, data?: unknown): Promise<T> 
     headers: { "x-lumen": "1", ...(data !== undefined ? { "content-type": "application/json" } : {}) },
     body: data !== undefined ? JSON.stringify(data) : undefined,
   });
-  if (!res.ok) {
-    let code = "http_" + res.status, message = res.statusText || "Request failed";
-    try { const j = await res.json(); code = j.error?.code ?? code; message = j.error?.message ?? message; } catch { /* not json */ }
-    if (res.status === 401 && !location.pathname.startsWith("/login") && location.pathname.startsWith("/app")) location.href = "/login";
-    if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: message }));
-    throw new ApiError(res.status, code, message);
-  }
+  if (!res.ok) return failed(res);
   return res.json() as Promise<T>;
+}
+
+async function failed(res: Response): Promise<never> {
+  let code = "http_" + res.status, message = res.statusText || "Request failed";
+  try { const j = await res.json(); code = j.error?.code ?? code; message = j.error?.message ?? message; } catch { /* not json */ }
+  if (res.status === 401 && !location.pathname.startsWith("/login") && location.pathname.startsWith("/app")) location.href = "/login";
+  if (res.status === 402) window.dispatchEvent(new CustomEvent("lumen:paywall", { detail: message }));
+  throw new ApiError(res.status, code, message);
+}
+
+/** The PDF's bytes; the worker fetches a saved link on first call. */
+async function pdfFile(itemId: string): Promise<ArrayBuffer> {
+  const res = await fetch(`/api/v1/items/${itemId}/file`, { credentials: "same-origin", headers: { "x-lumen": "1" } });
+  if (!res.ok) return failed(res);
+  return res.arrayBuffer();
+}
+
+async function uploadPdfFile(itemId: string, file: ArrayBuffer): Promise<void> {
+  const res = await fetch(`/api/v1/items/${itemId}/file`, { method: "PUT", credentials: "same-origin", headers: { "x-lumen": "1", "content-type": "application/pdf" }, body: file });
+  if (!res.ok) return failed(res);
 }
 
 const qs = (o: Record<string, string | number | undefined | null | boolean>) => {
@@ -77,6 +90,10 @@ export const api = {
   updateItem: (id: string, d: Partial<{ status: string; progress: number; favorite: boolean; collectionId: string | null; tags: string[]; title: string }>) =>
     req<{ item: Item }>("PATCH", `/api/v1/items/${id}`, d),
   deleteItem: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/items/${id}`),
+  createPdf: (d: { title: string; sha256: string; bytes: number; pageCount: number; pages: string[][] }) => req<{ item: Item; created: boolean }>("POST", "/api/v1/items/pdf", d),
+  savePdfText: (itemId: string, d: { sha256: string; pageCount: number; pages: string[][] } | { failed: true }) => req<{ contentHtml: string | null; pdf: PdfInfo }>("PUT", `/api/v1/items/${itemId}/text`, d),
+  pdfFile,
+  uploadPdfFile,
 
   addHighlight: (itemId: string, d: { quote: string; prefix: string; suffix: string; position: number; color: string; note?: string }) =>
     req<{ highlight: Highlight }>("POST", `/api/v1/items/${itemId}/highlights`, d),
@@ -109,6 +126,10 @@ export const api = {
   tokens: () => req<{ data: Token[] }>("GET", "/api/v1/tokens"),
   createToken: (name: string, kind: "extension" | "agent" = "extension") => req<{ id: string; token: string }>("POST", "/api/v1/tokens", { name, kind }),
 
+  recall: (itemId?: string) => req<{ data: RecallCard[]; total: number; due: number; nextDueAt: number | null }>("GET", "/api/v1/recall" + qs({ item: itemId })),
+  createRecall: (itemId: string) => req<{ data: RecallCard[]; created: boolean }>("POST", `/api/v1/recall/items/${itemId}`, {}),
+  reviewRecall: (id: string, grade: "again" | "good", answer?: string) => req<{ card: RecallCard }>("POST", `/api/v1/recall/${id}/review`, { grade, answer }),
+
   reads: (period: "daily" | "weekly") => req<Reads>("GET", `/api/v1/reads?period=${period}`),
   reminders: () => req<{ data: Reminder[] }>("GET", "/api/v1/reminders"),
   snooze: (id: string, days: number) => req<{ ok: true }>("POST", `/api/v1/items/${id}/snooze`, { days }),
@@ -118,7 +139,6 @@ export const api = {
   muteTopic: (name: string) => req<{ ok: true }>("DELETE", `/api/v1/topics/${encodeURIComponent(name)}`),
   saveTrend: (id: string) => req<{ item: Item; created: boolean }>("POST", `/api/v1/trends/${id}/save`, {}),
   dismissTrend: (id: string) => req<{ ok: true }>("POST", `/api/v1/trends/${id}/dismiss`, {}),
-  similar: () => req<{ data: Similar[]; optedOut: boolean }>("GET", "/api/v1/similar"),
   analytics: () => req<Analytics>("GET", "/api/v1/analytics"),
   following: () => req<{ feeds: FollowedFeed[]; unseenTotal: number; refreshing: boolean }>("GET", "/api/v1/following"),
   follow: (url: string) => req<{ feed: FollowedFeed; created: boolean }>("POST", "/api/v1/following", { url }),

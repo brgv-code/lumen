@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import type { AIAction, Citation, Highlight, HighlightAnswer, ItemTldr, ItemWithContent, TextQuote } from "@lumen/core";
 import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, HIGHLIGHT_COLORS, colorVar, modelLabel, parseSlash, splitCitations } from "@lumen/core";
@@ -13,6 +13,7 @@ import { capture } from "../../lib/analytics";
 import { useDebounced, hostOf } from "../../lib/hooks";
 import { burst, useToast } from "../../components/ui";
 import { HighlightCard } from "../../components/cards";
+import { PdfBody } from "../../components/PdfBody";
 import { useApp } from "./Layout";
 
 interface AIState {
@@ -37,7 +38,8 @@ type KeptAnswer = Pick<HighlightAnswer, "action" | "question" | "answer" | "mode
 export default function Reader() {
   const { id = "" } = useParams();
   const { hash } = useLocation();
-  const { collections, refresh } = useApp();
+  const { collections, refresh, labs } = useApp();
+  const nav = useNavigate();
   const toast = useToast();
   const [item, setItem] = useState<ItemWithContent | null>(null);
   const [hls, setHls] = useState<Highlight[]>([]);
@@ -120,7 +122,7 @@ export default function Reader() {
       const r = await api.addHighlight(item.id, { ...quote, color });
       setHls((l) => [...l, r.highlight]);
       if (item.status === "inbox") setItem({ ...item, status: "reading" });
-      toast(<>Highlighted <span className="muted">+2 glow</span></>, "glow");
+      toast("Highlighted");
       refresh();
       if (withNote) setTimeout(() => document.querySelector<HTMLButtonElement>(`#card-${r.highlight.id} .key--quiet`)?.click(), 80);
       return r.highlight;
@@ -318,9 +320,20 @@ export default function Reader() {
     refresh();
     if (status === "done") {
       if (ev) burst(ev.clientX, ev.clientY);
-      toast(<>Finished. Lovely reading. <span className="muted">+10 glow</span></>, "glow");
+      toast("Finished. Lovely reading.");
+      // Recall needs highlights; without any, finishing stays a quiet toast.
+      if (hls.length) {
+        try {
+          await api.createRecall(item.id);
+          refresh();
+          nav(`/app/recall?item=${item.id}`);
+        } catch (e) { toast((e as Error).message, "err"); }
+      }
     } else if (status === "archived") toast("Archived");
   };
+
+  // A PDF opens its stored copy; a local upload without one has nothing to open.
+  const originalHref = !item?.pdf ? item?.url : item.pdf.locked || (!item.pdf.hasFile && item.url.startsWith(`${location.origin}/app/read/`)) ? null : `/api/v1/items/${item.id}/file`;
 
   if (missing) return <div className="panel"><h2>That page is not in your library.</h2><Link to="/app/library" className="key key--sm" style={{ marginTop: 12 }}>Back to library</Link></div>;
   if (!item) return <div className="reader"><div className="article"><div className="skeleton" style={{ height: 40, maxWidth: 520, margin: "0 auto 20px" }} />{[0, 1, 2, 3, 4].map((k) => <div key={k} className="skeleton" style={{ height: 18, maxWidth: 680, margin: "12px auto" }} />)}</div></div>;
@@ -341,7 +354,7 @@ export default function Reader() {
           <Heart size={17} fill={item.favorite ? "currentColor" : "none"} />
         </button>
         <button className="icon-btn" aria-label="Archive" onClick={() => setStatus("archived")}><Archive size={17} /></button>
-        <a className="icon-btn" href={item.url} target="_blank" rel="noreferrer" aria-label="Open original"><ExternalLink size={17} /></a>
+        {originalHref && <a className="icon-btn" href={originalHref} target="_blank" rel="noreferrer" aria-label="Open original"><ExternalLink size={17} /></a>}
         {item.status === "done" ? (
           <span className="chip chip--mint" style={{ height: 34, padding: "0 14px" }}><Check size={14} /> Finished</span>
         ) : (
@@ -357,12 +370,15 @@ export default function Reader() {
               <span className="chip">{item.siteName || hostOf(item.url)}</span>
               {item.author && <span>{item.author}</span>}
               <span>· {item.readingMinutes} min read</span>
-              {alsoSaving > 0 && <span className="chip chip--mint">{alsoSaving} readers like you saved this</span>}
+              {item.pdf?.pages && <span>· {item.pdf.pages} pages</span>}
+              {labs && alsoSaving > 0 && <span className="chip chip--mint">{alsoSaving} readers like you saved this</span>}
             </div>
             <h1>{item.title}</h1>
           </header>
           {html ? (
             <div ref={bodyRef} className="article__body" onClick={onBodyClick} dangerouslySetInnerHTML={{ __html: html }} />
+          ) : item.pdf ? (
+            <div className="article__body"><PdfBody itemId={item.id} pdf={item.pdf} onText={(result) => setItem({ ...item, ...result })} /></div>
           ) : (
             <div className="article__body">
               <div className="surface gridlines" style={{ padding: 32, textAlign: "center", fontFamily: "var(--font-ui)", fontSize: 15 }}>
@@ -435,9 +451,9 @@ export default function Reader() {
             )}
             {[...hls].sort((a, b) => a.position - b.position).map((h) => (
               <div key={h.id} id={`card-${h.id}`} data-anchor={`hl:${h.id}`}>
-                <HighlightCard h={h} title={item.title} url={item.url}
+                <HighlightCard compact h={h} title={item.title} url={item.url}
                   onColor={async (color) => { const r = await api.updateHighlight(h.id, { color }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); }}
-                  onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast(<>Note kept <span className="muted">+3 glow</span></>, "glow"); refresh(); }}
+                  onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast("Note kept"); refresh(); }}
                   onDelete={async () => { await api.deleteHighlight(h.id); setHls((l) => l.filter((x) => x.id !== h.id)); refresh(); }}
                   onFollowUp={(question) => askThread(h, question)}
                   followUp={threadAsk?.highlightId === h.id ? threadAsk : undefined} />

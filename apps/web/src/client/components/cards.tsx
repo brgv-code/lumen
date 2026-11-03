@@ -9,11 +9,8 @@ import { hostOf, timeAgo } from "../lib/hooks";
 import { useToast } from "./ui";
 import { capture } from "../lib/analytics";
 
-const LETTER_BG = ["var(--key-lamp)", "var(--key-iris)", "linear-gradient(180deg,#3fd39a,#0f9a63)", "linear-gradient(180deg,#5b9bff,#2563eb)", "linear-gradient(180deg,#ff8a6b,#e24c2b)"];
 export function SiteLetter({ url }: { url: string }) {
-  const h = hostOf(url);
-  const n = [...h].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return <span className="letter" style={{ background: LETTER_BG[n % LETTER_BG.length] }}>{h.slice(0, 1).toUpperCase()}</span>;
+  return <span className="letter">{hostOf(url).slice(0, 1).toUpperCase()}</span>;
 }
 
 const STATUS_CHIP: Record<string, [string, string]> = {
@@ -59,8 +56,10 @@ export function ItemCard({ item, onFavorite, onDelete }: { item: Item; onFavorit
   );
 }
 
-export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFollowUp, followUp }: {
+export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFollowUp, followUp, compact }: {
   h: Highlight; title: string; url: string;
+  /** In the reader's margin: no article title, tools only on hover. */
+  compact?: boolean;
   onDelete?: () => void; onNote?: (note: string | null) => void; onColor?: (c: string) => void;
   /** Ask in the thread; the answer is kept under this highlight. */
   onFollowUp?: (question: string) => void;
@@ -78,7 +77,7 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFoll
     toast("Copied with citation");
   };
   return (
-    <article className="hl-card">
+    <article className={`hl-card${compact ? " hl-card--compact" : ""}`}>
       <blockquote><mark className="hl" style={hlStyle(h.color)}>{h.quote}</mark></blockquote>
       {onNote ? (
         <NoteEditor value={h.note} onSave={onNote} />
@@ -112,16 +111,18 @@ export function HighlightCard({ h, title, url, onDelete, onNote, onColor, onFoll
         </div>
       )}
       <div className="row small muted" style={{ gap: 6 }}>
-        <Link to={`/app/read/${h.itemId}#${h.id}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "50%", color: "var(--ink-2)", fontWeight: 500 }}>{title}</Link>
-        <span style={{ whiteSpace: "nowrap" }}>· {timeAgo(h.createdAt)}</span>
+        {!compact && <Link to={`/app/read/${h.itemId}#${h.id}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "50%", color: "var(--ink-2)", fontWeight: 500 }}>{title}</Link>}
+        <span style={{ whiteSpace: "nowrap" }}>{compact ? "" : "· "}{timeAgo(h.createdAt)}</span>
         <span className="spacer" />
-        {onColor && (
-          <div style={{ marginRight: 6, display: "inline-flex" }}><ColorMenu value={h.color} onChange={onColor} /></div>
-        )}
-        <button className="icon-btn" onClick={shareIt} aria-label="Share as a card" title="Share as a card"><Share2 size={15} /></button>
-        <button className="icon-btn" onClick={copy} aria-label="Copy with citation" title="Copy with citation"><Copy size={15} /></button>
-        <a className="icon-btn" href={url} target="_blank" rel="noreferrer" aria-label="Open source"><ExternalLink size={15} /></a>
-        {onDelete && <button className="icon-btn" onClick={onDelete} aria-label="Delete highlight"><Trash2 size={15} /></button>}
+        <span className="hl-card__tools">
+          {onColor && (
+            <div style={{ marginRight: 6, display: "inline-flex" }}><ColorMenu value={h.color} onChange={onColor} /></div>
+          )}
+          <button className="icon-btn" onClick={shareIt} aria-label="Share as a card" title="Share as a card"><Share2 size={15} /></button>
+          <button className="icon-btn" onClick={copy} aria-label="Copy with citation" title="Copy with citation"><Copy size={15} /></button>
+          <a className="icon-btn" href={url} target="_blank" rel="noreferrer" aria-label="Open source"><ExternalLink size={15} /></a>
+          {onDelete && <button className="icon-btn" onClick={onDelete} aria-label="Delete highlight"><Trash2 size={15} /></button>}
+        </span>
       </div>
     </article>
   );

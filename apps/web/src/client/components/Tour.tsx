@@ -11,6 +11,7 @@ export const APP_TOUR: TourStep[] = [
   { target: "save", title: "Save anything", body: "Paste a link and Lumen makes a clean, calm reader view. Shortcut: ⌘S.", place: "bottom" },
   { target: "nav-library", title: "Library", body: "Everything you saved, by status: inbox, reading, done. Progress is remembered as you scroll.", place: "right" },
   { target: "nav-highlights", title: "Highlights and notes", body: "Every passage you marked, across everything you read. Copy one with a link that jumps back to the exact sentence.", place: "right" },
+  { target: "nav-recall", title: "Recall", body: "When you finish an article, answer two or three questions about what you highlighted, in your own words. They come back later, further apart each time, so it sticks.", place: "right" },
   { target: "nav-collections", title: "Collections", body: "One per project. Point a collection at a note in Obsidian or Notion and new highlights flow there, once each.", place: "right" },
   { target: "nav-following", title: "Blogs you follow", body: "Follow your favourite blogs. Lumen checks them every few hours and tells you when they publish something new.", place: "right" },
   { target: "nav-ask", title: "Ask your library", body: "Ask anything about what you have read. Answers quote your own highlights and notes, with sources.", place: "right" },
