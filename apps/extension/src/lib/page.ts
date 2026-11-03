@@ -1,6 +1,25 @@
 // Read the active page for Ask. Uses the content script when it is there, and falls back to
 // injecting a one off reader (tabs opened before the extension loaded have no content script).
 
+const VIEWER_PAGE = "/pdf.html";
+
+/** Lumen's PDF viewer for a PDF address; the address rides in the query so it survives a reload. */
+export function pdfViewerUrl(file: string): string {
+  return `${chrome.runtime.getURL(VIEWER_PAGE)}?file=${encodeURIComponent(file)}`;
+}
+
+/** The PDF a viewer tab shows, or null when the tab is anything else. */
+export function viewedPdf(tabUrl: string | undefined): string | null {
+  if (!tabUrl?.startsWith(chrome.runtime.getURL(VIEWER_PAGE))) return null;
+  return new URL(tabUrl).searchParams.get("file");
+}
+
+/** A viewer tab stands for its PDF, so the popup and panel treat it like the page it shows. */
+export function asPage(tab: chrome.tabs.Tab): chrome.tabs.Tab {
+  const file = viewedPdf(tab.url);
+  return file ? { ...tab, url: file } : tab;
+}
+
 export interface PageContext { title: string; url: string; text: string; selection: string; via: "script" | "inject" }
 
 function extract() {

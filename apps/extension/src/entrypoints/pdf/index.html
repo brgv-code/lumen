@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF</title>
+  </head>
+  <body>
+    <header class="pdfbar">
+      <b class="pdfbar__title" data-title></b>
+      <span class="sp"></span>
+      <span class="small muted" data-pages></span>
+      <button class="key ghost" data-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>
+      <button class="key ghost" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>
+      <button class="key ghost" data-bypass>Browser viewer</button>
+    </header>
+    <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
+    <div class="pdfstate" data-state>
+      <div class="surface stack">
+        <b data-state-title>Opening the PDF…</b>
+        <span class="small muted" data-state-body></span>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
