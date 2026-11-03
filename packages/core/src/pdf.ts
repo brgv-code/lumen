@@ -31,6 +31,9 @@ export interface PdfInfo {
   locked: boolean;
 }
 
+/** A pdf.js text content entry: text with its transform, or a marked content tag with no text. */
+export type PdfTextItem = { str: string; transform: number[]; height: number; hasEOL: boolean } | { type: string };
+
 interface Line { text: string; y: number; height: number }
 
 // A gap this many line heights wide ends a paragraph; pdf.js line spacing is about 1.2.
@@ -38,8 +41,20 @@ const PARAGRAPH_GAP = 1.6;
 // Titles, author lines and licence notes are shorter than this; an abstract is not.
 const EXCERPT_MIN_WORDS = 40;
 
+/** The PDF's own Title, when the producer filled it with something better than a file name. */
+export function pdfTitle(info: unknown): string | null {
+  if (!info || typeof info !== "object" || !("Title" in info) || typeof info.Title !== "string") return null;
+  const title = info.Title.trim();
+  return title && !/\.(pdf|docx?|tex)$/i.test(title) ? title : null;
+}
+
 export function isPdfBytes(bytes: Uint8Array): boolean {
   return bytes.length >= 5 && String.fromCharCode(...bytes.subarray(0, 5)) === "%PDF-";
+}
+
+/** One page of pdf.js text content as runs; the y of the baseline is the transform's last term. */
+export function pdfRuns(items: readonly PdfTextItem[]): PdfRun[] {
+  return items.flatMap((entry) => ("str" in entry ? [{ text: entry.str, y: entry.transform[5], height: entry.height || Math.abs(entry.transform[3]), endsLine: entry.hasEOL }] : []));
 }
 
 /** Browser side: each page's runs become that page's paragraphs, in reading order. */
