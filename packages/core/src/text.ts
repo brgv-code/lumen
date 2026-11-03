@@ -40,25 +40,59 @@ export function matchQuote(text: string, sel: TextQuote): [number, number] | nul
   return [best, best + quote.length];
 }
 
-/** When the exact quote moved or changed whitespace, try a normalised search. */
+/** A loosened copy of a text, with the raw index of each character kept. */
+interface Loosened { loose: string; map: number[] }
+
+// Squeezing out every space makes short quotes ambiguous ("aton" in "a ton"), so it needs a longer quote.
+const SQUEEZED_MIN = 10;
+
+/** When the exact quote moved or changed whitespace, search with spaces collapsed, then with spaces and line end hyphens dropped. */
 function fuzzyFallback(text: string, sel: TextQuote): [number, number] | null {
-  const q = normalize(sel.quote).trim();
-  if (q.length < 3) return null;
-  // map normalised index back to raw index
-  const map: number[] = [];
-  let norm = "";
-  let prevSpace = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const space = /\s/.test(ch);
-    if (space && prevSpace) continue;
-    norm += space ? " " : ch;
-    map.push(i);
-    prevSpace = space;
+  return looseMatch(text, sel, collapseSpaces, 3) ?? looseMatch(text, sel, squeeze, SQUEEZED_MIN);
+}
+
+/** Every occurrence in the loosened text is scored by the loosened prefix and suffix, as in the exact search. */
+function looseMatch(text: string, sel: TextQuote, loosen: (raw: string) => Loosened, minLength: number): [number, number] | null {
+  const quote = loosen(sel.quote).loose.trim();
+  if (quote.length < minLength) return null;
+  const { loose, map } = loosen(text);
+  const prefix = loosen(sel.prefix).loose;
+  const suffix = loosen(sel.suffix).loose;
+  let best: number | null = null;
+  let bestScore = -Infinity;
+  for (let at = loose.indexOf(quote); at !== -1; at = loose.indexOf(quote, at + 1)) {
+    const score = commonSuffix(loose.slice(Math.max(0, at - prefix.length), at), prefix)
+      + commonPrefix(loose.slice(at + quote.length, at + quote.length + suffix.length), suffix)
+      - Math.abs(map[at] - sel.position) / 10_000;
+    if (score > bestScore) { bestScore = score; best = at; }
   }
-  const j = norm.indexOf(q);
-  if (j === -1) return null;
-  return [map[j], map[j + q.length - 1] + 1];
+  return best === null ? null : [map[best], map[best + quote.length - 1] + 1];
+}
+
+function collapseSpaces(raw: string): Loosened {
+  const map: number[] = [];
+  let loose = "";
+  let previousSpace = false;
+  for (let index = 0; index < raw.length; index++) {
+    const space = /\s/.test(raw[index]);
+    if (space && previousSpace) continue;
+    loose += space ? " " : raw[index];
+    map.push(index);
+    previousSpace = space;
+  }
+  return { loose, map };
+}
+
+/** PDF lines end in a break or a hyphen that the text view joins, and paragraphs there sit with no space between. */
+function squeeze(raw: string): Loosened {
+  const map: number[] = [];
+  let loose = "";
+  for (let index = 0; index < raw.length; index++) {
+    if (/\s/.test(raw[index]) || (raw[index] === "-" && /\s/.test(raw[index + 1] ?? ""))) continue;
+    loose += raw[index];
+    map.push(index);
+  }
+  return { loose, map };
 }
 
 function commonSuffix(a: string, b: string): number {
