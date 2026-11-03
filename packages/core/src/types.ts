@@ -1,6 +1,7 @@
 // Shared shapes for the API, the web app and the extension.
 
 import type { HighlightColor } from "./colors.ts";
+import type { PdfInfo } from "./pdf.ts";
 export type { HighlightColor } from "./colors.ts";
 
 export const ITEM_STATUSES = ["inbox", "reading", "done", "archived"] as const;
@@ -61,6 +62,8 @@ export interface Item {
 
 export interface ItemWithContent extends Item {
   contentHtml: string | null;
+  /** Only on PDF items. */
+  pdf?: PdfInfo;
 }
 
 /** W3C Web Annotation style text quote selector plus a position hint. */
