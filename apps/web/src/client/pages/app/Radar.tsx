@@ -33,8 +33,6 @@ export default function Radar() {
         lead="What is moving"
         pay="in what you read."
         sub="Your topics (tags plus anything you follow), watched on Hacker News and dev.to. Refreshed every six hours."
-        mesh="mesh-sky"
-        tiles={[["tile--sky", <RadarIcon />], ["tile--peach", <MessageSquare />], ["tile--mint", <Plus />], ["tile--iris", <ExternalLink />]]}
         actions={<button className="key key--ghost key--sm" disabled={busy} onClick={async () => { setBusy(true); await api.refreshRadar().catch(() => {}); await radar.reload(); setBusy(false); toast("Radar refreshed"); }}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>}
       />
 

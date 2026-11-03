@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, Copy, Plus, Sparkles, Terminal, Trash2, Wrench, Activity } from "lucide-react";
+import { Bot, Copy, Plus, Sparkles, Trash2, Wrench } from "lucide-react";
 import { api, type Token, agentLabel } from "../../lib/api";
 import { timeAgo } from "../../lib/hooks";
 import { Empty, useToast } from "../../components/ui";
@@ -30,7 +30,6 @@ export default function Agents() {
     <div className="page">
       <PageHero pill={<><Bot size={13} /> Agents</>} lead="Your agents," pay="reading with you."
         sub="Every agent connected to your Lumen library over MCP: what it is, when it last worked, and what it can do."
-        mesh="mesh-iris" tiles={[["tile--iris", <Bot />], ["tile--lamp", <Sparkles />], ["tile--ink", <Terminal />], ["tile--mint", <Activity />]]}
         actions={<button className="key key--iris key--sm" onClick={openAgent}><Plus size={14} /> Connect another agent</button>} />
 
       {!user.pro && <div className="card-flat row" style={{ padding: 14, background: "var(--lamp-tint)" }}><span className="small" style={{ flex: 1 }}>Agent tools are part of Lumen Pro. Your agents stay connected and answer again once you upgrade.</span><a className="key key--lamp key--sm" href="/app/upgrade">See Pro</a></div>}

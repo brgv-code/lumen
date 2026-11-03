@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Crown, Sparkles, Check, Clock } from "lucide-react";
+import { Crown, Check } from "lucide-react";
 import { api } from "../../lib/api";
 import { burst, useToast } from "../../components/ui";
 import { PageHero } from "../../components/PageHero";
@@ -39,8 +39,6 @@ export default function Upgrade() {
         lead={status === "pro" ? "Thank you for" : "Keep the lamp"}
         pay={status === "pro" ? "keeping the lamp lit." : "bright."}
         sub={status === "trial" ? "You have every Pro feature right now. When the trial ends, everything you saved stays free; Spark, Radar, agents, analytics and Notion move to Pro." : status === "free" ? "Your library, highlights, notes and Obsidian sync are free forever. Pro adds the parts that think with you." : "Everything is unlocked."}
-        mesh="mesh-lamp"
-        tiles={[["tile--lamp", <Crown />], ["tile--iris", <Sparkles />], ["tile--mint", <Check />], ["tile--sky", <Clock />]]}
       />
 
       <div className="grid-2">

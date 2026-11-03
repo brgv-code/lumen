@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUp, MessageCircle, Sparkles, Highlighter, BookOpen, Library } from "lucide-react";
+import { ArrowUp, MessageCircle, Sparkles } from "lucide-react";
 import { streamChat, type ChatSource } from "../../lib/api";
 import { PageHero } from "../../components/PageHero";
 import { Md } from "../../components/Md";
@@ -34,8 +34,7 @@ export default function Ask() {
   return (
     <div className="page page--narrow">
       <PageHero pill={<><MessageCircle size={13} /> Ask</>} lead="Ask everything" pay="you have read."
-        sub="Answers come from your own saved articles, highlights and notes, with numbered sources you can open."
-        mesh="mesh-iris" tiles={[["tile--iris", <Sparkles />], ["tile--lamp", <Highlighter />], ["tile--mint", <BookOpen />], ["tile--sky", <Library />]]} />
+        sub="Answers come from your own saved articles, highlights and notes, with numbered sources you can open." />
       <section className="panel stack" style={{ gap: 14, minHeight: 360 }}>
         {msgs.length === 0 && (
           <div className="grid-2">

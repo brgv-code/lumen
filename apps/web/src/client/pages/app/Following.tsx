@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, BellOff, Check, ExternalLink, Heart, Plus, RefreshCw, Rss, Trash2, BookmarkPlus } from "lucide-react";
+import { Bell, BellOff, Check, ExternalLink, Heart, Plus, RefreshCw, Rss, Trash2 } from "lucide-react";
 import { api, type FeedPost, type FollowedFeed } from "../../lib/api";
 import { useAsync, timeAgo, hostOf } from "../../lib/hooks";
 import { Empty, useToast } from "../../components/ui";
@@ -52,7 +52,6 @@ export default function Following() {
     <div className="page">
       <PageHero pill={<><Heart size={13} /> Following</>} lead="Blogs you love," pay="never missed."
         sub="Follow any blog and Lumen checks it every few hours. New posts land here, on Home, and as a notification from the extension."
-        mesh="mesh-peach" tiles={[["tile--peach", <Heart />], ["tile--lamp", <Bell />], ["tile--sky", <Rss />], ["tile--mint", <BookmarkPlus />]]}
         actions={<form className="row" style={{ flexWrap: "wrap" }} onSubmit={follow}>
           <input className="input" style={{ width: 300, height: 36 }} placeholder="Blog address or RSS feed" value={url} onChange={(e) => setUrl(e.target.value)} />
           <button className="key key--lamp key--sm" disabled={busy}>{busy ? "Finding the feed…" : <><Plus size={14} /> Follow</>}</button>

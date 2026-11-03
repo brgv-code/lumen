@@ -32,7 +32,6 @@ export default function Owner() {
     <div className="page">
       <PageHero pill={<><Gauge size={13} /> Owner</>} lead="Who is reading," pay="and how it goes."
         sub="Signups, activation and hosted AI from Lumen's own database. Funnels over time, retention, paths and replays are in PostHog."
-        mesh="mesh-lamp" tiles={[["tile--lamp", <Gauge />], ["tile--ink", <ExternalLink />]]}
         actions={<a className="key key--ghost key--sm" href="https://eu.posthog.com" target="_blank" rel="noreferrer">Open PostHog <ExternalLink size={13} /></a>} />
       {err && <p className="small" style={{ color: "var(--rose, #c33)" }}>{err}</p>}
       {s && (

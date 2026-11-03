@@ -1,4 +1,4 @@
-import type { Item, Highlight, HighlightAnswer, ItemTldr, Collection, Destination, Idea, User } from "@lumen/core";
+import type { Item, Highlight, HighlightAnswer, ItemTldr, RecallCard, Collection, Destination, Idea, User } from "@lumen/core";
 import type { SessionUser } from "../env";
 import { entitlement } from "./plan";
 
@@ -69,6 +69,21 @@ export const toAnswer = (r: Row): HighlightAnswer => ({
   question: r.question ?? null,
   answer: r.answer,
   model: r.model ?? null,
+  createdAt: r.created_at,
+});
+
+export const toRecall = (r: Row): RecallCard => ({
+  id: r.id,
+  itemId: r.item_id,
+  itemTitle: r.item_title,
+  highlightId: r.highlight_id ?? null,
+  quote: r.quote ?? null,
+  question: r.question,
+  answer: r.answer ?? null,
+  step: r.step,
+  reviews: r.reviews,
+  dueAt: r.due_at,
+  reviewedAt: r.reviewed_at ?? null,
   createdAt: r.created_at,
 });
 

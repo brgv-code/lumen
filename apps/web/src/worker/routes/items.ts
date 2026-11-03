@@ -9,10 +9,11 @@ import { trackUser } from "../lib/analytics";
 import { extractFromHtml, extractFromUrl } from "../lib/extract";
 import { glowStmt } from "../lib/glow";
 import { peerFilter } from "./discover";
+import { pdfInfo, pdfKey } from "../lib/files";
 
 export const items = new Hono<AppEnv>();
 
-const ITEM_SELECT = `SELECT i.id, i.url, i.title, i.site_name, i.author, i.excerpt, i.cover_url, i.kind, i.status, i.progress, i.favorite,
+export const ITEM_SELECT = `SELECT i.id, i.url, i.title, i.site_name, i.author, i.excerpt, i.cover_url, i.kind, i.status, i.progress, i.favorite,
   i.word_count, i.reading_minutes, i.collection_id, i.created_at, i.updated_at, i.finished_at,
   (SELECT group_concat(t.name) FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = i.id) AS tags,
   (SELECT count(*) FROM highlights h WHERE h.item_id = i.id) AS highlight_count
@@ -113,7 +114,10 @@ items.get("/:id", async (c) => {
     c.env.DB.prepare("UPDATE items SET last_opened_at = ? WHERE id = ?").bind(now(), row.id),
   ]);
   const n = (peers.results[0] as { n: number }).n;
-  return c.json({ item: { ...toItem(row), contentHtml: row.content_html ?? null }, highlights: await withAnswers(c.env.DB, hl.results.map((r) => toHighlight(r as Record<string, unknown>))), tldr: await tldrFor(c.env.DB, String(row.id)), alsoSaving: n >= 2 ? n : 0 });
+  const pdf = row.kind === "pdf" ? await pdfInfo(c.env.DB, u, String(row.id)) : undefined;
+  // A locked PDF keeps its highlights and notes; only the pages need Pro.
+  const contentHtml = pdf?.locked ? null : (row.content_html ?? null);
+  return c.json({ item: { ...toItem(row), contentHtml, ...(pdf ? { pdf } : {}) }, highlights: await withAnswers(c.env.DB, hl.results.map((r) => toHighlight(r as Record<string, unknown>))), tldr: await tldrFor(c.env.DB, String(row.id)), alsoSaving: n >= 2 ? n : 0 });
 });
 
 items.patch("/:id", async (c) => {
@@ -159,6 +163,7 @@ items.delete("/:id", async (c) => {
   const u = c.get("user");
   const r = await c.env.DB.prepare("DELETE FROM items WHERE user_id = ? AND id = ?").bind(u.id, c.req.param("id")).run();
   if (!r.meta.changes) fail(404, "not_found", "No such item.");
+  await c.env.FILES.delete(pdfKey(u.id, c.req.param("id")));
   return c.json({ ok: true });
 });
 

@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 const Upgrade = lazy(() => import("./pages/app/Upgrade"));
 const Ask = lazy(() => import("./pages/app/Ask"));
 const Following = lazy(() => import("./pages/app/Following"));
+const Recall = lazy(() => import("./pages/app/Recall"));
 const Agents = lazy(() => import("./pages/app/Agents"));
 const ExtensionPage = lazy(() => import("./pages/app/ExtensionPage"));
 const Owner = lazy(() => import("./pages/app/Owner"));
@@ -44,6 +45,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="library" element={<LibraryPage />} />
               <Route path="read/:id" element={<Reader />} />
               <Route path="highlights" element={<Highlights />} />
+              <Route path="recall" element={<Recall />} />
               <Route path="collections" element={<Collections />} />
               <Route path="collections/:id" element={<LibraryPage />} />
               <Route path="spark" element={<ProGate feature="spark"><Spark /></ProGate>} />

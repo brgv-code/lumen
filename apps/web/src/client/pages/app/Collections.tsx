@@ -35,8 +35,6 @@ export default function Collections() {
         lead="Shelves for"
         pay="what you are working on."
         sub="Point a collection at a note and every new highlight in it flows there, once each. One collection per piece you are writing works beautifully."
-        mesh="mesh-peach"
-        tiles={[["tile--peach", <FolderHeart />], ["tile--lamp", <Send />], ["tile--iris", <Plus />], ["tile--mint", <FolderHeart />]]}
         actions={<button className="key key--lamp key--sm" onClick={() => setOpen(true)}><Plus size={15} /> New collection</button>}
       />
       {collections.length === 0 ? (
