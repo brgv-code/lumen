@@ -124,7 +124,11 @@ export class Lumen {
     });
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applySettings());
     let dotFrame = 0;
-    window.addEventListener("resize", () => { cancelAnimationFrame(dotFrame); dotFrame = requestAnimationFrame(() => this.placeDots()); });
+    const replaceDots = () => { cancelAnimationFrame(dotFrame); dotFrame = requestAnimationFrame(() => this.placeDots()); };
+    window.addEventListener("resize", replaceDots);
+    // The PDF viewer, and some sites, scroll a container instead of the window; pages also reflow after the dots are drawn.
+    document.addEventListener("scroll", replaceDots, { capture: true, passive: true });
+    new ResizeObserver(replaceDots).observe(this.surface.root);
     const mo = new MutationObserver(() => this.adaptMarks());
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
