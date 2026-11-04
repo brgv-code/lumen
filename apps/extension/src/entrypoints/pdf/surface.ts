@@ -14,7 +14,12 @@ export function markLineEnds(layer: HTMLElement) {
   for (const br of layer.querySelectorAll("br")) {
     const span = lastTextSpan(br.previousElementSibling);
     const text = span?.textContent ?? "";
-    if (span && text && !/\s$/.test(text)) span.append(text.endsWith("-") ? "\n" : " ");
+    if (!span || !text || /\s$/.test(text)) continue;
+    // Its own element: inside the span it would widen a box pdf.js scaled to the glyphs, and a mark over it would run past the line.
+    const lineEnd = document.createElement("span");
+    lineEnd.className = "lumen-eol";
+    lineEnd.textContent = text.endsWith("-") ? "\n" : " ";
+    span.after(lineEnd);
   }
   layer.dataset.lumenLines = "";
 }
