@@ -124,7 +124,11 @@ export class Lumen {
     });
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applySettings());
     let dotFrame = 0;
-    window.addEventListener("resize", () => { cancelAnimationFrame(dotFrame); dotFrame = requestAnimationFrame(() => this.placeDots()); });
+    const replaceDots = () => { cancelAnimationFrame(dotFrame); dotFrame = requestAnimationFrame(() => this.placeDots()); };
+    window.addEventListener("resize", replaceDots);
+    // The PDF viewer, and some sites, scroll a container instead of the window; pages also reflow after the dots are drawn.
+    document.addEventListener("scroll", replaceDots, { capture: true, passive: true });
+    new ResizeObserver(replaceDots).observe(this.surface.root);
     const mo = new MutationObserver(() => this.adaptMarks());
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
@@ -594,7 +598,7 @@ export class Lumen {
     if (!r.ok || !answer) { this.toast(r.error ?? "Could not keep this answer", "err"); return false; }
     this.highlights = this.highlights.map((h) => (h.id === owner.id ? { ...h, answers: [...(h.answers ?? []), answer] } : h));
     this.placeDots();
-    this.toast("Kept with this highlight");
+    this.toast("Kept. The dot after this passage opens it again");
     return true;
   }
 

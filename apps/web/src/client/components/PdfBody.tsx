@@ -33,7 +33,7 @@ export function PdfBody({ itemId, pdf, onText }: { itemId: string; pdf: PdfInfo;
   return <Notice title="Reading the PDF…" body="Pulling the text out of each page, right here in your browser." />;
 }
 
-function Notice({ title, body, retry }: { title: string; body: string; retry?: () => void }) {
+export function Notice({ title, body, retry }: { title: string; body: string; retry?: () => void }) {
   return (
     <div className="surface gridlines" style={{ padding: 32, textAlign: "center", fontFamily: "var(--font-ui)", fontSize: 15 }}>
       <span className="tile tile--lg tile--sky" style={{ position: "relative" }}><FileText /></span>

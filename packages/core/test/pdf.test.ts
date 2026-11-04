@@ -88,3 +88,21 @@ test("pdf.js text items become runs, marked content tags are skipped", () => {
     { text: "is all", y: 686, height: 10, endsLine: false },
   ]);
 });
+
+// The page view and the extension viewer share PdfText: these parts need no DOM.
+test("PdfText finds the page a quote sits on, from a text view quote too", async () => {
+  const { PdfText } = await import("../src/pdf-dom.ts");
+  const text = new PdfText([[line("QueryBandits shapes queries", 700)], [line("before they reach the transduc-", 700), line("tion model.", 688)], []]);
+  assert.equal(text.pageOf({ quote: "QueryBandits shapes", prefix: "", suffix: "", position: 0 }), 1);
+  assert.equal(text.pageOf({ quote: "the transduction model.", prefix: "", suffix: "", position: 0 }), 2);
+  assert.equal(text.pageOf({ quote: "not in this paper at all", prefix: "", suffix: "", position: 0 }), null);
+});
+
+test("PdfText.covering picks the highlight that overlaps a passage", async () => {
+  const { PdfText } = await import("../src/pdf-dom.ts");
+  const text = new PdfText([[line("One idea here.", 700), line("Another idea there.", 688)]]);
+  const first = { id: "a", quote: "One idea", prefix: "", suffix: "", position: 0 };
+  const second = { id: "b", quote: "Another idea", prefix: "", suffix: "", position: 15 };
+  assert.equal(text.covering({ quote: "idea there", prefix: "", suffix: "", position: 0 }, [first, second])?.id, "b");
+  assert.equal(text.covering({ quote: "here.", prefix: "", suffix: "", position: 0 }, [second]), undefined);
+});

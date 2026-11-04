@@ -88,7 +88,8 @@ function squeeze(raw: string): Loosened {
   const map: number[] = [];
   let loose = "";
   for (let index = 0; index < raw.length; index++) {
-    if (/\s/.test(raw[index]) || (raw[index] === "-" && /\s/.test(raw[index + 1] ?? ""))) continue;
+    // Every hyphen goes: a quote may keep one ("Query-Bandits") where the page has it before a line end.
+    if (/\s/.test(raw[index]) || raw[index] === "-") continue;
     loose += raw[index];
     map.push(index);
   }

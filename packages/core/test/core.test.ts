@@ -41,6 +41,17 @@ test("matchQuote finds a PDF quote in the text view, using context to pick the o
   assert.equal(view.slice(joined[0], joined[1]), "input.Then the model writes");
 });
 
+// The viewer saves "Query-\nBandits" as "Query-Bandits", and its own page text still has the line end.
+test("matchQuote finds a quote whose line end hyphen was kept before a capital", () => {
+  const page = "In this work we introduce the Query-\nBandits framework, which shapes queries before they reach the model. It in-\nline cites GPT-\n4 results.";
+  const hit = matchQuote(page, { quote: "introduce the Query-Bandits framework, which shapes queries", prefix: "", suffix: "", position: 0 });
+  assert.ok(hit);
+  assert.equal(page.slice(hit[0], hit[1]), "introduce the Query-\nBandits framework, which shapes queries");
+  const mixed = matchQuote(page, { quote: "It inline cites GPT-4 results.", prefix: "", suffix: "", position: 0 });
+  assert.ok(mixed);
+  assert.equal(page.slice(mixed[0], mixed[1]), "It in-\nline cites GPT-\n4 results.");
+});
+
 test("matchQuote does not match a short quote only by squeezing out spaces", () => {
   assert.equal(matchQuote("a ton of bricks", { quote: "aton", prefix: "", suffix: "", position: 0 }), null);
 });

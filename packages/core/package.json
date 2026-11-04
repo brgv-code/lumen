@@ -16,7 +16,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./dom": "./src/dom.ts",
-    "./bar": "./src/bar.ts"
+    "./bar": "./src/bar.ts",
+    "./pdf-dom": "./src/pdf-dom.ts"
   },
   "license": "AGPL-3.0-only"
 }

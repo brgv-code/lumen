@@ -9,5 +9,9 @@ body { overflow: hidden; }
 .pdfstate { position: absolute; inset: 48px 0 0; display: grid; place-items: center; padding: 16px; }
 .pdfstate[hidden] { display: none; }
 .pdfstate .surface { max-width: 420px; text-align: center; }
+/* pdf.js sizes a page as content plus border; ui.css's border-box shrank the canvas but not the text layer, so marks drifted off the glyphs. */
+.pdfViewer .page { box-sizing: content-box; }
 /* Marks sit in pdf.js spans that are scaled to the drawn glyphs; padding would shift them off the text. */
 .textLayer mark.lumen-mark { padding: 0; border-radius: 0; }
+/* Inline, the band covers the fallback font's full height and overlaps the next line; a box keeps it to the span's line. */
+.textLayer mark.lumen-mark { display: inline-block; }

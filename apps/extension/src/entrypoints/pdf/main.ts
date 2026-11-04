@@ -10,7 +10,8 @@ import { getSettings, pageKey } from "../../lib/storage";
 import { applyPageTheme } from "../../lib/theme";
 import type { Settings } from "../../lib/types";
 import { Lumen } from "../content/lumen";
-import { PdfSurface, markLineEnds } from "./surface";
+import { markLineEnds } from "@lumen/core/pdf-dom";
+import { PdfSurface } from "./surface";
 
 const file = new URLSearchParams(location.search).get("file") ?? "";
 let title = fileName(file);
