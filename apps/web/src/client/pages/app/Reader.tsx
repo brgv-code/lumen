@@ -14,6 +14,8 @@ import { useDebounced, hostOf } from "../../lib/hooks";
 import { burst, useToast } from "../../components/ui";
 import { HighlightCard } from "../../components/cards";
 import { PdfBody } from "../../components/PdfBody";
+import { PdfPages } from "../../components/PdfPages";
+import type { PdfText } from "@lumen/core/pdf-dom";
 import { useApp } from "./Layout";
 
 interface AIState {
@@ -58,26 +60,31 @@ export default function Reader() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const articleRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** A PDF's whole text once its pages are shown; anchoring and quotes go through it. */
+  const [pdfText, setPdfText] = useState<PdfText | null>(null);
+  const [pagesFailed, setPagesFailed] = useState(false);
 
   useEffect(() => {
     setItem(null); setHls([]); setMissing(false); setAi(null);
-    setTldr(null);
+    setTldr(null); setPdfText(null); setPagesFailed(false);
     api.item(id).then((r) => { setItem(r.item); setHls(r.highlights); setTldr(r.tldr); setAlsoSaving(r.alsoSaving ?? 0); }).catch(() => setMissing(true));
     window.scrollTo(0, 0);
   }, [id]);
 
   const html = item?.contentHtml ? DOMPurify.sanitize(item.contentHtml, { FORBID_TAGS: ["style", "form", "iframe"], FORBID_ATTR: ["style"] }) : "";
+  // A PDF with its file shows its real pages; the text view stays for one without a stored file or when the pages fail.
+  const showPages = Boolean(item?.pdf && item.pdf.hasFile && !item.pdf.locked && (item.pdf.text === "ready" || item.pdf.text === "no_text") && !pagesFailed);
 
   // paint highlights into the article after render
   useLayoutEffect(() => {
     const root = bodyRef.current;
-    if (!root || !html) return;
+    if (!root || !html || showPages) return;
     unwrapMarks(root, "mark[data-hl]");
     for (const h of [...hls].sort((a, b) => b.position - a.position)) {
       const r = anchorToRange(root, h);
       if (r) for (const m of wrapRange(r, { "data-hl": h.id, class: "hl" })) m.style.setProperty("--hl", colorVar(h.color));
     }
-  }, [html, hls]);
+  }, [html, hls, showPages]);
 
   useEffect(() => {
     if (!hash || !hls.length) return;
@@ -113,20 +120,33 @@ export default function Reader() {
     document.getElementById(`card-${m.dataset.hl}`)?.animate([{ transform: "scale(1)" }, { transform: "scale(1.02)" }, { transform: "scale(1)" }], { duration: 400 });
   };
 
-  const highlight = async (color: string, quote: TextQuote, withNote = false): Promise<Highlight | undefined> => {
+  /** The quotes a selection saves: one on an article, one per page on a PDF so a highlight never crosses a page break. */
+  const quotesOf = (snapshot: BarSnapshot): TextQuote[] => {
+    const quotes = pdfText && bodyRef.current ? pdfText.quotesFor(bodyRef.current, snapshot.range) : [];
+    return quotes.length ? quotes : [snapshot.quote];
+  };
+
+  const highlight = async (color: string, quotes: TextQuote[], withNote = false): Promise<Highlight | undefined> => {
     if (!item) return;
     setLastColor(color);
     setWheelAt(null);
     window.getSelection()?.removeAllRanges();
-    try {
-      const r = await api.addHighlight(item.id, { ...quote, color });
-      setHls((l) => [...l, r.highlight]);
-      if (item.status === "inbox") setItem({ ...item, status: "reading" });
-      toast("Highlighted");
-      refresh();
-      if (withNote) setTimeout(() => document.querySelector<HTMLButtonElement>(`#card-${r.highlight.id} .key--quiet`)?.click(), 80);
-      return r.highlight;
-    } catch (e) { toast((e as Error).message, "err"); return undefined; }
+    const added: Highlight[] = [];
+    let failure: Error | null = null;
+    // One at a time, in reading order; parts saved before a failure still show.
+    for (const quote of quotes) {
+      try { added.push((await api.addHighlight(item.id, { ...quote, color })).highlight); }
+      catch (e) { failure = e as Error; break; }
+    }
+    const [first] = added;
+    if (failure) toast(failure.message, "err");
+    if (!first) return undefined;
+    setHls((l) => [...l, ...added]);
+    if (item.status === "inbox") setItem({ ...item, status: "reading" });
+    if (!failure) toast("Highlighted");
+    refresh();
+    if (withNote) setTimeout(() => document.querySelector<HTMLButtonElement>(`#card-${first.id} .key--quiet`)?.click(), 80);
+    return first;
   };
 
   const copyText = async (text: string, withCitation: boolean) => {
@@ -177,7 +197,9 @@ export default function Reader() {
   const keep = async () => {
     if (!ai || ai.action === "related" || ai.action === "tldr" || !ai.passage || ai.streaming || !ai.answer || ai.keptOn) return;
     const root = bodyRef.current;
-    const owner = (root ? coveringQuote(root, ai.passage.quote, hls) : undefined) ?? (await highlight(lastColor(), ai.passage.quote));
+    const quotes = quotesOf(ai.passage);
+    const covering = pdfText ? pdfText.covering(quotes[0], hls) : root ? coveringQuote(root, ai.passage.quote, hls) : undefined;
+    const owner = covering ?? (await highlight(lastColor(), quotes));
     if (!owner) return;
     try {
       await storeAnswer(owner.id, { action: ai.action, question: ai.question ?? null, answer: ai.answer, model: ai.model ?? null });
@@ -188,15 +210,15 @@ export default function Reader() {
   const onChoose = (choice: BarChoice, snapshot: BarSnapshot) => {
     const quote = snapshot.quote.quote;
     capture("selection_bar_choice", { surface: "reader", choice: choice.kind === "action" ? choice.action : choice.kind });
-    if (choice.kind === "highlight") return highlight(choice.color, snapshot.quote);
+    if (choice.kind === "highlight") return highlight(choice.color, quotesOf(snapshot));
     if (choice.kind === "any-colour") {
       const box = snapshot.range.getBoundingClientRect();
       return setWheelAt({ x: box.left + box.width / 2, y: box.top, snapshot });
     }
     if (choice.kind === "extra") return;
     switch (choice.action) {
-      case "note": return highlight(lastColor(), snapshot.quote, true);
-      case "save": return highlight("mint", snapshot.quote);
+      case "note": return highlight(lastColor(), quotesOf(snapshot), true);
+      case "save": return highlight("mint", quotesOf(snapshot));
       case "copy": return copyText(quote, false);
       case "cite": return copyText(quote, true);
       case "related": return runRelated(quote, snapshot);
@@ -210,7 +232,7 @@ export default function Reader() {
   const runTldr = async () => {
     const root = bodyRef.current;
     if (!root || !item) return;
-    paragraphsRef.current = readableParagraphs(root);
+    paragraphsRef.current = pdfText ? pdfParagraphsIn(root, pdfText) : readableParagraphs(root);
     const shown = tldr ?? (ai?.action === "tldr" && !ai.streaming && ai.answer ? { text: ai.answer, model: ai.model ?? null } : null);
     capture("tldr_opened", { surface: "reader", kept: Boolean(tldr), cached: Boolean(shown) });
     if (shown) return setAi({ action: "tldr", text: item.title, answer: shown.text, model: shown.model, streaming: false, keptOn: tldr ? tldr.id : undefined });
@@ -295,7 +317,7 @@ export default function Reader() {
     for (const card of margin.querySelectorAll(":scope > [data-anchor]")) observer.observe(card);
     resizeRef.current = observer;
     return () => { observer.disconnect(); resizeRef.current = null; };
-  }, [html]);
+  }, [html, showPages]);
 
   // The bar lives outside React; it always calls the latest handler.
   const chooseRef = useRef(onChoose);
@@ -311,7 +333,7 @@ export default function Reader() {
       onChoose: (choice, snapshot) => chooseRef.current(choice, snapshot),
     });
     return () => bar.destroy();
-  }, [html]);
+  }, [html, showPages]);
 
   const setStatus = async (status: "done" | "archived" | "reading", ev?: React.MouseEvent) => {
     if (!item) return;
@@ -375,7 +397,12 @@ export default function Reader() {
             </div>
             <h1>{item.title}</h1>
           </header>
-          {html ? (
+          {showPages && item.pdf ? (
+            <div className="article__body article__body--pdf" onClick={onBodyClick}>
+              <PdfPages itemId={item.id} highlights={hls} pagesRef={bodyRef} onText={setPdfText} onFail={() => { setPdfText(null); setPagesFailed(true); }}
+                onPainted={() => { if (marginRef.current && bodyRef.current) alignMargin(marginRef.current, bodyRef.current, aiQuoteRef.current); }} />
+            </div>
+          ) : html ? (
             <div ref={bodyRef} className="article__body" onClick={onBodyClick} dangerouslySetInnerHTML={{ __html: html }} />
           ) : item.pdf ? (
             <div className="article__body"><PdfBody itemId={item.id} pdf={item.pdf} onText={(result) => setItem({ ...item, ...result })} /></div>
@@ -466,9 +493,17 @@ export default function Reader() {
 
       {wheelAt && (
         <div className="cp-pop cp-pop--center" style={{ position: "fixed", left: wheelAt.x, top: wheelAt.y - 10, transform: "translate(-50%, -100%)" }}>
-          <ColorWheel initial={lastColor().startsWith("#") ? lastColor() : "#ff7a59"} onPick={(c) => { rememberColor(c); highlight(c, wheelAt.snapshot.quote); }} />
+          <ColorWheel initial={lastColor().startsWith("#") ? lastColor() : "#ff7a59"} onPick={(c) => { rememberColor(c); highlight(c, quotesOf(wheelAt.snapshot)); }} />
         </div>
       )}
     </>
   );
+}
+
+/** A PDF's paragraphs for TL;DR, each pointing at its page so a citation scrolls there. */
+function pdfParagraphsIn(root: HTMLElement, text: PdfText): ReturnType<typeof readableParagraphs> {
+  return text.paragraphs().flatMap(({ text: paragraph, page }) => {
+    const element = root.querySelector(`.page[data-page-number="${page}"]`);
+    return element ? [{ text: paragraph, quote: { quote: paragraph, prefix: "", suffix: "", position: 0 }, element }] : [];
+  });
 }
