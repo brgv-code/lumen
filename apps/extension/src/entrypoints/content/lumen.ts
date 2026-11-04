@@ -598,7 +598,7 @@ export class Lumen {
     if (!r.ok || !answer) { this.toast(r.error ?? "Could not keep this answer", "err"); return false; }
     this.highlights = this.highlights.map((h) => (h.id === owner.id ? { ...h, answers: [...(h.answers ?? []), answer] } : h));
     this.placeDots();
-    this.toast("Kept with this highlight");
+    this.toast("Kept. The dot after this passage opens it again");
     return true;
   }
 
