@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import type { AIAction, Citation, Highlight, HighlightAnswer, ItemTldr, ItemWithContent, TextQuote } from "@lumen/core";
-import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, HIGHLIGHT_COLORS, colorVar, modelLabel, parseSlash, splitCitations } from "@lumen/core";
+import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, citedSources, HIGHLIGHT_COLORS, colorVar, modelLabel, parseSlash, splitCitations } from "@lumen/core";
 import { ColorWheel, recentColors, rememberColor, lastColor, setLastColor } from "../../components/ColorPicker";
 import { anchorToRange, coveringQuote, readableParagraphs, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarSnapshot } from "@lumen/core/bar";
@@ -452,9 +452,9 @@ export default function Reader() {
                           : ai.answer}
                       </p>
                     )}
-                    {ai.sources && ai.sources.length > 0 && (
+                    {ai.sources && citedSources(ai.sources, ai.answer).length > 0 && (
                       <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                        {ai.sources.map((source) => <li key={source.n}><Link to={`/app/read/${source.itemId}`}>{source.title}</Link></li>)}
+                        {citedSources(ai.sources, ai.answer).map((source) => <li key={source.n}><Link to={`/app/read/${source.itemId}`}>{source.title}</Link></li>)}
                       </ol>
                     )}
                   </div>

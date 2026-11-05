@@ -158,3 +158,9 @@ export function formatSourceBlock(
 function escapeMd(s: string): string {
   return (s || "").replace(/([\[\]])/g, "\\$1");
 }
+
+/** The sources an answer cites as [n], in their own order: retrieval returns more than the answer uses. */
+export function citedSources<T extends { n: number }>(sources: readonly T[], answer: string): T[] {
+  const cited = new Set(Array.from(answer.matchAll(/\[(\d+)\]/g), (match) => Number(match[1])));
+  return sources.filter((source) => cited.has(source.n));
+}
