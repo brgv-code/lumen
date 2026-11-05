@@ -324,6 +324,9 @@
   margin: 0 auto;
 }
 .article__body p { margin: 0 0 1.1em; }
+/* Readability wraps every article in div.page; the app's .page grid let a wide code block stretch the whole column. */
+.article__body .page { display: block; }
+.article__body figure { margin: 1em 0; }
 /* PDF text view: a quiet page marker, drawn by CSS so it never ends up inside a quote. */
 .article__body section[data-page]::before { content: "Page " attr(data-page); display: block; margin: 2em 0 0.8em; font: 500 12px/1 var(--font-ui); letter-spacing: 0.04em; color: var(--ink-3); }
 .article__body section[data-page]:first-child::before { margin-top: 0; }
