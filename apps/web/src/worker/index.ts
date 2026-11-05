@@ -50,7 +50,7 @@ app.onError((err, c) => {
 });
 
 /** Latest extension version, so older installs can say "update available". Bump with each release. */
-const EXTENSION_VERSION = "2.6.1";
+const EXTENSION_VERSION = "2.7.1";
 /** The public Chrome Web Store listing; /chrome is the short link to share. */
 const STORE_LISTING = "https://chromewebstore.google.com/detail/lumen/hohicfgangllelfkhnbghegnbepjfkkk";
 app.get("/chrome", (c) => c.redirect(STORE_LISTING, 302));
