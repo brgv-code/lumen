@@ -46,8 +46,14 @@ test("an upgraded bar is never upgraded twice", () => {
   assert.deepEqual(upgradeBarActions(["copy", "explain"], BAR_SETTINGS_VERSION), ["copy", "explain"]);
 });
 
+test("the LUM-1 default bar gains Ask and Define, a customised one keeps its choices", () => {
+  assert.deepEqual(upgradeBarActions(["highlight", "note", "explain", "simplify", "copy"], 2), DEFAULT_BAR_ACTIONS);
+  assert.deepEqual(DEFAULT_BAR_ACTIONS, ["highlight", "note", "ask", "define", "explain", "simplify", "copy"]);
+  assert.deepEqual(upgradeBarActions(["highlight", "explain"], 2), ["highlight", "explain"]);
+});
+
 test("More holds everything off the bar, never Summary", () => {
-  assert.deepEqual(menuActions(DEFAULT_BAR_ACTIONS), ["ask", "define", "counterpoint", "related", "expand", "save", "cite"]);
+  assert.deepEqual(menuActions(DEFAULT_BAR_ACTIONS), ["counterpoint", "related", "expand", "save", "cite"]);
   assert.ok(!menuActions(["highlight"]).includes("summarize"));
 });
 

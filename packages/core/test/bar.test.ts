@@ -59,14 +59,14 @@ function setup(config: Partial<BarConfig> = {}) {
 test("the bar renders the default actions in order, then More", () => {
   const { find, bar } = setup();
   const acts = Array.from(find(".bar").querySelectorAll<HTMLElement>(".rove")).map((element) => element.dataset.act ?? element.dataset.color ?? "more");
-  assert.deepEqual(acts, ["sun", "note", "explain", "simplify", "copy", "more"]);
+  assert.deepEqual(acts, ["sun", "note", "ask", "define", "explain", "simplify", "copy", "more"]);
   assert.equal(bar.isOpen(), true);
 });
 
 test("More lists what is not on the bar, then the host extras", () => {
   const { find } = setup();
   const items = Array.from(find(".menu").querySelectorAll<HTMLElement>(".item")).map((element) => element.dataset.act ?? element.dataset.extra);
-  assert.deepEqual(items, ["ask", "define", "counterpoint", "related", "expand", "save", "cite", "panel"]);
+  assert.deepEqual(items, ["counterpoint", "related", "expand", "save", "cite", "panel"]);
 });
 
 test("choosing reports the choice with the snapshot and closes the bar", () => {
@@ -92,7 +92,7 @@ test("More toggles its menu and Escape closes the menu before the bar", () => {
   click(more);
   assert.equal(find(".menu").hidden, false);
   assert.equal(more.getAttribute("aria-expanded"), "true");
-  press(find('.item[data-act="define"]'), "Escape");
+  press(find('.item[data-act="counterpoint"]'), "Escape");
   assert.equal(find(".menu").hidden, true);
   assert.equal(bar.isOpen(), true);
   press(more, "Escape");
