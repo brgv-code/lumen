@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, lazy } from "react";
+import { StrictMode, Suspense, lazy, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./styles/tokens.css";
@@ -9,25 +9,32 @@ import Login from "./pages/Login";
 import { ConsentBanner } from "./components/Consent";
 import { initAnalytics } from "./lib/analytics";
 
-const AppLayout = lazy(() => import("./pages/app/Layout"));
-const Home = lazy(() => import("./pages/app/Home"));
-const LibraryPage = lazy(() => import("./pages/app/Library"));
-const Reader = lazy(() => import("./pages/app/Reader"));
-const Highlights = lazy(() => import("./pages/app/Highlights"));
-const Collections = lazy(() => import("./pages/app/Collections"));
-const Spark = lazy(() => import("./pages/app/Spark"));
-const Integrations = lazy(() => import("./pages/app/Integrations"));
-const Settings = lazy(() => import("./pages/app/Settings"));
-const Radar = lazy(() => import("./pages/app/Radar"));
-const Analytics = lazy(() => import("./pages/app/Analytics"));
+const pageLoaders: Array<() => Promise<unknown>> = [];
+function page<T extends ComponentType>(load: () => Promise<{ default: T }>) {
+  pageLoaders.push(load);
+  return lazy(load);
+}
+// Every page downloads once the shell is up so a first click renders like a revisit; a failed prefetch just retries on click.
+const prefetchPages = () => setTimeout(() => pageLoaders.forEach((load) => load().catch(() => {})), 300);
+const AppLayout = lazy(() => import("./pages/app/Layout").then((layout) => { prefetchPages(); return layout; }));
+const Home = page(() => import("./pages/app/Home"));
+const LibraryPage = page(() => import("./pages/app/Library"));
+const Reader = page(() => import("./pages/app/Reader"));
+const Highlights = page(() => import("./pages/app/Highlights"));
+const Collections = page(() => import("./pages/app/Collections"));
+const Spark = page(() => import("./pages/app/Spark"));
+const Integrations = page(() => import("./pages/app/Integrations"));
+const Settings = page(() => import("./pages/app/Settings"));
+const Radar = page(() => import("./pages/app/Radar"));
+const Analytics = page(() => import("./pages/app/Analytics"));
 import NotFound from "./pages/NotFound";
-const Upgrade = lazy(() => import("./pages/app/Upgrade"));
-const Ask = lazy(() => import("./pages/app/Ask"));
-const Following = lazy(() => import("./pages/app/Following"));
-const Recall = lazy(() => import("./pages/app/Recall"));
-const Agents = lazy(() => import("./pages/app/Agents"));
-const ExtensionPage = lazy(() => import("./pages/app/ExtensionPage"));
-const Owner = lazy(() => import("./pages/app/Owner"));
+const Upgrade = page(() => import("./pages/app/Upgrade"));
+const Ask = page(() => import("./pages/app/Ask"));
+const Following = page(() => import("./pages/app/Following"));
+const Recall = page(() => import("./pages/app/Recall"));
+const Agents = page(() => import("./pages/app/Agents"));
+const ExtensionPage = page(() => import("./pages/app/ExtensionPage"));
+const Owner = page(() => import("./pages/app/Owner"));
 import { ProGate } from "./pages/app/ProGate";
 
 initAnalytics();
