@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { normalizeColor, ITEM_KINDS, ITEM_STATUSES, type ItemStatus } from "@lumen/core";
+import { googleDocUrl, normalizeColor, ITEM_KINDS, ITEM_STATUSES, type ItemStatus } from "@lumen/core";
 import type { AppEnv } from "../env";
 import { body, decodeCursor, encodeCursor, fail, id, isHttpUrl, now, oneOf, str } from "../lib/util";
 import { toHighlight, toItem, toTldr } from "../lib/map";
 import { withAnswers } from "../lib/answers";
 import { cleanCitations, tldrFor } from "../lib/tldr";
 import { trackUser } from "../lib/analytics";
-import { extractFromHtml, extractFromUrl } from "../lib/extract";
+import { extractFromHtml, extractFromMarkdown, extractFromUrl, type Extracted } from "../lib/extract";
 import { glowStmt } from "../lib/glow";
 import { peerFilter } from "./discover";
 import { pdfInfo, pdfKey } from "../lib/files";
@@ -66,24 +66,37 @@ items.get("/lookup", async (c) => {
 
 items.post("/", async (c) => {
   const u = c.get("user");
-  const b = await body<{ url?: string; html?: string; title?: string; collectionId?: string; tags?: string[]; status?: string; kind?: string }>(c);
+  const b = await body<{ url?: string; html?: string; markdown?: string; title?: string; collectionId?: string; tags?: string[]; status?: string; kind?: string }>(c);
   const raw = str(b.url, 4000);
   if (!raw || !isHttpUrl(raw)) fail(422, "bad_url", "A valid http(s) URL is required.");
   const url = normalizeUrl(raw);
   const db = c.env.DB;
 
   const existing = await db.prepare(`${ITEM_SELECT} WHERE i.user_id = ? AND i.url = ?`).bind(u.id, url).first();
-  if (existing) return c.json({ item: toItem(existing), created: false });
+  // A doc keeps changing, so saving it again brings the item up to date; other pages stay as first saved.
+  const isDoc = googleDocUrl(url) !== null;
+  if (existing && !isDoc) return c.json({ item: toItem(existing), created: false });
 
-  if (b.collectionId) await ownCollection(db, u.id, b.collectionId);
+  if (b.collectionId && !existing) await ownCollection(db, u.id, b.collectionId);
 
-  let ex;
+  let ex: Extracted;
   try {
-    ex = b.html ? extractFromHtml(b.html.slice(0, 3_000_000), url) : await extractFromUrl(url);
+    // A doc's page markup is only its canvas shell, which older extensions still send; use the export instead.
+    ex = b.markdown ? extractFromMarkdown(b.markdown.slice(0, 10_000_000), url, str(b.title, 300) ?? null)
+      : b.html && !isDoc ? extractFromHtml(b.html.slice(0, 3_000_000), url)
+      : await extractFromUrl(url);
   } catch {
     const host = new URL(url).hostname;
     ex = { title: host, siteName: host, author: null, excerpt: null, contentHtml: null, contentText: null, coverUrl: null, wordCount: 0, readingMinutes: 1, kind: "bookmark" as const };
   }
+  if (existing) {
+    if (!ex.contentHtml) return c.json({ item: toItem(existing), created: false });
+    await db.prepare(`UPDATE items SET title = ?, site_name = ?, excerpt = ?, content_html = ?, content_text = ?, kind = ?, word_count = ?, reading_minutes = ?, updated_at = ? WHERE id = ?`)
+      .bind(ex.title, ex.siteName, ex.excerpt, ex.contentHtml, ex.contentText, ex.kind, ex.wordCount, ex.readingMinutes, now(), existing.id).run();
+    const row = await db.prepare(`${ITEM_SELECT} WHERE i.id = ?`).bind(existing.id).first();
+    return c.json({ item: toItem(row!), created: false });
+  }
+
   const kind = oneOf(b.kind, ITEM_KINDS) ?? ex.kind;
   const t = now();
   const itemId = id("itm_");
@@ -213,6 +226,8 @@ items.post("/:id/highlights", async (c) => {
 });
 
 export function normalizeUrl(u: string): string {
+  const doc = googleDocUrl(u);
+  if (doc) return doc;
   try {
     const x = new URL(u);
     x.hash = "";

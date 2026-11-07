@@ -10,3 +10,4 @@ export * from "./icons.ts";
 export * from "./slash.ts";
 export * from "./recall.ts";
 export * from "./pdf.ts";
+export * from "./gdocs.ts";

@@ -1,4 +1,4 @@
-import { BAR_SETTINGS_VERSION, answerFromNote, upgradeBarActions, type Highlight } from "@lumen/core";
+import { BAR_SETTINGS_VERSION, answerFromNote, googleDocUrl, upgradeBarActions, type Highlight } from "@lumen/core";
 import { DEFAULT_SETTINGS, type Settings } from "./types";
 
 const SETTINGS = "lumen_settings_v2";
@@ -49,6 +49,8 @@ export async function setLocalHighlights(url: string, list: Highlight[]) {
 }
 
 export function pageKey(url: string): string {
+  const doc = googleDocUrl(url);
+  if (doc) return doc;
   try {
     const u = new URL(url);
     u.hash = "";

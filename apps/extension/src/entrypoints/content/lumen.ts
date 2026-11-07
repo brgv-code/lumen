@@ -1,6 +1,6 @@
 // Lumen on a reading surface: a selection toolbar that never takes over copy and paste,
 // highlights that come back when you return, and margin answers in a side card.
-import { HIGHLIGHT_COLORS, answerLabel, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
+import { HIGHLIGHT_COLORS, answerLabel, googleDocId, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
 import { WHEEL_CSS, bindWheel, wheelHTML } from "./wheel";
 import { coveringQuote, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarConfig, type BarSnapshot, type SelectionBar } from "@lumen/core/bar";
@@ -133,6 +133,7 @@ export class Lumen {
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     this.applySettings();
+    if (googleDocId(this.surface.url())) this.mountReadPill();
 
     chrome.runtime.onMessage.addListener((m, _s, reply) => {
       if (m?.type === "GET_HTML") { reply(this.surface.html()); return; }
@@ -642,6 +643,28 @@ export class Lumen {
       : await send<{ ok: boolean; error?: string }>({ type: "SAVE_PAGE", url: this.surface.url(), title: this.surface.title(), html: this.surface.html(), kind: this.surface.kind });
     this.toast(r.ok ? "Saved to Lumen · +1 glow" : r.error ?? "Could not save", r.ok ? "ok" : "err");
     if (r.ok) this.surface.onSaved?.();
+  }
+
+  /** Docs draws its text on a canvas, so nothing here can be highlighted; offer Lumen's reader instead. */
+  mountReadPill() {
+    const pill = document.createElement("div");
+    pill.className = "read-pill";
+    pill.innerHTML = `<button class="read-go" data-act="read">✦ Read with Lumen</button><button class="read-x" data-act="dismiss" title="Hide" aria-label="Hide">✕</button>`;
+    const go = pill.querySelector<HTMLButtonElement>(".read-go")!;
+    pill.onclick = async (event) => {
+      const act = (event.target as HTMLElement).closest("button")?.dataset.act;
+      if (act === "dismiss") { pill.remove(); this.host.classList.remove("has-read-pill"); return; }
+      if (act !== "read" || go.disabled) return;
+      go.disabled = true;
+      go.textContent = "Opening…";
+      const reply = await send<{ ok: boolean; error?: string }>({ type: "READ_IN_LUMEN", url: this.surface.url() })
+        .catch((error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      go.disabled = false;
+      go.textContent = "✦ Read with Lumen";
+      if (!reply.ok) this.toast(reply.error ?? "Could not open this doc in Lumen", "err");
+    };
+    this.root.appendChild(pill);
+    this.host.classList.add("has-read-pill");
   }
 
   toast(text: string, tone: "ok" | "err" = "ok") {
