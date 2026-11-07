@@ -72,8 +72,9 @@ export default function Reader() {
   }, [id]);
 
   const html = item?.contentHtml ? DOMPurify.sanitize(item.contentHtml, { FORBID_TAGS: ["style", "form", "iframe"], FORBID_ATTR: ["style"] }) : "";
-  // A PDF with its file shows its real pages; the text view stays for one without a stored file or when the pages fail.
-  const showPages = Boolean(item?.pdf && item.pdf.hasFile && !item.pdf.locked && (item.pdf.text === "ready" || item.pdf.text === "no_text") && !pagesFailed);
+  // A PDF with its file, or a saved link opened for the first time, shows its real pages; the text view stays for one without a stored file or when the pages fail.
+  const firstOpen = item?.pdf?.text === "pending";
+  const showPages = Boolean(item?.pdf && !item.pdf.locked && !pagesFailed && (firstOpen || (item.pdf.hasFile && (item.pdf.text === "ready" || item.pdf.text === "no_text"))));
 
   // paint highlights into the article after render
   useLayoutEffect(() => {
@@ -399,7 +400,8 @@ export default function Reader() {
           </header>
           {showPages && item.pdf ? (
             <div className="article__body article__body--pdf" onClick={onBodyClick}>
-              <PdfPages itemId={item.id} highlights={hls} pagesRef={bodyRef} onText={setPdfText} onFail={() => { setPdfText(null); setPagesFailed(true); }}
+              <PdfPages itemId={item.id} firstOpen={firstOpen} highlights={hls} pagesRef={bodyRef} onText={setPdfText} onFail={() => { setPdfText(null); setPagesFailed(true); }}
+                onSaved={(result) => setItem((current) => current && { ...current, ...result })}
                 onPainted={() => { if (marginRef.current && bodyRef.current) alignMargin(marginRef.current, bodyRef.current, aiQuoteRef.current); }} />
             </div>
           ) : html ? (

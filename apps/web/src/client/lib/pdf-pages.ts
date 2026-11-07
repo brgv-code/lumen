@@ -1,27 +1,43 @@
 // A PDF as its real pages in the reader: pdf.js draws pages near the screen and drops far ones, the page flows with the article.
 import { pdfRuns, type PdfRun } from "@lumen/core";
 import { PdfText, markLineEnds } from "@lumen/core/pdf-dom";
+import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 export interface ShownPdf {
-  text: PdfText;
+  /** Every page's text, read after the first pages are drawn. */
+  text: Promise<PdfText>;
   destroy(): void;
 }
 
 // pdf.js page border on each side (pdf_viewer.css `--page-border`), so a page fits the column exactly.
 const PAGE_BORDER = 9;
 
-/** Draws `bytes` as pages inside `container`; `onLayer` gets each text layer once it is ready for marks. */
-export async function showPdfPages(bytes: ArrayBuffer, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const { default: workerSrc } = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
-  pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-  // The viewer module reads the core library from this global when it loads.
-  Object.assign(globalThis, { pdfjsLib: pdfjs });
-  const [{ EventBus, PDFPageView, RenderingStates }] = await Promise.all([import("pdfjs-dist/legacy/web/pdf_viewer.mjs"), import("pdfjs-dist/legacy/web/pdf_viewer.css")]);
+/**
+ * Draws a PDF as pages inside `container`, page 1 first; `onLayer` gets each text layer once it is ready for marks.
+ * `file` is a stored file's address, or the bytes still on their way on a first open.
+ */
+export async function showPdfPages(file: string | Promise<ArrayBuffer>, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
+  // Our own worker, started now so it downloads alongside the core library instead of after it.
+  const port = new Worker(workerSrc, { type: "module" });
+  try {
+    return await openPdf(file, port, container, onLayer);
+  } catch (error) {
+    port.terminate();
+    throw error;
+  }
+}
 
-  // pdf.js hands its copy of the bytes to its worker.
-  const task = pdfjs.getDocument({ data: new Uint8Array(bytes.slice(0)), cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
-  const doc = await task.promise;
+async function openPdf(file: string | Promise<ArrayBuffer>, port: Worker, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
+  const styles = import("pdfjs-dist/legacy/web/pdf_viewer.css");
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // The viewer module reads the core library from this global when it loads; it downloads while the file opens.
+  Object.assign(globalThis, { pdfjsLib: pdfjs });
+  const viewer = import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
+  const worker = pdfjs.PDFWorker.create({ port });
+  // By URL, pdf.js asks for the ranges page 1 needs first and streams the rest behind them. Bytes go to the worker as a copy; the caller keeps them.
+  const source = typeof file === "string" ? { url: file, httpHeaders: { "x-lumen": "1" } } : { data: new Uint8Array((await file).slice(0)) };
+  const task = pdfjs.getDocument({ ...source, worker, cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
+  const [doc, { EventBus, PDFPageView, RenderingStates }] = await Promise.all([task.promise, viewer, styles]);
   const eventBus = new EventBus();
   eventBus.on("textlayerrendered", ({ source }: { source: { textLayer: { div: HTMLElement } | null } }) => {
     if (!source.textLayer) return;
@@ -29,24 +45,22 @@ export async function showPdfPages(bytes: ArrayBuffer, container: HTMLDivElement
     onLayer(source.textLayer.div);
   });
 
-  const pages = [];
-  for (let number = 1; number <= doc.numPages; number++) pages.push(await doc.getPage(number));
+  const first = await doc.getPage(1);
+  const widthOf = (page: typeof first) => page.getViewport({ scale: 1 }).width;
   // One scale for every page: pdf.js sizes pages from a single --scale-factor on the container.
-  const widest = Math.max(...pages.map((page) => page.getViewport({ scale: 1 }).width));
+  let widest = widthOf(first);
   const fitScale = () => (container.clientWidth - 2 * PAGE_BORDER) / (widest * pdfjs.PixelsPerInch.PDF_TO_CSS_UNITS);
   const scale = fitScale();
-  const views = pages.map((page, index) => {
-    const view = new PDFPageView({ container, eventBus, id: index + 1, scale, defaultViewport: page.getViewport({ scale: scale * pdfjs.PixelsPerInch.PDF_TO_CSS_UNITS }) });
-    view.setPdfPage(page);
-    return view;
-  });
-  const runs: PdfRun[][] = [];
-  for (const page of pages) runs.push(pdfRuns((await page.getTextContent()).items));
+  // Every slot starts at page 1's size, so page 1 draws without waiting for the others to load.
+  const defaultViewport = first.getViewport({ scale: scale * pdfjs.PixelsPerInch.PDF_TO_CSS_UNITS });
+  const views: InstanceType<typeof PDFPageView>[] = [];
+  for (let number = 1; number <= doc.numPages; number++) views.push(new PDFPageView({ container, eventBus, id: number, scale, defaultViewport }));
+  views[0].setPdfPage(first);
 
   // Draw pages a screen away; drop canvases three screens away so a long paper does not fill memory.
   const nearby = new Set<InstanceType<typeof PDFPageView>>();
   const draw = (view: InstanceType<typeof PDFPageView>) => {
-    if (view.renderingState !== RenderingStates.INITIAL) return;
+    if (view.renderingState !== RenderingStates.INITIAL || !view.pdfPage) return;
     view.draw().catch((error: Error) => { if (error.name !== "RenderingCancelledException") console.warn("pdf.js could not draw a page", error); });
   };
   const viewOf = (target: Element) => views[Number((target as HTMLElement).dataset.pageNumber) - 1];
@@ -65,7 +79,13 @@ export async function showPdfPages(bytes: ArrayBuffer, container: HTMLDivElement
   }, { rootMargin: "300% 0px" });
   for (const view of views) { near.observe(view.div); far.observe(view.div); }
 
-  // The column narrows with the window: pages follow its width. A standalone page waits to be drawn again after update.
+  // A standalone page waits to be drawn again after update.
+  const rescale = () => {
+    const next = fitScale();
+    for (const view of views) view.update({ scale: next });
+    for (const view of nearby) draw(view);
+  };
+  // The column narrows with the window: pages follow its width.
   let lastWidth = container.clientWidth;
   let frame = 0;
   const resized = new ResizeObserver(() => {
@@ -74,23 +94,47 @@ export async function showPdfPages(bytes: ArrayBuffer, container: HTMLDivElement
     frame = requestAnimationFrame(() => {
       if (container.clientWidth === lastWidth) return;
       lastWidth = container.clientWidth;
-      const next = fitScale();
-      for (const view of views) view.update({ scale: next });
-      for (const view of nearby) draw(view);
+      rescale();
     });
   });
   resized.observe(container);
 
+  // The other pages and every page's text load after page 1 is on screen; neither is needed for the first pixel.
+  let closed = false;
+  const text = (async () => {
+    const pages = [first];
+    for (let number = 2; number <= doc.numPages; number++) {
+      const page = await doc.getPage(number);
+      const view = views[number - 1];
+      view.setPdfPage(page);
+      if (nearby.has(view)) draw(view);
+      pages.push(page);
+    }
+    const widestPage = Math.max(...pages.map(widthOf));
+    if (widestPage > widest) { widest = widestPage; rescale(); }
+    const runs: PdfRun[][] = [];
+    for (const page of pages) runs.push(pdfRuns((await page.getTextContent()).items));
+    return new PdfText(runs);
+  })().catch((error: Error) => {
+    // A document closed mid-read never delivers its text, rather than failing a reader that already left.
+    if (closed) return new Promise<PdfText>(() => {});
+    throw error;
+  });
+
   return {
-    text: new PdfText(runs),
+    text,
     destroy() {
+      closed = true;
       near.disconnect();
       far.disconnect();
       resized.disconnect();
       cancelAnimationFrame(frame);
       // The divs go too: a document opened after its reader left must leave nothing behind.
       for (const view of views) { view.destroy(); view.div.remove(); }
-      task.destroy().catch((error: Error) => console.warn("pdf.js did not close cleanly", error));
+      // pdf.js leaves a worker it was handed running, so it goes once the document has closed.
+      task.destroy()
+        .catch((error: Error) => console.warn("pdf.js did not close cleanly", error))
+        .finally(() => { worker.destroy(); port.terminate(); });
     },
   };
 }

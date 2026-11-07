@@ -14,6 +14,8 @@ export const pdf = new Hono<AppEnv>();
 const SHA256 = /^[0-9a-f]{64}$/;
 // The text of 500 dense pages is well under this; anything bigger is not from our parser.
 const MAX_TEXT_CHARS = 3_000_000;
+// Covers the whole download; a 25 MB file reaches a Worker well inside it.
+const UPSTREAM_TIMEOUT_MS = 30_000;
 
 function requirePdfAccess(c: Parameters<typeof requirePro>[0]) {
   requirePro(c, "pdf");
@@ -45,6 +47,15 @@ async function storeFile(env: Env, userId: string, itemId: string, stream: Reada
   const t = now();
   await env.DB.prepare(`INSERT INTO item_files (item_id, user_id, r2_key, bytes, created_at, updated_at) VALUES (?,?,?,?,?,?)
     ON CONFLICT(item_id) DO UPDATE SET r2_key = excluded.r2_key, bytes = excluded.bytes, updated_at = excluded.updated_at`).bind(itemId, userId, key, bytes, t, t).run();
+}
+
+/** The bytes R2 returned for a Range request, so pdf.js can fetch only what page 1 needs. */
+function servedRange(object: R2ObjectBody): { start: number; end: number } | null {
+  const range = object.range;
+  if (!range) return null;
+  if ("suffix" in range) return { start: object.size - range.suffix, end: object.size - 1 };
+  const start = range.offset ?? 0;
+  return { start, end: start + (range.length ?? object.size - start) - 1 };
 }
 
 async function markFailed(db: D1Database, userId: string, itemId: string) {
@@ -103,24 +114,29 @@ pdf.put("/:id/file", async (c) => {
 pdf.get("/:id/file", async (c) => {
   requirePdfAccess(c);
   const u = c.get("user");
+  const fileHeaders = { "content-type": "application/pdf", "x-content-type-options": "nosniff", "cache-control": "private, max-age=3600", "accept-ranges": "bytes" };
+  // The key holds the user's id and goes when the item does, so a stored range skips the database.
+  if (c.req.header("range")) {
+    const stored = await c.env.FILES.get(pdfKey(u.id, c.req.param("id")), { range: c.req.raw.headers });
+    const part = stored && servedRange(stored);
+    if (stored && part) return new Response(stored.body, { status: 206, headers: { ...fileHeaders, "content-range": `bytes ${part.start}-${part.end}/${stored.size}`, "content-length": String(part.end - part.start + 1) } });
+  }
   const item = await ownPdf(c.env.DB, u.id, c.req.param("id"));
-  const headers = {
-    "content-type": "application/pdf",
-    "content-disposition": `inline; filename="${item.title.replace(/[^\w .-]+/g, "_").slice(0, 80)}.pdf"`,
-    "x-content-type-options": "nosniff",
-    "cache-control": "private, max-age=3600",
-  };
+  const headers = { ...fileHeaders, "content-disposition": `inline; filename="${item.title.replace(/[^\w .-]+/g, "_").slice(0, 80)}.pdf"` };
   const stored = await c.env.FILES.get(pdfKey(u.id, item.id));
-  if (stored) return new Response(stored.body, { headers });
+  if (stored) return new Response(stored.body, { headers: { ...headers, "content-length": String(stored.size) } });
 
   if (!isHttpUrl(item.url) || item.url.startsWith(new URL(c.req.url).origin)) fail(404, "no_file", "This PDF's file was not stored.");
-  const upstream = await fetch(item.url, { headers: { "user-agent": "Mozilla/5.0 (compatible; LumenReader/1.0; +https://github.com/brgv-code/lumen)", accept: "application/pdf" }, redirect: "follow" }).catch(() => null);
+  // A source can stall mid-download for minutes; the reader gets an error it can retry instead of waiting forever.
+  const signal = AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
+  const upstream = await fetch(item.url, { headers: { "user-agent": "Mozilla/5.0 (compatible; LumenReader/1.0; +https://github.com/brgv-code/lumen)", accept: "application/pdf" }, redirect: "follow", signal }).catch(() => null);
   const declared = Number(upstream?.headers.get("content-length") ?? 0);
   if (!upstream?.ok || declared > PDF_MAX_BYTES) {
     await markFailed(c.env.DB, u.id, item.id);
     fail(422, declared > PDF_MAX_BYTES ? "too_large" : "unreachable", declared > PDF_MAX_BYTES ? "PDFs can be up to 25 MB." : "The PDF could not be downloaded from its link.");
   }
-  const file = await upstream.arrayBuffer();
+  // Not marked failed: a stall is the source's bad moment, the next open may get the file.
+  const file = await upstream.arrayBuffer().catch(() => fail(502, "upstream_stalled", "The PDF's site stopped sending it."));
   if (file.byteLength > PDF_MAX_BYTES || !isPdfBytes(new Uint8Array(file, 0, Math.min(5, file.byteLength)))) {
     await markFailed(c.env.DB, u.id, item.id);
     fail(422, file.byteLength > PDF_MAX_BYTES ? "too_large" : "not_pdf", file.byteLength > PDF_MAX_BYTES ? "PDFs can be up to 25 MB." : "That link did not return a PDF.");
