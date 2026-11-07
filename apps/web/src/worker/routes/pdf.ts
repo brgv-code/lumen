@@ -112,21 +112,17 @@ pdf.put("/:id/file", async (c) => {
 pdf.get("/:id/file", async (c) => {
   requirePdfAccess(c);
   const u = c.get("user");
-  const item = await ownPdf(c.env.DB, u.id, c.req.param("id"));
-  const headers = {
-    "content-type": "application/pdf",
-    "content-disposition": `inline; filename="${item.title.replace(/[^\w .-]+/g, "_").slice(0, 80)}.pdf"`,
-    "x-content-type-options": "nosniff",
-    "cache-control": "private, max-age=3600",
-    "accept-ranges": "bytes",
-  };
-  const asked = c.req.header("range");
-  const stored = await c.env.FILES.get(pdfKey(u.id, item.id), asked ? { range: c.req.raw.headers } : {});
-  if (stored) {
-    const part = asked ? servedRange(stored) : null;
-    if (!part) return new Response(stored.body, { headers: { ...headers, "content-length": String(stored.size) } });
-    return new Response(stored.body, { status: 206, headers: { ...headers, "content-range": `bytes ${part.start}-${part.end}/${stored.size}`, "content-length": String(part.end - part.start + 1) } });
+  const fileHeaders = { "content-type": "application/pdf", "x-content-type-options": "nosniff", "cache-control": "private, max-age=3600", "accept-ranges": "bytes" };
+  // The key holds the user's id and goes when the item does, so a stored range skips the database.
+  if (c.req.header("range")) {
+    const stored = await c.env.FILES.get(pdfKey(u.id, c.req.param("id")), { range: c.req.raw.headers });
+    const part = stored && servedRange(stored);
+    if (stored && part) return new Response(stored.body, { status: 206, headers: { ...fileHeaders, "content-range": `bytes ${part.start}-${part.end}/${stored.size}`, "content-length": String(part.end - part.start + 1) } });
   }
+  const item = await ownPdf(c.env.DB, u.id, c.req.param("id"));
+  const headers = { ...fileHeaders, "content-disposition": `inline; filename="${item.title.replace(/[^\w .-]+/g, "_").slice(0, 80)}.pdf"` };
+  const stored = await c.env.FILES.get(pdfKey(u.id, item.id));
+  if (stored) return new Response(stored.body, { headers: { ...headers, "content-length": String(stored.size) } });
 
   if (!isHttpUrl(item.url) || item.url.startsWith(new URL(c.req.url).origin)) fail(404, "no_file", "This PDF's file was not stored.");
   const upstream = await fetch(item.url, { headers: { "user-agent": "Mozilla/5.0 (compatible; LumenReader/1.0; +https://github.com/brgv-code/lumen)", accept: "application/pdf" }, redirect: "follow" }).catch(() => null);

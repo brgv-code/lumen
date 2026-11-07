@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { colorVar, type Highlight } from "@lumen/core";
 import { unwrapMarks, wrapRange } from "@lumen/core/dom";
 import type { PdfText } from "@lumen/core/pdf-dom";
-import { api } from "../lib/api";
 import { showPdfPages } from "../lib/pdf-pages";
 import { Notice } from "./PdfBody";
 
@@ -41,15 +40,17 @@ export function PdfPages({ itemId, highlights, pagesRef, onText, onPainted, onFa
     if (!root) return;
     let cancelled = false;
     let destroy = () => {};
-    api.pdfFile(itemId)
-      .then((bytes) => showPdfPages(bytes, root, () => paintRef.current()))
+    showPdfPages(`/api/v1/items/${itemId}/file`, root, () => paintRef.current())
       .then((pdf) => {
         if (cancelled) return pdf.destroy();
         destroy = pdf.destroy;
-        textRef.current = pdf.text;
         setShown(true);
-        latest.current.onText(pdf.text);
-        paintRef.current();
+        return pdf.text.then((text) => {
+          if (cancelled) return;
+          textRef.current = text;
+          latest.current.onText(text);
+          paintRef.current();
+        });
       })
       .catch((error: Error) => {
         console.warn("Lumen could not show the PDF's pages", error);
