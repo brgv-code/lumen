@@ -47,6 +47,15 @@ async function storeFile(env: Env, userId: string, itemId: string, stream: Reada
     ON CONFLICT(item_id) DO UPDATE SET r2_key = excluded.r2_key, bytes = excluded.bytes, updated_at = excluded.updated_at`).bind(itemId, userId, key, bytes, t, t).run();
 }
 
+/** The bytes R2 returned for a Range request, so pdf.js can fetch only what page 1 needs. */
+function servedRange(object: R2ObjectBody): { start: number; end: number } | null {
+  const range = object.range;
+  if (!range) return null;
+  if ("suffix" in range) return { start: object.size - range.suffix, end: object.size - 1 };
+  const start = range.offset ?? 0;
+  return { start, end: start + (range.length ?? object.size - start) - 1 };
+}
+
 async function markFailed(db: D1Database, userId: string, itemId: string) {
   const t = now();
   await db.prepare(`INSERT INTO item_files (item_id, user_id, text_status, created_at, updated_at) VALUES (?,?,'failed',?,?)
@@ -109,9 +118,15 @@ pdf.get("/:id/file", async (c) => {
     "content-disposition": `inline; filename="${item.title.replace(/[^\w .-]+/g, "_").slice(0, 80)}.pdf"`,
     "x-content-type-options": "nosniff",
     "cache-control": "private, max-age=3600",
+    "accept-ranges": "bytes",
   };
-  const stored = await c.env.FILES.get(pdfKey(u.id, item.id));
-  if (stored) return new Response(stored.body, { headers });
+  const asked = c.req.header("range");
+  const stored = await c.env.FILES.get(pdfKey(u.id, item.id), asked ? { range: c.req.raw.headers } : {});
+  if (stored) {
+    const part = asked ? servedRange(stored) : null;
+    if (!part) return new Response(stored.body, { headers: { ...headers, "content-length": String(stored.size) } });
+    return new Response(stored.body, { status: 206, headers: { ...headers, "content-range": `bytes ${part.start}-${part.end}/${stored.size}`, "content-length": String(part.end - part.start + 1) } });
+  }
 
   if (!isHttpUrl(item.url) || item.url.startsWith(new URL(c.req.url).origin)) fail(404, "no_file", "This PDF's file was not stored.");
   const upstream = await fetch(item.url, { headers: { "user-agent": "Mozilla/5.0 (compatible; LumenReader/1.0; +https://github.com/brgv-code/lumen)", accept: "application/pdf" }, redirect: "follow" }).catch(() => null);
