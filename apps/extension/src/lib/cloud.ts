@@ -64,6 +64,10 @@ export async function syncTarget(): Promise<{ sent: number; to?: string }> {
     method: "POST",
     headers: { authorization: `Bearer ${s.obsidianKey}`, "content-type": "text/markdown" },
     body: p.markdown,
+  }).catch(async (error) => {
+    // The error ack releases this sync's claim, so the next sync offers the same highlights.
+    await cloudApi.ack(dest.id, p, "Obsidian unreachable").catch(() => {});
+    throw error;
   });
   if (!res.ok) {
     await cloudApi.ack(dest.id, p, `Obsidian ${res.status}`).catch(() => {});

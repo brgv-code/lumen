@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SLASH_HINT, citedSources, colorSwatch, parseSlash, type SlashCommand } from "@lumen/core";
+import { SLASH_HINT, citedSources, colorSwatch, parseSlash, patchReply, type SlashCommand } from "@lumen/core";
 import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
@@ -9,7 +9,7 @@ import { Md } from "../../lib/md";
 
 type Tab = "ask" | "page" | "you";
 interface Source { n: number; kind: string; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null }
-interface Msg { role: "user" | "assistant"; content: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean; kind?: "tldr" }
+interface Msg { id?: string; role: "user" | "assistant"; content: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean; kind?: "tldr" }
 
 async function activeTab() {
   const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -61,7 +61,7 @@ export default function Panel() {
     const onUpd = (_id: number, info: chrome.tabs.TabChangeInfo) => { if (info.status === "complete") refreshTab(); };
     chrome.tabs.onActivated.addListener(onAct);
     chrome.tabs.onUpdated.addListener(onUpd);
-    const onMsg = (m: { type?: string; prompt?: string }) => { if (m?.type === "PANEL_PROMPT" && m.prompt) { setTab("ask"); ask(m.prompt); } };
+    const onMsg = (m: { type?: string; prompt?: string }) => { if (m?.type === "PANEL_PROMPT" && m.prompt) { setTab("ask"); askRef.current(m.prompt); } };
     chrome.runtime.onMessage.addListener(onMsg);
     if (START_PROMPT) setTimeout(() => ask(START_PROMPT), 300);
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && FLOAT) closeFloat(); };
@@ -73,9 +73,10 @@ export default function Panel() {
 
   /** Streams one reply from a port into a new assistant message. */
   const streamInto = (question: string, port: chrome.runtime.Port, kind?: Msg["kind"]) => {
-    setMsgs((l) => [...l, { role: "user", content: question }, { role: "assistant", content: "", streaming: true, kind }]);
+    const replyId = crypto.randomUUID();
+    setMsgs((l) => [...l, { role: "user", content: question }, { id: replyId, role: "assistant", content: "", streaming: true, kind }]);
     setInput("");
-    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => l.map((m, k) => (k === l.length - 1 ? fn(m) : m)));
+    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => patchReply(l, replyId, fn));
     port.onMessage.addListener((m: { chunk?: string; done?: boolean; error?: string }) => {
       if (m.chunk) patch((x) => ({ ...x, content: x.content + m.chunk }));
       if (m.done) { patch((x) => ({ ...x, streaming: false })); port.disconnect(); }
@@ -111,10 +112,11 @@ export default function Panel() {
     const ctx = usePage ? await readPage(t) : null;
     if (usePage) setCtxInfo(ctx ?? "none");
     const history = msgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content }));
-    setMsgs((l) => [...l, { role: "user", content: input }, { role: "assistant", content: "", streaming: true }]);
+    const replyId = crypto.randomUUID();
+    setMsgs((l) => [...l, { role: "user", content: input }, { id: replyId, role: "assistant", content: "", streaming: true }]);
     setInput("");
     const port = chrome.runtime.connect({ name: "lumen-chat" });
-    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => l.map((m, k) => (k === l.length - 1 ? fn(m) : m)));
+    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => patchReply(l, replyId, fn));
     port.onMessage.addListener((m: { chunk?: string; sources?: Source[]; done?: boolean; error?: string; upgrade?: boolean }) => {
       if (m.sources) patch((x) => ({ ...x, sources: m.sources }));
       if (m.chunk) patch((x) => ({ ...x, content: x.content + m.chunk }));
@@ -123,6 +125,10 @@ export default function Panel() {
     });
     port.postMessage({ question, history, selection: ctx?.selection || undefined, page: ctx ? { title: ctx.title, url: t?.url ?? "", text: ctx.text } : undefined });
   };
+
+  // The message listener is added once on mount; through this it asks with the chat as it is now.
+  const askRef = useRef(ask);
+  askRef.current = ask;
 
   const openInLumen = (path: string) => send({ type: "OPEN_DASHBOARD", path });
   const host = cur?.url?.startsWith("http") ? new URL(cur.url).hostname.replace(/^www\./, "") : "";

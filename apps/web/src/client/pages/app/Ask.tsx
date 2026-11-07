@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUp, MessageCircle, Sparkles } from "lucide-react";
-import { citedSources } from "@lumen/core";
+import { citedSources, patchReply } from "@lumen/core";
 import { streamChat, type ChatSource } from "../../lib/api";
 import { PageHero } from "../../components/PageHero";
 import { Md } from "../../components/Md";
 import { useNavigate } from "react-router-dom";
 
-interface Msg { role: "user" | "assistant"; content: string; sources?: ChatSource[]; error?: string; streaming?: boolean }
+interface Msg { id?: string; role: "user" | "assistant"; content: string; sources?: ChatSource[]; error?: string; streaming?: boolean }
 
 const STARTERS = ["What have I been reading about lately?", "Which of my highlights disagree with each other?", "Summarise what I know about attention", "What should I write next, based on my notes?"];
 
@@ -21,9 +21,10 @@ export default function Ask() {
   const ask = async (question: string) => {
     if (!question.trim()) return;
     const history = msgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content }));
-    setMsgs((l) => [...l, { role: "user", content: question }, { role: "assistant", content: "", streaming: true }]);
+    const replyId = crypto.randomUUID();
+    setMsgs((l) => [...l, { role: "user", content: question }, { id: replyId, role: "assistant", content: "", streaming: true }]);
     setQ("");
-    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => l.map((m, k) => (k === l.length - 1 ? fn(m) : m)));
+    const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => patchReply(l, replyId, fn));
     try {
       // This page asks the library itself, so every follow up searches it too.
       await streamChat({ question, history, library: true }, { text: (t) => patch((m) => ({ ...m, content: t })), sources: (s) => patch((m) => ({ ...m, sources: s })) });

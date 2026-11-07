@@ -6,30 +6,33 @@ interface Req { action: AIAction; text: string; question?: string; title?: strin
 /** done gets the model that answered, for the card footer. */
 type On = { chunk: (t: string) => void; done: (model?: string) => void; error: (e: string) => void };
 
-export async function streamAnswer(req: Req, s: Settings, on: On) {
+export async function streamAnswer(req: Req, s: Settings, on: On, signal?: AbortSignal) {
   try {
-    if (s.provider === "lumen") return await viaLumen("/ai/run", req, s, on);
+    if (s.provider === "lumen") return await viaLumen("/ai/run", req, s, on, signal);
     const prompt = readerPrompt(req.action, req.text, { question: req.question, title: req.title, context: req.context });
-    return await viaLocal(prompt, READER_SYSTEM, s, on);
+    return await viaLocal(prompt, READER_SYSTEM, s, on, signal);
   } catch (e) {
+    // A card that closed asked for this; nobody is left to show an error to.
+    if (signal?.aborted) return;
     on.error(e instanceof Error ? e.message : String(e));
   }
 }
 
 /** TL;DR of a page: hosted Lumen reads it all (chunked server side); local models read the start. */
-export async function streamTldr(req: { title: string; paragraphs: string[] }, s: Settings, on: On) {
+export async function streamTldr(req: { title: string; paragraphs: string[] }, s: Settings, on: On, signal?: AbortSignal) {
   try {
-    if (s.provider === "lumen") return await viaLumen("/ai/tldr", req, s, on);
-    return await viaLocal(tldrPrompt(req.title, paragraphsWithin(req.paragraphs, LOCAL_TLDR_CHARS)), TLDR_SYSTEM, s, on);
+    if (s.provider === "lumen") return await viaLumen("/ai/tldr", req, s, on, signal);
+    return await viaLocal(tldrPrompt(req.title, paragraphsWithin(req.paragraphs, LOCAL_TLDR_CHARS)), TLDR_SYSTEM, s, on, signal);
   } catch (e) {
+    if (signal?.aborted) return;
     on.error(e instanceof Error ? e.message : String(e));
   }
 }
 
-function viaLocal(prompt: string, system: string, s: Settings, on: On) {
-  if (s.provider === "ollama") return viaOllama(prompt, system, s, on);
-  if (s.provider === "openai") return viaOpenAI(prompt, system, s, on);
-  return viaClaude(prompt, system, s, on);
+function viaLocal(prompt: string, system: string, s: Settings, on: On, signal?: AbortSignal) {
+  if (s.provider === "ollama") return viaOllama(prompt, system, s, on, signal);
+  if (s.provider === "openai") return viaOpenAI(prompt, system, s, on, signal);
+  return viaClaude(prompt, system, s, on, signal);
 }
 
 async function readSSE(res: Response, pick: (j: any) => string | undefined, on: On, model?: string) {
@@ -52,22 +55,24 @@ async function readSSE(res: Response, pick: (j: any) => string | undefined, on: 
   on.done(model);
 }
 
-async function viaLumen(path: string, req: object, s: Settings, on: On) {
+async function viaLumen(path: string, req: object, s: Settings, on: On, signal?: AbortSignal) {
   if (!s.token) return on.error("Connect Lumen in settings, or switch the provider to Ollama or Claude.");
   const res = await fetch(`${s.apiBase}/api/v1${path}`, {
     method: "POST",
     headers: { authorization: `Bearer ${s.token}`, "content-type": "application/json" },
     body: JSON.stringify(req),
+    signal,
   });
   if (!res.ok) { let m = `Lumen answered ${res.status}`; try { m = (await res.json()).error?.message ?? m; } catch { /* */ } return on.error(m); }
   await readSSE(res, (j) => j.response, on, res.headers.get("x-lumen-model") ?? undefined);
 }
 
-async function viaOllama(prompt: string, system: string, s: Settings, on: On) {
+async function viaOllama(prompt: string, system: string, s: Settings, on: On, signal?: AbortSignal) {
   const res = await fetch(`${s.ollamaBaseUrl}/api/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ model: s.model, system, prompt, stream: true }),
+    signal,
   });
   if (res.status === 403) return on.error("Ollama blocked the extension. Restart it with OLLAMA_ORIGINS='chrome-extension://*' ollama serve");
   if (!res.ok) return on.error(`Ollama answered ${res.status}`);
@@ -88,11 +93,12 @@ async function viaOllama(prompt: string, system: string, s: Settings, on: On) {
   on.done(s.model);
 }
 
-async function viaOpenAI(prompt: string, system: string, s: Settings, on: On) {
+async function viaOpenAI(prompt: string, system: string, s: Settings, on: On, signal?: AbortSignal) {
   const res = await fetch(`${s.openaiBaseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${s.openaiKey}` },
     body: JSON.stringify({ model: s.model, stream: true, messages: [{ role: "system", content: system }, { role: "user", content: prompt }] }),
+    signal,
   });
   if (!res.ok) return on.error(`API answered ${res.status}: ${(await res.text()).slice(0, 160)}`);
   await readSSE(res, (j) => j.choices?.[0]?.delta?.content, on, s.model);
@@ -105,7 +111,7 @@ async function nativeAllowed(): Promise<boolean> {
 }
 
 /** Claude through the local Lumen helper, which runs `claude -p` (native messaging). */
-async function viaClaude(prompt: string, system: string, s: Settings, on: On): Promise<void> {
+async function viaClaude(prompt: string, system: string, s: Settings, on: On, signal?: AbortSignal): Promise<void> {
   if (!(await nativeAllowed())) { on.error(NO_PERMISSION); return; }
   return new Promise((resolve) => {
     let port: chrome.runtime.Port;
@@ -127,6 +133,8 @@ async function viaClaude(prompt: string, system: string, s: Settings, on: On): P
         : "The Lumen helper stopped. Is the claude CLI on your PATH?");
       resolve();
     });
+    // Disconnecting ends the helper's claude run; finished stops the disconnect from reporting an error.
+    signal?.addEventListener("abort", () => { finished = true; port.disconnect(); resolve(); }, { once: true });
     port.postMessage({ type: "claude", model: s.claudeModel, system, prompt });
   });
 }

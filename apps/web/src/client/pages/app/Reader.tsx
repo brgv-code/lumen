@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
-import type { AIAction, Citation, Highlight, HighlightAnswer, ItemTldr, ItemWithContent, TextQuote } from "@lumen/core";
-import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, citedSources, HIGHLIGHT_COLORS, colorVar, modelLabel, parseSlash, splitCitations } from "@lumen/core";
+import type { AIAction, Citation, Highlight, HighlightAnswer, ItemTldr, ItemWithContent, LiveAnswers, TextQuote } from "@lumen/core";
+import { BAR_LABEL, DEFAULT_BAR_ACTIONS, SLASH_HINT, answerLabel, citeForClipboard, citedSources, HIGHLIGHT_COLORS, colorVar, endLive, modelLabel, parseSlash, patchLive, splitCitations, startLive } from "@lumen/core";
 import { ColorWheel, recentColors, rememberColor, lastColor, setLastColor } from "../../components/ColorPicker";
 import { anchorToRange, coveringQuote, readableParagraphs, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarSnapshot } from "@lumen/core/bar";
@@ -48,7 +48,7 @@ export default function Reader() {
   const [missing, setMissing] = useState(false);
   const [alsoSaving, setAlsoSaving] = useState(0);
   const [wheelAt, setWheelAt] = useState<{ x: number; y: number; snapshot: BarSnapshot } | null>(null);
-  const [threadAsk, setThreadAsk] = useState<{ highlightId: string; action: AIAction; question: string | null; answer: string; streaming: boolean } | null>(null);
+  const [threadAsks, setThreadAsks] = useState<LiveAnswers<{ highlightId: string; action: AIAction; question: string | null; answer: string; streaming: boolean }>>({});
   const [tldr, setTldr] = useState<ItemTldr | null>(null);
   const paragraphsRef = useRef<ReturnType<typeof readableParagraphs>>([]);
   const marginRef = useRef<HTMLDivElement>(null);
@@ -289,13 +289,14 @@ export default function Reader() {
     if (slash?.command === "related") return runRelated(slash.rest || h.quote);
     const action: AIAction = slash ? (slash.command === "define" ? "define" : "counterpoint") : "ask";
     const question = slash ? null : input;
-    setThreadAsk({ highlightId: h.id, action, question, answer: "", streaming: true });
+    const requestId = crypto.randomUUID();
+    setThreadAsks((live) => startLive(live, h.id, requestId, { highlightId: h.id, action, question, answer: "", streaming: true }));
     try {
-      const { answer, model } = await streamAI({ action, text: slash?.rest || h.quote, question: question ?? undefined, title: item?.title }, (t) => setThreadAsk((s) => (s ? { ...s, answer: t } : s)));
+      const { answer, model } = await streamAI({ action, text: slash?.rest || h.quote, question: question ?? undefined, title: item?.title }, (t) => setThreadAsks((live) => patchLive(live, h.id, requestId, (s) => ({ ...s, answer: t }))));
       const r = await api.keepAnswer(h.id, { action, question, answer, model, parentId: h.answers?.at(-1)?.id });
       setHls((l) => l.map((x) => (x.id === h.id ? { ...x, answers: [...(x.answers ?? []), r.answer] } : x)));
     } catch (e) { toast((e as Error).message, "err"); }
-    finally { setThreadAsk(null); }
+    finally { setThreadAsks((live) => endLive(live, h.id, requestId)); }
   };
 
   aiQuoteRef.current = ai?.action === "tldr" ? paragraphsRef.current[0]?.quote ?? null : ai?.passage?.quote ?? null;
@@ -305,7 +306,7 @@ export default function Reader() {
     if (!margin || !body) return;
     for (const card of margin.querySelectorAll(":scope > [data-anchor]")) resizeRef.current?.observe(card);
     alignMargin(margin, body, aiQuoteRef.current);
-  }, [hls, ai, threadAsk, html]);
+  }, [hls, ai, threadAsks, html]);
 
   // Cards grow while answers stream and the article reflows as fonts and images load.
   useEffect(() => {
@@ -485,7 +486,7 @@ export default function Reader() {
                   onNote={async (note) => { const r = await api.updateHighlight(h.id, { note }); setHls((l) => l.map((x) => (x.id === h.id ? r.highlight : x))); if (note && !h.note) toast("Note kept"); refresh(); }}
                   onDelete={async () => { await api.deleteHighlight(h.id); setHls((l) => l.filter((x) => x.id !== h.id)); refresh(); }}
                   onFollowUp={(question) => askThread(h, question)}
-                  followUp={threadAsk?.highlightId === h.id ? threadAsk : undefined} />
+                  followUp={threadAsks[h.id]} />
               </div>
             ))}
             {hls.length === 0 && <p className="small muted">Nothing marked yet. Select a sentence that matters.</p>}

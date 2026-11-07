@@ -7,7 +7,7 @@ import { withAnswers } from "../lib/answers";
 import { cleanCitations, tldrFor } from "../lib/tldr";
 import { trackUser } from "../lib/analytics";
 import { extractFromHtml, extractFromMarkdown, extractFromUrl, type Extracted } from "../lib/extract";
-import { glowStmt } from "../lib/glow";
+import { glowOnceStmt, glowStmt } from "../lib/glow";
 import { peerFilter } from "./discover";
 import { pdfInfo, pdfKey } from "../lib/files";
 
@@ -147,7 +147,7 @@ items.patch("/:id", async (c) => {
     sets.push("status = ?"); args.push(status);
     if (status === "done" && row.status !== "done") {
       sets.push("finished_at = ?", "progress = 1"); args.push(now());
-      stmts.push(glowStmt(db, u, "finish", row.id));
+      stmts.push(glowOnceStmt(db, u, "finish", row.id));
     }
     if (status === "reading" && row.status === "inbox") { /* started */ }
   }

@@ -51,15 +51,21 @@ export default function Integrations() {
           a.click();
           URL.revokeObjectURL(a.href);
         } else {
-          const cfg = d.config as { baseUrl: string; notePath: string };
-          const key = getKey(d.id);
-          if (!key) throw new Error("Add your Obsidian Local REST API key first.");
-          const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/vault/${cfg.notePath.split("/").map(encodeURIComponent).join("/")}`, {
-            method: "POST",
-            headers: { authorization: `Bearer ${key}`, "content-type": "text/markdown" },
-            body: p.markdown,
-          }).catch(() => { throw new Error("Could not reach Obsidian. Is it open with the Local REST API plugin, and is its certificate trusted?"); });
-          if (!res.ok) throw new Error(`Obsidian answered ${res.status}`);
+          try {
+            const cfg = d.config as { baseUrl: string; notePath: string };
+            const key = getKey(d.id);
+            if (!key) throw new Error("Add your Obsidian Local REST API key first.");
+            const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/vault/${cfg.notePath.split("/").map(encodeURIComponent).join("/")}`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${key}`, "content-type": "text/markdown" },
+              body: p.markdown,
+            }).catch(() => { throw new Error("Could not reach Obsidian. Is it open with the Local REST API plugin, and is its certificate trusted?"); });
+            if (!res.ok) throw new Error(`Obsidian answered ${res.status}`);
+          } catch (error) {
+            // The error ack releases this sync's claim, so trying again right away offers the same highlights.
+            await api.ack(d.id, p, (error as Error).message).catch((ackError) => console.warn("Lumen could not record the failed sync", ackError));
+            throw error;
+          }
         }
         await api.ack(d.id, p);
         toast(p.counts.answers ? `Sent ${p.counts.highlights} highlights and ${p.counts.answers} answers to ${d.name}` : p.counts.highlights ? `Sent ${p.counts.highlights} new highlights to ${d.name}` : `Sent to ${d.name}`);

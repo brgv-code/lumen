@@ -72,13 +72,14 @@ export interface PageState {
 }
 
 export type Msg =
-  | { type: "AI_REQUEST"; action: AIAction; text: string; question?: string; title?: string; context?: string }
+  | { type: "AI_REQUEST"; requestId: number; action: AIAction; text: string; question?: string; title?: string; context?: string }
   | { type: "PAGE_STATE"; url: string; auto?: boolean }
   | { type: "SAVE_PAGE"; url: string; title: string; html: string; kind?: "pdf" }
   | { type: "ADD_HIGHLIGHT"; url: string; title: string; html: string; kind?: "pdf"; quote: TextQuote; color: string; note?: string; collectionId?: string }
   | { type: "UPDATE_HIGHLIGHT"; id: string; url: string; color?: string; note?: string | null }
   | { type: "DELETE_HIGHLIGHT"; id: string; url: string }
-  | { type: "AI_TLDR"; title: string; paragraphs: string[] }
+  | { type: "AI_TLDR"; requestId: number; title: string; paragraphs: string[] }
+  | { type: "AI_CANCEL"; requestId: number }
   | { type: "KEEP_TLDR"; url: string; title: string; html: string; kind?: "pdf"; text: string; model: string | null; citations: Citation[] }
   | { type: "KEEP_ANSWER"; highlightId: string; url: string; action: AIAction; question: string | null; answer: string; model: string | null; parentId?: string }
   | { type: "GET_COLLECTIONS" }

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { Collection } from "@lumen/core";
 import { send } from "../../lib/msg";
 import { asPage, viewedPdf } from "../../lib/page";
-import type { PageState, Settings } from "../../lib/types";
+import type { Msg, PageState, Settings } from "../../lib/types";
+import { followOutcome, type FollowReply } from "../../lib/follow";
 import { Picker } from "./Picker";
 
 /** One job: save this page to the right place. Everything else lives in the side panel. */
@@ -104,11 +105,11 @@ export default function Popup() {
             title={follow ? `Following ${follow.title}. Click to unfollow.` : "Follow this blog and get notified about new posts"}
             onClick={async () => {
               setFollowBusy(true);
-              if (follow) { await send({ type: "UNFOLLOW_SITE", id: follow.id }); setFollow(null); setMsg("Unfollowed"); }
-              else {
-                const r = await send<{ ok: boolean; feed?: { id: string; title: string }; error?: string }>({ type: "FOLLOW_SITE", url: tab!.url! });
-                if (r.ok && r.feed) { setFollow(r.feed); setMsg(`Following ${r.feed.title}. You'll hear when it publishes.`); } else setMsg(r.error ?? "No feed found on this site");
-              }
+              const request: Msg = follow ? { type: "UNFOLLOW_SITE", id: follow.id } : { type: "FOLLOW_SITE", url: tab!.url! };
+              const reply = await send<FollowReply>(request).catch((error): FollowReply => ({ ok: false, error: String(error) }));
+              const outcome = followOutcome(follow ?? null, reply);
+              setFollow(outcome.follow);
+              setMsg(outcome.message);
               setFollowBusy(false);
             }}>{follow ? "♥ Following" : "♡ Follow"}</button>
           </div>

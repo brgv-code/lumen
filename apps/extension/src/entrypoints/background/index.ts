@@ -1,8 +1,11 @@
 import { googleDocExportUrl, googleDocTitle, googleDocUrl, type AIAction, type Highlight } from "@lumen/core";
 import { streamAnswer, streamTldr, testProvider } from "../../lib/ai";
 import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
-import { getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
+import { allLocalHighlights, getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
+import { uploadLocalHighlights } from "../../lib/offline";
 import { pdfViewerUrl, viewedPdf } from "../../lib/page";
+import { rerunIfAsked } from "../../lib/runs";
+import { OpenStreams } from "../../lib/streams";
 import type { Msg, PageState } from "../../lib/types";
 
 export default defineBackground(() => {
@@ -23,6 +26,7 @@ export default defineBackground(() => {
       if (msg?.type === "LUMEN_CONNECT" && typeof msg.token === "string" && msg.token.startsWith("lum_") && origin) {
         await saveSettings({ token: msg.token, apiBase: origin });
         buildMenus();
+        uploadOffline();
         refreshMarkedIndex().catch(() => {});
         refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error));
         return reply({ ok: true });
@@ -74,7 +78,7 @@ export default defineBackground(() => {
     if (d.reason === "install") chrome.runtime.openOptionsPage();
     refreshMarkedIndex().catch(() => {});
   });
-  chrome.runtime.onStartup.addListener(() => { buildMenus(); refreshMarkedIndex().catch(() => {}); });
+  chrome.runtime.onStartup.addListener(() => { buildMenus(); refreshMarkedIndex().catch(() => {}); uploadOffline(); });
   chrome.contextMenus.onClicked.addListener((info, tab) => onMenu(info, tab).catch(() => {}));
   chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
 
@@ -140,33 +144,43 @@ function safePost(port: chrome.runtime.Port, m: object) {
 
 /* ---------------- right click menus ---------------- */
 
-let building = false;
-async function buildMenus() {
-  if (building) return;
-  building = true;
-  try {
-    await chrome.contextMenus.removeAll();
-    const s = await getSettings();
-    const add = (o: chrome.contextMenus.CreateProperties) => chrome.contextMenus.create(o, () => void chrome.runtime.lastError);
-    add({ id: "save-page", title: "Save page to Lumen", contexts: ["page"] });
-    add({ id: "save-link", title: "Save link to Lumen", contexts: ["link"] });
-    add({ id: "follow", title: "Follow this blog in Lumen", contexts: ["page"] });
-    add({ id: "highlight", title: "Highlight with Lumen", contexts: ["selection"] });
-    add({ id: "explain", title: "Explain with Lumen", contexts: ["selection"] });
-    add({ id: "ask", title: "Ask Lumen about “%s”", contexts: ["selection"] });
-    let cols: { id: string; name: string; emoji: string }[] = [];
-    if (s.token) cols = (await cloudApi.collections().catch(() => ({ data: [] }))).data as typeof cols;
-    if (cols.length) {
-      add({ id: "send", title: "Send to Lumen", contexts: ["page", "selection", "link"] });
-      for (const c of cols.slice(0, 12)) add({ id: `send:${c.id}`, parentId: "send", title: `${c.emoji} ${c.name}`, contexts: ["page", "selection", "link"] });
-    }
-    add({ id: "sep", type: "separator", contexts: ["page"] });
-    add({ id: "panel", title: "Open the Lumen panel", contexts: ["page", "selection"] });
-    add({ id: "helper", title: `Show or hide ${s.helper.name} on this site`, contexts: ["page"] });
-  } finally {
-    building = false;
+// A rebuild asked for mid build (connecting, a new collection) runs after it instead of being dropped.
+const buildMenus = rerunIfAsked(async () => {
+  await chrome.contextMenus.removeAll();
+  const s = await getSettings();
+  const add = (o: chrome.contextMenus.CreateProperties) => chrome.contextMenus.create(o, () => void chrome.runtime.lastError);
+  add({ id: "save-page", title: "Save page to Lumen", contexts: ["page"] });
+  add({ id: "save-link", title: "Save link to Lumen", contexts: ["link"] });
+  add({ id: "follow", title: "Follow this blog in Lumen", contexts: ["page"] });
+  add({ id: "highlight", title: "Highlight with Lumen", contexts: ["selection"] });
+  add({ id: "explain", title: "Explain with Lumen", contexts: ["selection"] });
+  add({ id: "ask", title: "Ask Lumen about “%s”", contexts: ["selection"] });
+  let cols: { id: string; name: string; emoji: string }[] = [];
+  if (s.token) cols = (await cloudApi.collections().catch(() => ({ data: [] }))).data as typeof cols;
+  if (cols.length) {
+    add({ id: "send", title: "Send to Lumen", contexts: ["page", "selection", "link"] });
+    for (const c of cols.slice(0, 12)) add({ id: `send:${c.id}`, parentId: "send", title: `${c.emoji} ${c.name}`, contexts: ["page", "selection", "link"] });
   }
-}
+  add({ id: "sep", type: "separator", contexts: ["page"] });
+  add({ id: "panel", title: "Open the Lumen panel", contexts: ["page", "selection"] });
+  add({ id: "helper", title: `Show or hide ${s.helper.name} on this site`, contexts: ["page"] });
+});
+
+/* ---------------- offline highlights ---------------- */
+
+// Highlights made while disconnected join the library once connected; startup retries any that failed.
+const uploadOffline = rerunIfAsked(async () => {
+  if (!(await connected())) return;
+  await uploadLocalHighlights({ all: allLocalHighlights, set: setLocalHighlights }, {
+    itemFor: async (url) => {
+      const item = await ensureItem(url, "", "");
+      addToMarkedIndex(pageKey(item.url ?? url)).catch(() => {});
+      return item.id;
+    },
+    addHighlight: async (itemId, highlight) => (await cloudApi.addHighlight(itemId, { ...highlight })).highlight.id,
+    keepAnswer: async (highlightId, answer) => (await cloud<{ answer: { id: string } }>("POST", `/highlights/${highlightId}/answers`, { highlightId, ...answer })).answer.id,
+  }).catch((error) => console.warn("Lumen could not upload the highlights made while disconnected", error));
+});
 
 async function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab) {
   if (!tab?.id) return;
@@ -371,28 +385,38 @@ async function autoSend(tabId?: number) {
   }
 }
 
+// A margin answer's card can close before its stream ends; AI_CANCEL stops it so it stops using quota.
+const openStreams = new OpenStreams();
+
 async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<unknown> {
   const tabId = sender.tab?.id;
   switch (msg.type) {
     case "AI_REQUEST": {
       const s = await getSettings();
       const send = (m: object) => tabId !== undefined && chrome.tabs.sendMessage(tabId, m).catch(() => {});
+      const stream = tabId !== undefined ? openStreams.start(tabId, msg.requestId) : null;
       streamAnswer(msg, s, {
-        chunk: (chunk) => send({ type: "AI_CHUNK", chunk }),
-        done: (model) => send({ type: "AI_DONE", model }),
-        error: (error) => send({ type: "AI_ERROR", error }),
-      });
+        chunk: (chunk) => send({ type: "AI_CHUNK", chunk, requestId: msg.requestId }),
+        done: (model) => send({ type: "AI_DONE", model, requestId: msg.requestId }),
+        error: (error) => send({ type: "AI_ERROR", error, requestId: msg.requestId }),
+      }, stream?.signal).finally(() => stream?.finish());
       return { ok: true, provider: s.provider };
     }
 
     case "AI_TLDR": {
       const s = await getSettings();
       const send = (m: object) => tabId !== undefined && chrome.tabs.sendMessage(tabId, m).catch(() => {});
+      const stream = tabId !== undefined ? openStreams.start(tabId, msg.requestId) : null;
       streamTldr(msg, s, {
-        chunk: (chunk) => send({ type: "AI_CHUNK", chunk }),
-        done: (model) => send({ type: "AI_DONE", model }),
-        error: (error) => send({ type: "AI_ERROR", error }),
-      });
+        chunk: (chunk) => send({ type: "AI_CHUNK", chunk, requestId: msg.requestId }),
+        done: (model) => send({ type: "AI_DONE", model, requestId: msg.requestId }),
+        error: (error) => send({ type: "AI_ERROR", error, requestId: msg.requestId }),
+      }, stream?.signal).finally(() => stream?.finish());
+      return { ok: true };
+    }
+
+    case "AI_CANCEL": {
+      if (tabId !== undefined) openStreams.cancel(tabId, msg.requestId);
       return { ok: true };
     }
 
@@ -546,6 +570,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "SAVE_SETTINGS": {
       const settings = await saveSettings(msg.settings);
       if ("token" in msg.settings || "helper" in msg.settings) buildMenus();
+      if ("token" in msg.settings) uploadOffline();
       if ("token" in msg.settings || "apiBase" in msg.settings) {
         refreshMarkedIndex().catch(() => {});
         refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error));
