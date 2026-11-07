@@ -3,11 +3,13 @@ import { streamAnswer, streamTldr, testProvider } from "../../lib/ai";
 import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
 import { pdfViewerUrl, viewedPdf } from "../../lib/page";
+import { PDF_TIMING, Timeline, now } from "../../lib/pdf-timing";
 import type { Msg, PageState } from "../../lib/types";
 
 export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((msg: Msg, sender, reply) => {
-    handle(msg, sender).then(reply, (e) => reply({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+    const started = now();
+    handle(msg, sender).then(reply, (e) => reply({ ok: false, error: e instanceof Error ? e.message : String(e) })).finally(() => timeViewerMessage(msg, sender, started));
     return true;
   });
 
@@ -58,6 +60,13 @@ export default defineBackground(() => {
       port.onMessage.addListener((req: { question: string; page?: { title: string; url: string; text: string }; selection?: string; history?: { role: string; content: string }[] }) => chat(port, req));
     }
   });
+
+  if (PDF_TIMING) {
+    chrome.webRequest.onBeforeRequest.addListener((details) => {
+      if (requestStarts.size > 50) requestStarts.clear();
+      requestStarts.set(details.requestId, details.timeStamp);
+    }, { urls: ["http://*/*", "https://*/*"], types: ["main_frame"] });
+  }
 
   chrome.webRequest.onHeadersReceived.addListener(
     (details) => { openInViewer(details).catch((error) => console.warn("Lumen could not open the PDF viewer", error)); },
@@ -320,14 +329,32 @@ function isPdfResponse(headers: chrome.webRequest.HttpHeader[] = []): boolean {
   return header("content-type").includes("application/pdf") && !header("content-disposition").startsWith("attachment");
 }
 
+// Timing for the slow PDF open, kept per tab until that tab's viewer reads it.
+const pdfTimelines = new Map<number, Timeline>();
+const requestStarts = new Map<string, number>();
+
 async function openInViewer(details: chrome.webRequest.WebResponseHeadersDetails) {
   if (details.tabId < 0 || details.method !== "GET" || details.statusCode >= 400 || !isPdfResponse(details.responseHeaders)) return;
-  await rememberPdfTab(details.tabId, details.url);
-  const settings = await getSettings();
-  if (!settings.token || !settings.pdfViewer || !(await isPro())) return;
-  const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
-  if (bypassed.includes(details.url)) return;
-  await chrome.tabs.update(details.tabId, { url: pdfViewerUrl(details.url) });
+  const timeline = new Timeline("background");
+  if (PDF_TIMING) pdfTimelines.set(details.tabId, timeline);
+  const requested = requestStarts.get(details.requestId);
+  if (requested) timeline.add("browser request until PDF headers", requested, details.timeStamp, details.url, "network");
+  timeline.add("PDF headers until Lumen's listener runs", details.timeStamp);
+  await timeline.time("remember tab", rememberPdfTab(details.tabId, details.url));
+  const settings = await timeline.time("read settings", getSettings());
+  if (!settings.token || !settings.pdfViewer || !(await timeline.time("plan check (isPro)", isPro()))) return timeline.add("left to the browser's viewer: not connected, viewer off or not Pro", now());
+  const bypassed: string[] = (await timeline.time("read bypass list", chrome.storage.session.get(BYPASS_KEY)))[BYPASS_KEY] ?? [];
+  if (bypassed.includes(details.url)) return timeline.add("left to the browser's viewer: bypassed", now());
+  await timeline.time("redirect tab to Lumen's viewer", chrome.tabs.update(details.tabId, { url: pdfViewerUrl(details.url) }));
+}
+
+/** How long the background took to answer each message from a PDF viewer tab. */
+function timeViewerMessage(msg: Msg, sender: chrome.runtime.MessageSender, started: number) {
+  const tabId = sender.tab?.id;
+  if (!PDF_TIMING || tabId === undefined || !viewedPdf(sender.url) || msg.type === "PDF_TIMING") return;
+  const timeline = pdfTimelines.get(tabId) ?? new Timeline("background");
+  pdfTimelines.set(tabId, timeline);
+  timeline.add(`answer ${msg.type}`, started);
 }
 
 /* ---------------- messages ---------------- */
@@ -589,6 +616,12 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       // The browser may serve the PDF from cache, which the header listener never sees.
       if (tabId !== undefined) await rememberPdfTab(tabId, msg.url);
       return { ok: true };
+    }
+
+    case "PDF_TIMING": {
+      const spans = tabId === undefined ? [] : (pdfTimelines.get(tabId)?.spans ?? []);
+      if (tabId !== undefined) pdfTimelines.delete(tabId);
+      return { spans };
     }
 
     case "PDF_TAB": {
