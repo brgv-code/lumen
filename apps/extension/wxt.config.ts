@@ -27,6 +27,8 @@ export default defineConfig({
     },
   },
   modules: ["@wxt-dev/module-react"],
+  // Timing logs for the PDF open, never in a store build.
+  vite: () => ({ define: { __LUMEN_PDF_TIMING__: JSON.stringify(!STORE) } }),
   manifest: {
     // A store title that stands out among the other extensions called Lumen.
     name: "Lumen: Highlight, Ask and Sync to your notes",

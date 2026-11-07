@@ -12,6 +12,11 @@ import type { Settings } from "../../lib/types";
 import { Lumen } from "../content/lumen";
 import { markLineEnds } from "@lumen/core/pdf-dom";
 import { PdfSurface } from "./surface";
+import { PDF_TIMING, Timeline, now, pageLoadSpans, printTimeline, watchLongFrames, type Span } from "../../lib/pdf-timing";
+
+const timeline = new Timeline("viewer");
+const longFrames = watchLongFrames();
+timeline.add("viewer page until main.ts runs (html, scripts, pdf.js core)", performance.timeOrigin);
 
 const file = new URLSearchParams(location.search).get("file") ?? "";
 let title = fileName(file);
@@ -20,7 +25,7 @@ const titleEl = document.querySelector<HTMLElement>("[data-title]")!;
 const pagesEl = document.querySelector<HTMLElement>("[data-pages]")!;
 const stateEl = document.querySelector<HTMLElement>("[data-state]")!;
 
-chrome.runtime.sendMessage({ type: "GET_SETTINGS" })
+timeline.time("message GET_SETTINGS (theme)", chrome.runtime.sendMessage({ type: "GET_SETTINGS" }))
   .then((reply: { settings: Settings }) => applyPageTheme(reply?.settings?.theme ?? "system"))
   .catch(() => applyPageTheme("system"));
 
@@ -33,7 +38,7 @@ document.querySelector<HTMLButtonElement>("[data-bypass]")!.onclick = async () =
 open().catch((error) => {
   console.warn("Lumen could not show the PDF", error);
   showProblem();
-});
+}).finally(reportTiming);
 
 function fileName(address: string): string {
   try {
@@ -54,14 +59,14 @@ async function open() {
   titleEl.textContent = document.title = title;
   if (!/^https?:/.test(file)) return showProblem();
   // Sent with the browser's cookies, so a PDF behind a sign in opens as it did before.
-  const response = await fetch(file, { credentials: "include" });
-  const bytes = response.ok ? await response.arrayBuffer() : null;
+  const response = await timeline.time("fetch PDF until headers", fetch(file, { credentials: "include" }), (reply) => `${reply.status}, content-length ${reply.headers.get("content-length") ?? "unknown"}`);
+  const bytes = response.ok ? await timeline.time("fetch PDF body", response.arrayBuffer(), (buffer) => `${(buffer.byteLength / 1048576).toFixed(2)} MB`) : null;
   if (!bytes || !isPdfBytes(new Uint8Array(bytes, 0, Math.min(5, bytes.byteLength)))) return showProblem();
 
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
   // The viewer component reads the core library from this global when its module loads.
   Object.assign(globalThis, { pdfjsLib: pdfjs });
-  const { EventBus, LinkTarget, PDFLinkService, PDFViewer } = await import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
+  const { EventBus, LinkTarget, PDFLinkService, PDFViewer } = await timeline.time("import pdf_viewer.mjs", import("pdfjs-dist/legacy/web/pdf_viewer.mjs"));
   const container = document.querySelector<HTMLDivElement>("#viewerContainer")!;
   const viewerEl = document.querySelector<HTMLDivElement>("#viewer")!;
   const eventBus = new EventBus();
@@ -71,7 +76,12 @@ async function open() {
 
   const assets = (folder: string) => chrome.runtime.getURL(`/pdfjs/${folder}/`);
   // pdf.js hands its copy of the bytes to the worker; the original stays for the upload.
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes.slice(0)), cMapUrl: assets("cmaps"), cMapPacked: true, standardFontDataUrl: assets("standard_fonts"), wasmUrl: assets("wasm") }).promise;
+  const doc = await timeline.time("getDocument (worker start, parse)", pdfjs.getDocument({ data: new Uint8Array(bytes.slice(0)), cMapUrl: assets("cmaps"), cMapPacked: true, standardFontDataUrl: assets("standard_fonts"), wasmUrl: assets("wasm") }).promise, (pdf) => `${pdf.numPages} pages`);
+  const shown = now();
+  if (PDF_TIMING) {
+    const firsts = { pagesinit: "setDocument until first page sized", pagerendered: "setDocument until first page drawn", textlayerrendered: "setDocument until first text layer", pagesloaded: "setDocument until every page sized" };
+    for (const [event, step] of Object.entries(firsts)) eventBus.on(event, () => timeline.add(step, shown), { once: true });
+  }
   viewer.setDocument(doc);
   linkService.setDocument(doc);
   stateEl.hidden = true;
@@ -82,7 +92,7 @@ async function open() {
     button.onclick = () => { viewer.currentScale = Math.min(5, Math.max(0.25, viewer.currentScale * (button.dataset.zoom === "in" ? 1.15 : 1 / 1.15))); };
   }
 
-  const { info } = await doc.getMetadata();
+  const { info } = await timeline.time("getMetadata", doc.getMetadata());
   title = pdfTitle(info) ?? title;
   titleEl.textContent = document.title = title;
 
@@ -91,21 +101,51 @@ async function open() {
     wantsSync = true;
     syncToLumen(surface, bytes).catch((error) => console.warn("Lumen could not store this PDF's text or file", error));
   });
+  const lumenStarted = now();
   const lumen = new Lumen(surface);
   lumen.start();
+  timeline.add("Lumen start (toolbar, listeners)", lumenStarted);
   eventBus.on("textlayerrendered", ({ source }: { source: { textLayer: { div: HTMLElement } | null } }) => {
     if (source.textLayer) markLineEnds(source.textLayer.div);
     lumen.paint();
   });
 
   const runs: PdfRun[][] = [];
+  const textStarted = now();
+  const pageTimes: number[] = [];
   for (let number = 1; number <= doc.numPages; number++) {
+    const pageStarted = now();
     const page = await doc.getPage(number);
     runs.push(pdfRuns((await page.getTextContent()).items));
+    pageTimes.push(now() - pageStarted);
+    if (PDF_TIMING) console.debug(`[lumen:pdf] text of page ${number}: ${Math.round(now() - pageStarted)} ms`);
   }
+  timeline.add("read text of every page, one at a time", textStarted, now(), slowestPages(pageTimes));
+  const painted = now();
   surface.setText(runs);
   lumen.paint();
+  timeline.add("setText and paint highlights", painted);
   if (wantsSync) syncToLumen(surface, bytes).catch((error) => console.warn("Lumen could not store this PDF's text or file", error));
+}
+
+const backgroundSpans: Span[] = [];
+
+/** Prints every step on one axis; `lumenPdfTiming()` in the console prints it again later. */
+async function reportTiming() {
+  if (!PDF_TIMING) return;
+  const reply: { spans?: Span[] } | undefined = await chrome.runtime.sendMessage({ type: "PDF_TIMING" }).catch((error) => {
+    console.warn("Lumen could not read the background's PDF timing", error);
+    return undefined;
+  });
+  backgroundSpans.push(...(reply?.spans ?? []));
+  printTimeline([...backgroundSpans, ...pageLoadSpans(), ...timeline.spans], longFrames);
+}
+if (PDF_TIMING) Object.assign(globalThis, { lumenPdfTiming: reportTiming });
+
+function slowestPages(pageTimes: number[]): string {
+  const total = pageTimes.reduce((sum, time) => sum + time, 0);
+  const slowest = pageTimes.map((time, index) => ({ time, page: index + 1 })).sort((first, second) => second.time - first.time).slice(0, 3);
+  return `${pageTimes.length} pages, ${Math.round(total / Math.max(1, pageTimes.length))} ms each on average, slowest ${slowest.map(({ page, time }) => `p${page} ${Math.round(time)} ms`).join(", ")}`;
 }
 
 let synced = false;
