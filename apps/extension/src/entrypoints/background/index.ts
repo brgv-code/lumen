@@ -1,4 +1,4 @@
-import type { AIAction, Highlight } from "@lumen/core";
+import { googleDocExportUrl, googleDocTitle, googleDocUrl, type AIAction, type Highlight } from "@lumen/core";
 import { streamAnswer, streamTldr, testProvider } from "../../lib/ai";
 import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
@@ -336,6 +336,22 @@ async function connected() {
   return Boolean((await getSettings()).token);
 }
 
+/** A Google Doc's markdown export, fetched with the browser's cookies so a private doc exports too. */
+async function docExport(url: string): Promise<{ markdown: string; title: string | null } | null> {
+  const exportUrl = googleDocExportUrl(url);
+  if (!exportUrl) return null;
+  const response = await fetch(exportUrl, { credentials: "include" });
+  if (!response.ok || !(response.headers.get("content-type") ?? "").includes("markdown")) return null;
+  return { markdown: await response.text(), title: googleDocTitle(response.headers.get("content-disposition")) };
+}
+
+/** Saves or refreshes a doc. Without an export (no access) the server tries the public export itself. */
+async function saveDoc(url: string, collectionId?: string, tags?: string[]) {
+  const doc = await docExport(url).catch((error) => { console.warn("Lumen could not export the Google Doc", error); return null; });
+  const s = await getSettings();
+  return cloudApi.save({ url: pageKey(url), markdown: doc?.markdown, title: doc?.title ?? undefined, collectionId: collectionId ?? (s.targetCollectionId || undefined), tags });
+}
+
 async function ensureItem(url: string, title: string, html: string, collectionId?: string, kind?: "pdf") {
   const found = await cloudApi.lookup(url);
   if (found.item) return found.item;
@@ -433,13 +449,16 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
 
     case "SAVE_PAGE": {
       if (!(await connected())) return { ok: false, error: "Connect Lumen in settings to save pages." };
-      const item = await ensureItem(pageKey(msg.url), msg.title, msg.html, undefined, msg.kind);
+      const item = googleDocUrl(msg.url) ? (await saveDoc(msg.url)).item : await ensureItem(pageKey(msg.url), msg.title, msg.html, undefined, msg.kind);
       return { ok: true, item };
     }
 
     case "SAVE_PAGE_TO": {
       if (!(await connected())) return { ok: false, error: "Connect Lumen in settings to save pages." };
       const url = pageKey(msg.url);
+      // A doc refreshes from its export first; the collection change below then applies to it as to any item.
+      const doc = googleDocUrl(msg.url) ? await saveDoc(msg.url, msg.collectionId, msg.tags) : null;
+      if (doc?.created) return { ok: true, item: doc.item };
       const found = await cloudApi.lookup(url);
       if (found.item) {
         const r = await cloud<{ item: unknown }>("PATCH", `/items/${found.item.id}`, { collectionId: msg.collectionId ?? null, ...(msg.tags?.length ? { tags: msg.tags } : {}) });
@@ -600,6 +619,14 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
       await chrome.storage.session.set({ [BYPASS_KEY]: bypassed.filter((url) => url !== msg.url) });
       await chrome.tabs.update(msg.tabId, { url: pdfViewerUrl(msg.url) });
+      return { ok: true };
+    }
+
+    case "READ_IN_LUMEN": {
+      if (!(await connected())) { await chrome.runtime.openOptionsPage(); return { ok: false, error: "Connect Lumen first, then read this doc in Lumen." }; }
+      const { item } = await saveDoc(msg.url);
+      const s = await getSettings();
+      await chrome.tabs.create({ url: `${s.apiBase}/app/read/${item.id}`, index: sender.tab ? sender.tab.index + 1 : undefined });
       return { ok: true };
     }
 

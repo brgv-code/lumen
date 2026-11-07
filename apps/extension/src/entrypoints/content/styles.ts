@@ -91,6 +91,16 @@ textarea:focus, input:focus { box-shadow: inset 0 0 0 1.5px #ff8a1f, 0 0 0 4px r
   background: #121215; color: #fff; font-size: 13.5px; font-weight: 500; box-shadow: 0 18px 34px -12px rgba(0,0,0,.5);
   animation: pop 300ms cubic-bezier(.34,1.56,.64,1) both; }
 .toast.err { background: #b42318; }
+/* centred with margins, not a transform: the pop animation owns transform */
+.read-pill { position: fixed; left: 0; right: 0; bottom: 22px; width: max-content; margin: 0 auto; display: flex; align-items: center; gap: 2px; padding: 4px;
+  border-radius: 999px; background: #121215; box-shadow: 0 18px 34px -12px rgba(0,0,0,.5); font: 500 13.5px "Geist", system-ui, sans-serif;
+  animation: pop 300ms cubic-bezier(.34,1.56,.64,1) both; }
+.read-pill button { height: 32px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; }
+.read-go { padding: 0 16px; color: #fff; background: linear-gradient(180deg,#ffb53d,#ff6a1a); box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+.read-go:disabled { opacity: .7; cursor: default; }
+.read-x { width: 32px; color: rgba(255,255,255,.6); background: transparent; }
+.read-x:hover { color: #fff; background: rgba(255,255,255,.1); }
+:host(.has-read-pill) .toast { bottom: 70px; }
 /* dark theme (from the Appearance setting, or the system when set to System) */
 :host(.dark) .hmenu { background: #18181b; }
 :host(.dark) .hhead b { color: #f4f4f5; }
