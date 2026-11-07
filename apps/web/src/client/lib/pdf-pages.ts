@@ -1,6 +1,7 @@
 // A PDF as its real pages in the reader: pdf.js draws pages near the screen and drops far ones, the page flows with the article.
 import { pdfRuns, type PdfRun } from "@lumen/core";
 import { PdfText, markLineEnds } from "@lumen/core/pdf-dom";
+import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 export interface ShownPdf {
   /** Every page's text, read after the first pages are drawn. */
@@ -13,16 +14,25 @@ const PAGE_BORDER = 9;
 
 /** Draws the PDF at `url` as pages inside `container`, page 1 first; `onLayer` gets each text layer once it is ready for marks. */
 export async function showPdfPages(url: string, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const { default: workerSrc } = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
-  pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-  // The viewer module reads the core library from this global when it loads.
-  Object.assign(globalThis, { pdfjsLib: pdfjs });
-  const [{ EventBus, PDFPageView, RenderingStates }] = await Promise.all([import("pdfjs-dist/legacy/web/pdf_viewer.mjs"), import("pdfjs-dist/legacy/web/pdf_viewer.css")]);
+  // Our own worker, started now so it downloads alongside the core library instead of after it.
+  const port = new Worker(workerSrc, { type: "module" });
+  try {
+    return await openPdf(url, port, container, onLayer);
+  } catch (error) {
+    port.terminate();
+    throw error;
+  }
+}
 
+async function openPdf(url: string, port: Worker, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
+  const styles = import("pdfjs-dist/legacy/web/pdf_viewer.css");
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const worker = pdfjs.PDFWorker.create({ port });
   // By URL, so pdf.js asks for the ranges page 1 needs first and streams the rest of the file behind them.
-  const task = pdfjs.getDocument({ url, httpHeaders: { "x-lumen": "1" }, cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
-  const doc = await task.promise;
+  const task = pdfjs.getDocument({ url, worker, httpHeaders: { "x-lumen": "1" }, cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
+  // The viewer module reads the core library from this global when it loads; it downloads while the file opens.
+  Object.assign(globalThis, { pdfjsLib: pdfjs });
+  const [doc, { EventBus, PDFPageView, RenderingStates }] = await Promise.all([task.promise, import("pdfjs-dist/legacy/web/pdf_viewer.mjs"), styles]);
   const eventBus = new EventBus();
   eventBus.on("textlayerrendered", ({ source }: { source: { textLayer: { div: HTMLElement } | null } }) => {
     if (!source.textLayer) return;
@@ -116,7 +126,10 @@ export async function showPdfPages(url: string, container: HTMLDivElement, onLay
       cancelAnimationFrame(frame);
       // The divs go too: a document opened after its reader left must leave nothing behind.
       for (const view of views) { view.destroy(); view.div.remove(); }
-      task.destroy().catch((error: Error) => console.warn("pdf.js did not close cleanly", error));
+      // pdf.js leaves a worker it was handed running, so it goes once the document has closed.
+      task.destroy()
+        .catch((error: Error) => console.warn("pdf.js did not close cleanly", error))
+        .finally(() => { worker.destroy(); port.terminate(); });
     },
   };
 }
