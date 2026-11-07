@@ -38,11 +38,41 @@ also stays in Lumen, which is what Ask searches. "Save to Lumen" on an answer ca
 passage with the answer as its note.
 
 ## Claude through your CLI
-```bash
-apps/native-host/install.sh          # registers for Chrome, Brave, Arc and Edge
-```
-The helper runs `claude -p --model <haiku|sonnet|opus>` and streams the answer back; page text goes
-in on stdin, never through a shell.
+The "Claude (local CLI)" model answers Explain, Expand, Summary and Define with your own Claude Code,
+on your Claude plan instead of Lumen's daily quota. Asking your library still goes through Lumen.
+
+Extensions cannot start programs, so a small helper in `apps/native-host` does it through Chrome
+native messaging: the extension sends the prompt, the helper runs `claude -p --model
+<haiku|sonnet|opus>` and streams the answer back. Page text goes in on stdin, never through a
+shell. Only `haiku`, `sonnet` and `opus` are accepted.
+
+**You need:** macOS or Linux (Windows is not supported yet), Node, and Claude Code installed and
+logged in (`claude -p "hi"` answers in a terminal).
+
+**Set up, once per computer:**
+1. Install Lumen from the Chrome Web Store.
+2. Get the helper and register it:
+   ```bash
+   git clone https://github.com/brgv-code/lumen
+   cd lumen/apps/native-host
+   ./install.sh            # registers for Chrome, Brave, Arc, Edge and Chromium
+   ```
+   Keep the folder: the browser runs the helper from there. With no arguments it allows both the
+   store build and the unpacked dev build; pass extension ids to allow others.
+3. Quit the browser fully and open it again. Browsers read helper registrations on start.
+4. Lumen settings → **Model** → **Claude (local CLI)**. Allow the "communicate with cooperating
+   native applications" prompt; Lumen asks for it only here.
+5. Pick Haiku, Sonnet or Opus, **Save**, then **Test**. It should say "Helper ready: node v…".
+
+**If Test fails:**
+- "Helper not installed": run `install.sh` again and restart the browser.
+- "The Lumen helper stopped" or "claude CLI not found": `claude` was not on PATH when you ran
+  `install.sh`. Install Claude Code, then run `install.sh` again.
+- "Allow the Claude helper first": pick Claude (local CLI) again and allow the prompt.
+
+What `install.sh` writes: `lumen-host.sh` next to it (the paths to `node` and `claude`), and
+`dev.lumen.host.json` in each browser's `NativeMessagingHosts` folder. To remove the helper,
+delete both.
 
 ## Chrome Web Store
 Store build, listing text, permission reasons, data usage answers and assets: [STORE.md](STORE.md).
