@@ -1,43 +1,100 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
+import { Marked, type MarkedToken, type Token, type Tokens } from "marked";
+import { CodeBlock } from "./code-block";
 
-/** Tiny, safe markdown for answers: paragraphs, "- " and "1." lists, **bold**, `code`, [n] and [p12] citations. */
-export function Md({ text, onCite, onParagraph }: { text: string; onCite?: (n: number) => void; onParagraph?: (n: number) => void }) {
-  // Group lines into runs: consecutive list lines become one list, everything else paragraphs.
-  const isItem = (l: string) => /^\s*([-*•]|\d+[.)])\s+/.test(l);
-  const runs: { kind: "p" | "ul" | "ol" | "q"; lines: string[] }[] = [];
-  for (const raw of text.replace(/\r/g, "").split("\n")) {
-    const l = raw.trimEnd();
-    if (!l.trim()) { runs.push({ kind: "p", lines: [] }); continue; }
-    const kind = /^\s*>/.test(l) ? "q" : isItem(l) ? (/^\s*\d/.test(l) ? "ol" : "ul") : "p";
-    const last = runs[runs.length - 1];
-    if (last && last.kind === kind && (kind !== "p" || last.lines.length)) last.lines.push(l);
-    else runs.push({ kind, lines: [l] });
-  }
-  return <>{runs.filter((r) => r.lines.length).map((r, k) => {
-    if (r.kind === "q") {
-      const body = r.lines.map((l) => l.replace(/^\s*>\s?/, "")).filter((l) => l.trim());
-      return <blockquote key={k} className="md-quote">{body.map((l, i) => <span key={i}>{i > 0 && <br />}{inline(l, onCite, onParagraph)}</span>)}</blockquote>;
+interface Handlers { onCite?: (n: number) => void; onParagraph?: (n: number) => void }
+
+// Models write single newlines as line breaks, so keep them.
+const parser = new Marked({ gfm: true, breaks: true });
+const HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
+const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'" };
+
+/** Safe GFM for answers, built as React elements so raw HTML never runs, plus [n] and [p12] citations. */
+export function Md({ text, onCite, onParagraph }: { text: string } & Handlers) {
+  // "•" bullets were lists before marked; keep them that way.
+  const source = text.replace(/^(\s*)•\s+/gm, "$1- ");
+  return <>{blocks(parser.lexer(source), { onCite, onParagraph })}</>;
+}
+
+function blocks(tokens: Token[], handlers: Handlers): ReactNode[] {
+  return tokens.map((token, key) => {
+    // No marked extensions are registered, so every token is a built in one.
+    const node = token as MarkedToken;
+    switch (node.type) {
+      case "paragraph": return <p key={key} className="md-p">{inlines(node.tokens, handlers)}</p>;
+      case "heading": { const Heading = HEADINGS[node.depth - 1] ?? "h6"; return <Heading key={key} className="md-h">{inlines(node.tokens, handlers)}</Heading>; }
+      case "code": return <CodeBlock key={key} code={node.text} lang={node.lang ?? ""} />;
+      case "blockquote": return <blockquote key={key} className="md-quote">{blocks(node.tokens, handlers)}</blockquote>;
+      case "list": return list(node, key, handlers);
+      case "table": return table(node, key, handlers);
+      case "hr": return <hr key={key} className="md-hr" />;
+      case "html": return <p key={key} className="md-p">{node.text}</p>;
+      case "text": return <Fragment key={key}>{"tokens" in node && node.tokens ? inlines(node.tokens, handlers) : cite(decode(node.text), handlers)}</Fragment>;
+      default: return null;
     }
-    if (r.kind === "p") return <p key={k} className="md-p">{r.lines.map((l, i) => <span key={i}>{i > 0 && <br />}{inline(l, onCite, onParagraph)}</span>)}</p>;
-    const items = r.lines.map((l, i) => <li key={i}>{inline(l.replace(/^\s*([-*•]|\d+[.)])\s+/, ""), onCite, onParagraph)}</li>);
-    return r.kind === "ol" ? <ol key={k} className="md-list">{items}</ol> : <ul key={k} className="md-list">{items}</ul>;
-  })}</>;
+  });
 }
 
-function inline(s: string, onCite?: (n: number) => void, onParagraph?: (n: number) => void): ReactNode[] {
-  const out: ReactNode[] = [];
-  const re = /(\[[^\]]+\]\((https?:[^)\s]+)\)|\*\*[^*]+\*\*|`[^`]+`|\[p?\d+\])/g;
-  let last = 0, m: RegExpExecArray | null, k = 0;
-  while ((m = re.exec(s))) {
-    if (m.index > last) out.push(s.slice(last, m.index));
-    const t = m[0];
-    if (m[2]) { const label = t.slice(1, t.indexOf("](")); out.push(<a key={k++} className="md-link" href={m[2]} target="_blank" rel="noreferrer">{label}</a>); }
-    else if (t.startsWith("**")) out.push(<b key={k++}>{t.slice(2, -2)}</b>);
-    else if (t.startsWith("`")) out.push(<code key={k++}>{t.slice(1, -1)}</code>);
-    else if (t.startsWith("[p")) { const n = Number(t.slice(2, -1)); out.push(<button key={k++} className="cite" onClick={() => onParagraph?.(n)}>¶{n}</button>); }
-    else { const n = Number(t.slice(1, -1)); out.push(<button key={k++} className="cite" onClick={() => onCite?.(n)}>{n}</button>); }
-    last = m.index + t.length;
-  }
-  if (last < s.length) out.push(s.slice(last));
-  return out;
+function list(node: Tokens.List, key: number, handlers: Handlers) {
+  const items = node.items.map((item, index) => (
+    <li key={index} className={item.task ? "md-task" : undefined}>
+      {item.task && <input type="checkbox" checked={item.checked ?? false} disabled />}
+      {blocks(item.tokens, handlers)}
+    </li>
+  ));
+  if (!node.ordered) return <ul key={key} className="md-list">{items}</ul>;
+  return <ol key={key} className="md-list" start={node.start === "" ? undefined : node.start}>{items}</ol>;
 }
+
+function table(node: Tokens.Table, key: number, handlers: Handlers) {
+  return (
+    <div key={key} className="md-table">
+      <table>
+        <thead><tr>{node.header.map((cell, index) => <th key={index} style={{ textAlign: cell.align ?? undefined }}>{inlines(cell.tokens, handlers)}</th>)}</tr></thead>
+        <tbody>
+          {node.rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>{row.map((cell, index) => <td key={index} style={{ textAlign: cell.align ?? undefined }}>{inlines(cell.tokens, handlers)}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function inlines(tokens: Token[], handlers: Handlers): ReactNode[] {
+  return tokens.map((token, key) => {
+    const node = token as MarkedToken;
+    switch (node.type) {
+      case "text": return <Fragment key={key}>{"tokens" in node && node.tokens ? inlines(node.tokens, handlers) : cite(decode(node.text), handlers)}</Fragment>;
+      case "escape": return decode(node.text);
+      case "strong": return <b key={key}>{inlines(node.tokens, handlers)}</b>;
+      case "em": return <em key={key}>{inlines(node.tokens, handlers)}</em>;
+      case "del": return <del key={key}>{inlines(node.tokens, handlers)}</del>;
+      case "codespan": return <code key={key}>{decode(node.text)}</code>;
+      case "br": return <br key={key} />;
+      case "link": return link(node.href, inlines(node.tokens, handlers), key);
+      case "image": return link(node.href, decode(node.text) || node.href, key);
+      // Models put <br> in table cells; any other tag shows as the text it is.
+      case "html": return /^<br\s*\/?>$/i.test(node.text) ? <br key={key} /> : node.text;
+      default: return null;
+    }
+  });
+}
+
+function link(href: string, label: ReactNode, key: number) {
+  if (!/^(https?:|mailto:)/i.test(href)) return <Fragment key={key}>{label}</Fragment>;
+  return <a key={key} className="md-link" href={href} target="_blank" rel="noreferrer">{label}</a>;
+}
+
+function cite(text: string, { onCite, onParagraph }: Handlers): ReactNode[] {
+  return text.split(/(\[p?\d+\])/).map((part, key) => {
+    const match = /^\[(p?)(\d+)\]$/.exec(part);
+    if (!match) return part;
+    const target = Number(match[2]);
+    if (match[1]) return <button key={key} className="cite" onClick={() => onParagraph?.(target)}>¶{target}</button>;
+    return <button key={key} className="cite" onClick={() => onCite?.(target)}>{target}</button>;
+  });
+}
+
+// marked 14 escapes text for HTML output and React escapes again, so undo the first pass.
+const decode = (text: string) => text.replace(/&(amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity);
