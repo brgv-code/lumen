@@ -19,6 +19,8 @@ let title = fileName(file);
 const titleEl = document.querySelector<HTMLElement>("[data-title]")!;
 const pagesEl = document.querySelector<HTMLElement>("[data-pages]")!;
 const stateEl = document.querySelector<HTMLElement>("[data-state]")!;
+const zoomEl = document.querySelector<HTMLElement>("[data-zoom-level]")!;
+const FIT_SCALES = ["auto", "page-fit", "page-width"];
 
 chrome.runtime.sendMessage({ type: "GET_SETTINGS" })
   .then((reply: { settings: Settings }) => applyPageTheme(reply?.settings?.theme ?? "system"))
@@ -76,11 +78,18 @@ async function open() {
   linkService.setDocument(doc);
   stateEl.hidden = true;
   pagesEl.textContent = `1 / ${doc.numPages}`;
-  eventBus.on("pagesinit", () => { viewer.currentScaleValue = "page-width"; });
+  // "auto" fills the width but caps the zoom, so a portrait page on a wide screen is not blown up.
+  eventBus.on("pagesinit", () => { viewer.currentScaleValue = "auto"; });
   eventBus.on("pagechanging", ({ pageNumber }: { pageNumber: number }) => { pagesEl.textContent = `${pageNumber} / ${doc.numPages}`; });
+  eventBus.on("scalechanging", ({ scale }: { scale: number }) => { zoomEl.textContent = `${Math.round(scale * 100)}%`; });
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-zoom]")) {
-    button.onclick = () => { viewer.currentScale = Math.min(5, Math.max(0.25, viewer.currentScale * (button.dataset.zoom === "in" ? 1.15 : 1 / 1.15))); };
+    button.onclick = () => { if (button.dataset.zoom === "in") viewer.increaseScale(); else viewer.decreaseScale(); };
   }
+  document.querySelector<HTMLButtonElement>("[data-fit]")!.onclick = () => { viewer.currentScaleValue = "page-fit"; };
+  // The viewer component does not refit on its own; the full pdf.js app does this on resize too.
+  window.addEventListener("resize", () => {
+    if (FIT_SCALES.includes(viewer.currentScaleValue)) viewer.currentScaleValue = viewer.currentScaleValue;
+  });
 
   const { info } = await doc.getMetadata();
   title = pdfTitle(info) ?? title;
