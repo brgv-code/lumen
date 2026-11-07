@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { Suspense, createContext, useContext, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { Collection, Stats, User } from "@lumen/core";
 import { Home, Library, Highlighter, BookCheck, FolderHeart, Sparkles, Plug, Settings, Search, Plus, Flame, LogOut, Puzzle, Radar, BarChart3, Bot } from "lucide-react";
@@ -172,7 +172,10 @@ export default function Layout() {
             )}
             <button className="key key--sm" data-tour="save" onClick={() => setSaveOpen(true)}><Plus size={15} /> Save a link</button>
           </div>
-          <Outlet />
+          {/* Only the page area waits on a page's code, so the sidebar and topbar never blank out. */}
+          <Suspense fallback={<div className="page"><div className="stack">{[0, 1, 2].map((key) => <div key={key} className="skeleton" style={{ height: 110 }} />)}</div></div>}>
+            <Outlet />
+          </Suspense>
         </div>
 
         <nav className="mobile-bar">
