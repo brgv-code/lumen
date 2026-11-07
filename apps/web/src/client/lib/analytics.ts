@@ -51,7 +51,8 @@ async function start() {
     capture_pageleave: true,
     autocapture: true,
     persistence: "localStorage+cookie",
-    session_recording: { maskAllInputs: true, maskTextSelector: ".ph-mask" },
+    // Recording pdf.js text layers blocked the main thread for seconds per open; replays show a placeholder.
+    session_recording: { maskAllInputs: true, maskTextSelector: ".ph-mask", blockSelector: ".pdfViewer" },
   });
   ph = posthog;
   apply();
