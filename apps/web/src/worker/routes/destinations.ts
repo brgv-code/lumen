@@ -18,9 +18,15 @@ import { trackUser } from "../lib/analytics";
 
 export const destinations = new Hono<AppEnv>();
 
+type Ledger = "deliveries" | "answer_deliveries" | "tldr_deliveries";
+/** Records an attempt's outcome; a delivered row stays delivered, so a late error from an overlapping sync cannot send it again. */
+const settle = (ledger: Ledger) => `DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at,
+  claim = NULL, claimed_until = NULL WHERE ${ledger}.status != 'delivered'`;
+const CLAIM_MS = 60_000;
+
 const SELECT = `SELECT d.*,
   (SELECT count(*) FROM deliveries x WHERE x.destination_id = d.id AND x.status = 'delivered') AS delivered_count,
-  (SELECT max(delivered_at) FROM deliveries x WHERE x.destination_id = d.id) AS last_delivered_at,
+  (SELECT max(delivered_at) FROM deliveries x WHERE x.destination_id = d.id AND x.status != 'pending') AS last_delivered_at,
   (SELECT count(*) FROM highlights h JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
      WHERE c.destination_id = d.id AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = d.id AND x.status = 'delivered'))
   + (SELECT count(*) FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
@@ -98,7 +104,7 @@ destinations.get("/:id/pending", async (c) => {
   const d = await own(c.env.DB, u.id, c.req.param("id"));
   const cfg = safeJson<Record<string, string>>(d.config, {});
   const format = (cfg.format as HighlightFormat) || "plain";
-  const { highlights: pending, late, tldrs } = await pendingFor(c.env.DB, d.id);
+  const { highlights: pending, late, tldrs } = await claimPending(c.env.DB, d.id);
   const groups = groupBySource(pending, late, tldrs);
   const withId = (h: PendingRow) => ({ ...h, blockId: blockIdFor(h.id) });
   const markdown = groups.map((g) => formatSourceBlock(g.source, g.highlights.map(withId), format, undefined, g.late.map((l) => ({ highlight: l, answer: l.answer })),
@@ -137,21 +143,21 @@ destinations.post("/:id/ack", async (c) => {
     ...ids.map((hid) =>
       db.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at)
         SELECT h.id, ?, ?, 1, ?, ? FROM highlights h WHERE h.id = ? AND h.user_id = ?
-        ON CONFLICT(highlight_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+        ON CONFLICT(highlight_id, destination_id) ${settle("deliveries")}`)
         .bind(d.id, status, b.error ?? null, t, hid, u.id)),
     // Clients from before LUM-2 ack only highlights: their answers kept up to now went out with them.
     ...(answerIds ?? ids).map((key) =>
       db.prepare(`INSERT INTO answer_deliveries (answer_id, destination_id, status, attempts, error, delivered_at)
         SELECT a.id, ?, ?, 1, ?, ? FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id
         WHERE ${answerIds ? "a.id = ?" : "h.id = ? AND a.created_at <= ?"} AND h.user_id = ?
-        ON CONFLICT(answer_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+        ON CONFLICT(answer_id, destination_id) ${settle("answer_deliveries")}`)
         .bind(d.id, status, b.error ?? null, t, key, ...(answerIds ? [] : [t]), u.id)),
     // Clients from before LUM-3 do not know TL;DRs: one kept for a page they wrote went out with it.
     ...(tldrIds ?? ids).map((key) =>
       db.prepare(`INSERT INTO tldr_deliveries (tldr_id, destination_id, status, attempts, error, delivered_at)
         SELECT tl.id, ?, ?, 1, ?, ? FROM item_tldrs tl JOIN items i ON i.id = tl.item_id
         WHERE ${tldrIds ? "tl.id = ?" : "i.id = (SELECT item_id FROM highlights WHERE id = ?) AND tl.created_at <= ?"} AND i.user_id = ?
-        ON CONFLICT(tldr_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+        ON CONFLICT(tldr_id, destination_id) ${settle("tldr_deliveries")}`)
         .bind(d.id, status, b.error ?? null, t, key, ...(tldrIds ? [] : [t]), u.id)),
   ]);
   if (status === "delivered") trackUser(c, "notes_synced", { kind: d.kind, highlights: ids.length, answers: answerIds?.length ?? null, tldrs: tldrIds?.length ?? null });
@@ -165,7 +171,7 @@ destinations.post("/:id/push", async (c) => {
   if (d.kind !== "notion" && d.kind !== "webhook") fail(422, "client_delivered", `${d.kind} is delivered by the extension or the browser. Use /pending and /ack.`);
   requirePro(c, d.kind as "notion" | "webhook");
   if (u.is_demo === 1) fail(403, "demo", "Pushing to external services is off in the demo.");
-  const { highlights: pending, late, tldrs } = await pendingFor(c.env.DB, d.id);
+  const { highlights: pending, late, tldrs } = await claimPending(c.env.DB, d.id);
   const answerIds = [...pending.flatMap((h) => h.answers.map((a) => a.id)), ...late.map((l) => l.answer.id)];
   if (!pending.length && !late.length && !tldrs.length) return c.json({ delivered: 0, answers: 0, tldrs: 0 });
   const cfg = safeJson<Record<string, string>>(d.config, {});
@@ -180,13 +186,13 @@ destinations.post("/:id/push", async (c) => {
   const db = c.env.DB;
   await db.batch([
     ...pending.map((p) => db.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at) VALUES (?,?,?,1,?,?)
-      ON CONFLICT(highlight_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+      ON CONFLICT(highlight_id, destination_id) ${settle("deliveries")}`)
       .bind(p.id, d.id, error ? "failed" : "delivered", error, t)),
     ...answerIds.map((answerId) => db.prepare(`INSERT INTO answer_deliveries (answer_id, destination_id, status, attempts, error, delivered_at) VALUES (?,?,?,1,?,?)
-      ON CONFLICT(answer_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+      ON CONFLICT(answer_id, destination_id) ${settle("answer_deliveries")}`)
       .bind(answerId, d.id, error ? "failed" : "delivered", error, t)),
     ...tldrs.map((entry) => db.prepare(`INSERT INTO tldr_deliveries (tldr_id, destination_id, status, attempts, error, delivered_at) VALUES (?,?,?,1,?,?)
-      ON CONFLICT(tldr_id, destination_id) DO UPDATE SET status = excluded.status, attempts = attempts + 1, error = excluded.error, delivered_at = excluded.delivered_at`)
+      ON CONFLICT(tldr_id, destination_id) ${settle("tldr_deliveries")}`)
       .bind(entry.tldr.id, d.id, error ? "failed" : "delivered", error, t)),
   ]);
   if (error) fail(502, "push_failed", error);
@@ -200,36 +206,63 @@ interface LateRow { highlightId: string; quote: string; title: string; url: stri
 /** A kept TL;DR this destination has not received; "own" once something from its page was sent there. */
 interface TldrRow { tldr: ItemTldr; item_id: string; title: string; url: string; site_name: string | null; placement: "top" | "own" }
 
-async function pendingFor(db: D1Database, destinationId: string): Promise<{ highlights: PendingRow[]; late: LateRow[]; tldrs: TldrRow[] }> {
-  return { highlights: await pendingHighlights(db, destinationId), late: await lateAnswers(db, destinationId), tldrs: await pendingTldrs(db, destinationId) };
+/** Claims what this destination has not received and no other sync is writing, then reads only that. */
+async function claimPending(db: D1Database, destinationId: string): Promise<{ highlights: PendingRow[]; late: LateRow[]; tldrs: TldrRow[] }> {
+  const claim = id("clm_");
+  const t = now();
+  // ?1 destination, ?2 this claim, ?3 now. One batch is one transaction in D1, so answers can follow the highlights claimed just before.
+  await db.batch([
+    db.prepare(`INSERT INTO deliveries (highlight_id, destination_id, status, attempts, error, delivered_at, claim, claimed_until)
+      SELECT h.id, ?1, 'pending', 0, NULL, ?3, ?2, ?3 + ${CLAIM_MS}
+      FROM highlights h JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
+      WHERE c.destination_id = ?1
+        AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ?1 AND (x.status = 'delivered' OR x.claimed_until > ?3))
+      ORDER BY i.created_at, h.position LIMIT 500
+      ON CONFLICT(highlight_id, destination_id) DO UPDATE SET claim = excluded.claim, claimed_until = excluded.claimed_until`).bind(destinationId, claim, t),
+    db.prepare(`INSERT INTO answer_deliveries (answer_id, destination_id, status, attempts, error, delivered_at, claim, claimed_until)
+      SELECT a.id, ?1, 'pending', 0, NULL, ?3, ?2, ?3 + ${CLAIM_MS}
+      FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
+      WHERE c.destination_id = ?1
+        AND EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ?1 AND (x.status = 'delivered' OR x.claim = ?2))
+        AND NOT EXISTS (SELECT 1 FROM answer_deliveries y WHERE y.answer_id = a.id AND y.destination_id = ?1 AND (y.status = 'delivered' OR y.claimed_until > ?3))
+      ON CONFLICT(answer_id, destination_id) DO UPDATE SET claim = excluded.claim, claimed_until = excluded.claimed_until`).bind(destinationId, claim, t),
+    db.prepare(`INSERT INTO tldr_deliveries (tldr_id, destination_id, status, attempts, error, delivered_at, claim, claimed_until)
+      SELECT tl.id, ?1, 'pending', 0, NULL, ?3, ?2, ?3 + ${CLAIM_MS}
+      FROM item_tldrs tl JOIN items i ON i.id = tl.item_id JOIN collections c ON c.id = i.collection_id
+      WHERE c.destination_id = ?1
+        AND NOT EXISTS (SELECT 1 FROM tldr_deliveries z WHERE z.tldr_id = tl.id AND z.destination_id = ?1 AND (z.status = 'delivered' OR z.claimed_until > ?3))
+      ORDER BY i.created_at LIMIT 200
+      ON CONFLICT(tldr_id, destination_id) DO UPDATE SET claim = excluded.claim, claimed_until = excluded.claimed_until`).bind(destinationId, claim, t),
+  ]);
+  return { highlights: await pendingHighlights(db, destinationId, claim), late: await lateAnswers(db, destinationId, claim), tldrs: await pendingTldrs(db, destinationId, claim) };
 }
 
-async function pendingTldrs(db: D1Database, destinationId: string): Promise<TldrRow[]> {
+async function pendingTldrs(db: D1Database, destinationId: string, claim: string): Promise<TldrRow[]> {
   const { results } = await db.prepare(`SELECT tl.*, i.title, i.url, i.site_name,
       EXISTS (SELECT 1 FROM highlights h JOIN deliveries x ON x.highlight_id = h.id WHERE h.item_id = i.id AND x.destination_id = ? AND x.status = 'delivered') AS sent_before
     FROM item_tldrs tl JOIN items i ON i.id = tl.item_id JOIN collections c ON c.id = i.collection_id
-    WHERE c.destination_id = ? AND NOT EXISTS (SELECT 1 FROM tldr_deliveries z WHERE z.tldr_id = tl.id AND z.destination_id = ? AND z.status = 'delivered')
-    ORDER BY i.created_at LIMIT 200`).bind(destinationId, destinationId, destinationId).all<Record<string, string>>();
+    WHERE c.destination_id = ? AND EXISTS (SELECT 1 FROM tldr_deliveries z WHERE z.tldr_id = tl.id AND z.destination_id = ? AND z.claim = ?)
+    ORDER BY i.created_at LIMIT 200`).bind(destinationId, destinationId, destinationId, claim).all<Record<string, string>>();
   return results.map((row) => ({ tldr: toTldr(row), item_id: row.item_id, title: row.title, url: row.url, site_name: row.site_name, placement: Number(row.sent_before) ? "own" : "top" }));
 }
 
-/** Highlights this destination has not received, with the answers that ride along with them. */
-async function pendingHighlights(db: D1Database, destinationId: string): Promise<PendingRow[]> {
+/** Highlights this sync claimed, with the answers that ride along with them. */
+async function pendingHighlights(db: D1Database, destinationId: string, claim: string): Promise<PendingRow[]> {
   const { results } = await db.prepare(`SELECT h.id, h.quote, h.note, i.title, i.url, i.site_name, i.id AS item_id
     FROM highlights h JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
-    WHERE c.destination_id = ? AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ? AND x.status = 'delivered')
-    ORDER BY i.created_at, h.position LIMIT 500`).bind(destinationId, destinationId).all<Omit<PendingRow, "answers">>();
-  const answers = await listAnswers(db, results.map((row) => row.id), destinationId);
+    WHERE c.destination_id = ? AND EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ? AND x.claim = ?)
+    ORDER BY i.created_at, h.position LIMIT 500`).bind(destinationId, destinationId, claim).all<Omit<PendingRow, "answers">>();
+  const answers = await listAnswers(db, results.map((row) => row.id), { destinationId, claim });
   return results.map((row) => ({ ...row, answers: answers.get(row.id) ?? [] }));
 }
 
-async function lateAnswers(db: D1Database, destinationId: string): Promise<LateRow[]> {
+async function lateAnswers(db: D1Database, destinationId: string, claim: string): Promise<LateRow[]> {
   const { results } = await db.prepare(`SELECT a.*, h.quote, h.item_id, i.title, i.url, i.site_name
     FROM highlight_answers a JOIN highlights h ON h.id = a.highlight_id JOIN items i ON i.id = h.item_id JOIN collections c ON c.id = i.collection_id
     WHERE c.destination_id = ?
       AND EXISTS (SELECT 1 FROM deliveries x WHERE x.highlight_id = h.id AND x.destination_id = ? AND x.status = 'delivered')
-      AND NOT EXISTS (SELECT 1 FROM answer_deliveries y WHERE y.answer_id = a.id AND y.destination_id = ? AND y.status = 'delivered')
-    ORDER BY i.created_at, h.position, a.created_at LIMIT 500`).bind(destinationId, destinationId, destinationId).all<Record<string, string>>();
+      AND EXISTS (SELECT 1 FROM answer_deliveries y WHERE y.answer_id = a.id AND y.destination_id = ? AND y.claim = ?)
+    ORDER BY i.created_at, h.position, a.created_at LIMIT 500`).bind(destinationId, destinationId, destinationId, claim).all<Record<string, string>>();
   return results.map((row) => ({ highlightId: row.highlight_id, quote: row.quote, title: row.title, url: row.url, site_name: row.site_name, item_id: row.item_id, answer: toAnswer(row) }));
 }
 
