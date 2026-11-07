@@ -84,3 +84,12 @@ test("levels", () => {
   assert.equal(levelFor(75).name, "Candle");
   assert.equal(levelFor(99999).progress, 1);
 });
+
+// BUG-7: an answer lists only the sources it cites, not everything retrieval returned.
+test("citedSources keeps only the numbers the answer cites", async () => {
+  const { citedSources } = await import("../src/cite.ts");
+  const sources = [{ n: 1, title: "QueryBandits" }, { n: 2, title: "DuckDB" }, { n: 3, title: "IndexNow" }];
+  assert.deepEqual(citedSources(sources, "Rewrites cut hallucinations [1], see also [3].").map((source) => source.n), [1, 3]);
+  assert.deepEqual(citedSources(sources, "No library item covers this."), []);
+  assert.deepEqual(citedSources(sources, "Paragraph [p2] and year [2023] are not sources."), []);
+});

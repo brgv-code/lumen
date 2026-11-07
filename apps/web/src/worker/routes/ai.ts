@@ -5,7 +5,7 @@ import type { AppEnv, SessionUser } from "../env";
 import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
 import { CHAT_MODEL, DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
-import { retrieve, sourcesBlock } from "../lib/retrieve";
+import { asksForLibrary, retrieve, sourcesBlock, terms } from "../lib/retrieve";
 import { LIBRARY_SYSTEM, TLDR_SYSTEM, chunkParagraphs, paragraphsWithin, tldrCombinePrompt, tldrPrompt } from "@lumen/core";
 import { safeJson, toIdea } from "../lib/map";
 import { glowStmt } from "../lib/glow";
@@ -95,22 +95,30 @@ ai.post("/tldr", async (c) => {
  *  SSE: first event {"sources":[...]}, then {"response":"..."} chunks, then [DONE]. */
 ai.post("/chat", async (c) => {
   const u = c.get("user");
-  const b = await body<{ question?: string; page?: { title?: string; url?: string; text?: string }; selection?: string; history?: { role: string; content: string }[] }>(c);
+  const b = await body<{ question?: string; page?: { title?: string; url?: string; text?: string }; selection?: string; history?: { role: string; content: string }[]; library?: boolean }>(c);
   const question = str(b.question, 1500);
   if (!question) fail(422, "bad_request", "Ask a question.");
   const chatModel = await spend(c, b.page?.text ? "ask_page" : "ask_library", CHAT_MODEL);
-  const sources = await retrieve(c.env.DB, u.id, `${question} ${b.selection ?? ""} ${b.page?.title ?? ""}`, 5);
+  const history = (b.history ?? []).slice(-6).filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+  // A follow up continues the chat; the library joins a fresh question, the Ask page, or a reader who asks for it (BUG-12).
+  const searchLibrary = b.library === true || !history.length || asksForLibrary(question);
+  // The conversation fills in only a vague question; otherwise its earlier topic would outweigh the one asked now.
+  const earlier = terms(question).length < 2 ? history.filter((m) => m.role === "user").slice(-2).map((m) => m.content).join(" ") : "";
+  const sources = searchLibrary ? await retrieve(c.env.DB, u.id, `${question} ${earlier} ${b.selection ?? ""} ${b.page?.title ?? ""}`, 5) : [];
   const pageText = (b.page?.text ?? "").replace(/\s+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
   const page = pageText ? `PAGE: "${b.page?.title ?? "Untitled"}" (${b.page?.url ?? ""})\n"""${pageText.slice(0, 12000)}"""` : "";
   const sel = b.selection ? `SELECTION: """${b.selection.slice(0, 2000)}"""` : "";
-  const history = (b.history ?? []).slice(-6).filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+  const library = searchLibrary ? `LIBRARY:\n${sourcesBlock(sources)}` : "";
+  const lastAnswer = history.filter((m) => m.role === "assistant").at(-1)?.content;
+  // Said outright, with the last answer right before it, so a short follow up is read against that answer, not the page (BUG-11).
+  const asked = lastAnswer ? `PREVIOUS ANSWER:\n"""${lastAnswer}"""\n\nQUESTION (a follow up to the previous answer): ${question}` : `QUESTION: ${question}`;
   let stream: ReadableStream;
   try {
     stream = (await c.env.AI.run(chatModel as Parameters<Ai["run"]>[0], {
       messages: [
         { role: "system", content: LIBRARY_SYSTEM },
         ...history,
-        { role: "user", content: [page, sel, `LIBRARY:\n${sourcesBlock(sources)}`, `QUESTION: ${question}`].filter(Boolean).join("\n\n") },
+        { role: "user", content: [page, sel, library, asked].filter(Boolean).join("\n\n") },
       ],
       stream: true,
       max_tokens: 700,

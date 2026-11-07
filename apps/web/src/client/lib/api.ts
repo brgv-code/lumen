@@ -209,7 +209,7 @@ export interface ChatSource { n: number; kind: "highlight" | "item"; id: string;
 
 /** Ask your library: streams the answer, calls onSources once. */
 export async function streamChat(
-  d: { question: string; history?: { role: string; content: string }[]; selection?: string },
+  d: { question: string; history?: { role: string; content: string }[]; selection?: string; library?: boolean },
   on: { text: (full: string) => void; sources: (s: ChatSource[]) => void },
   signal?: AbortSignal,
 ): Promise<string> {
