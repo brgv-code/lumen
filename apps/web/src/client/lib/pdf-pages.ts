@@ -12,27 +12,32 @@ export interface ShownPdf {
 // pdf.js page border on each side (pdf_viewer.css `--page-border`), so a page fits the column exactly.
 const PAGE_BORDER = 9;
 
-/** Draws the PDF at `url` as pages inside `container`, page 1 first; `onLayer` gets each text layer once it is ready for marks. */
-export async function showPdfPages(url: string, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
+/**
+ * Draws a PDF as pages inside `container`, page 1 first; `onLayer` gets each text layer once it is ready for marks.
+ * `file` is a stored file's address, or the bytes still on their way on a first open.
+ */
+export async function showPdfPages(file: string | Promise<ArrayBuffer>, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
   // Our own worker, started now so it downloads alongside the core library instead of after it.
   const port = new Worker(workerSrc, { type: "module" });
   try {
-    return await openPdf(url, port, container, onLayer);
+    return await openPdf(file, port, container, onLayer);
   } catch (error) {
     port.terminate();
     throw error;
   }
 }
 
-async function openPdf(url: string, port: Worker, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
+async function openPdf(file: string | Promise<ArrayBuffer>, port: Worker, container: HTMLDivElement, onLayer: (layer: HTMLElement) => void): Promise<ShownPdf> {
   const styles = import("pdfjs-dist/legacy/web/pdf_viewer.css");
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const worker = pdfjs.PDFWorker.create({ port });
-  // By URL, so pdf.js asks for the ranges page 1 needs first and streams the rest of the file behind them.
-  const task = pdfjs.getDocument({ url, worker, httpHeaders: { "x-lumen": "1" }, cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
   // The viewer module reads the core library from this global when it loads; it downloads while the file opens.
   Object.assign(globalThis, { pdfjsLib: pdfjs });
-  const [doc, { EventBus, PDFPageView, RenderingStates }] = await Promise.all([task.promise, import("pdfjs-dist/legacy/web/pdf_viewer.mjs"), styles]);
+  const viewer = import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
+  const worker = pdfjs.PDFWorker.create({ port });
+  // By URL, pdf.js asks for the ranges page 1 needs first and streams the rest behind them. Bytes go to the worker as a copy; the caller keeps them.
+  const source = typeof file === "string" ? { url: file, httpHeaders: { "x-lumen": "1" } } : { data: new Uint8Array((await file).slice(0)) };
+  const task = pdfjs.getDocument({ ...source, worker, cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
+  const [doc, { EventBus, PDFPageView, RenderingStates }] = await Promise.all([task.promise, viewer, styles]);
   const eventBus = new EventBus();
   eventBus.on("textlayerrendered", ({ source }: { source: { textLayer: { div: HTMLElement } | null } }) => {
     if (!source.textLayer) return;

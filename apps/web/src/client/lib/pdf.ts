@@ -72,6 +72,11 @@ export async function addLocalPdf(file: File): Promise<{ item: Item; fileStored:
   }
 }
 
+/** A saved link's first open in the page view: the text its pages already read, so the file is parsed once. */
+export async function savePdfPagesText(itemId: string, bytes: ArrayBuffer, runs: PdfRun[][]): Promise<{ contentHtml: string | null; pdf: PdfInfo }> {
+  return api.savePdfText(itemId, { sha256: await sha256Hex(bytes), pageCount: runs.length, pages: pdfParagraphs(runs) });
+}
+
 /** Diagram 2: a saved link's first open. The worker fetches and stores the file, the browser parses it. */
 export async function parseSavedPdf(itemId: string): Promise<{ contentHtml: string | null; pdf: PdfInfo }> {
   const bytes = await api.pdfFile(itemId);
