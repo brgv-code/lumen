@@ -10,6 +10,7 @@ export default function Popup() {
   const [s, setS] = useState<Settings | null>(null);
   const [tab, setTab] = useState<chrome.tabs.Tab | null>(null);
   const [isPdf, setIsPdf] = useState(false);
+  const [inBrowserPdf, setInBrowserPdf] = useState(false);
   const [page, setPage] = useState<PageState | null>(null);
   const [cols, setCols] = useState<Collection[]>([]);
   const [tags, setTags] = useState("");
@@ -35,6 +36,7 @@ export default function Popup() {
       if (r.settings.token) {
         send<{ collections: Collection[] }>({ type: "GET_COLLECTIONS" }).then((c) => setCols(c.collections ?? [])).catch(() => {});
         send<{ stats: { streak: number } | null }>({ type: "GET_HOME" }).then((h) => setStreak(h?.stats?.streak ?? null)).catch(() => {});
+        if (active?.id !== undefined && !viewedPdf(active.url) && t?.url?.startsWith("http")) send<{ viewable: boolean }>({ type: "PDF_TAB", tabId: active.id, url: t.url }).then((r) => setInBrowserPdf(r.viewable)).catch(() => setInBrowserPdf(false));
         if (t?.url?.startsWith("http")) send<{ feed: { id: string; title: string } | null }>({ type: "GET_FOLLOW", url: t.url }).then((r) => setFollow(r?.feed ?? null)).catch(() => setFollow(null));
       }
     })();
@@ -112,6 +114,13 @@ export default function Popup() {
           </div>
           {msg && <div className="small muted" style={{ textAlign: "center" }}>{msg}</div>}
         </div>
+      )}
+
+      {inBrowserPdf && (
+        <button className="key ghost" onClick={async () => {
+          await send({ type: "PDF_VIEW_IN_LUMEN", tabId: tab!.id!, url: tab!.url! });
+          window.close();
+        }}>Open in Lumen viewer</button>
       )}
 
       {connected && (
