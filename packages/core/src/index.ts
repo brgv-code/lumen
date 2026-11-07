@@ -9,6 +9,7 @@ export * from "./toolbar.ts";
 export * from "./icons.ts";
 export * from "./slash.ts";
 export * from "./chat.ts";
+export * from "./answer-stream.ts";
 export * from "./recall.ts";
 export * from "./pdf.ts";
 export * from "./gdocs.ts";

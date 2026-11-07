@@ -10,6 +10,7 @@
     "zip": "wxt zip",
     "build:store": "LUMEN_STORE=1 wxt zip",
     "typecheck": "tsc --noEmit -p .",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

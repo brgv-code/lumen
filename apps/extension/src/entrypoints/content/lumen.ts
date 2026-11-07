@@ -1,6 +1,6 @@
 // Lumen on a reading surface: a selection toolbar that never takes over copy and paste,
 // highlights that come back when you return, and margin answers in a side card.
-import { HIGHLIGHT_COLORS, answerLabel, googleDocId, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
+import { HIGHLIGHT_COLORS, answerLabel, applyAnswerEvent, cachedAnswer, googleDocId, requestToCancel, startAnswer, type AnswerEvent, type AnswerStream, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
 import { WHEEL_CSS, bindWheel, wheelHTML } from "./wheel";
 import { coveringQuote, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarConfig, type BarSnapshot, type SelectionBar } from "@lumen/core/bar";
@@ -53,10 +53,9 @@ export class Lumen {
   highlights: Highlight[] = [];
   pending: BarSnapshot | null = null;
   activeMark: string | null = null;
-  aiText = "";
-  aiModel: string | null = null;
-  /** The card streams a TL;DR: chunks render with ¶ links instead of plain text. */
-  tldrMode = false;
+  /** The answer the card shows; stream events for any other request are ignored. */
+  answer: AnswerStream | null = null;
+  requestCount = 0;
   /** This visit's TL;DR, so asking again costs no second call. */
   tldrCache: { text: string; model: string | null } | null = null;
   paragraphs: Paragraph[] = [];
@@ -366,7 +365,13 @@ export class Lumen {
     };
   }
 
-  hideCard() { this.card.hidden = true; this.card.innerHTML = ""; }
+  hideCard() { this.cancelAnswer(); this.card.hidden = true; this.card.innerHTML = ""; this.answer = null; }
+
+  /** Stops the answer the card is leaving, if it is still streaming. */
+  cancelAnswer() {
+    const requestId = requestToCancel(this.answer);
+    if (requestId !== null) send({ type: "AI_CANCEL", requestId }).catch(() => {});
+  }
 
   async highlight(color: string, withNote = false, collectionId?: string): Promise<Highlight | undefined> {
     if (!this.pending) return;
@@ -506,9 +511,9 @@ export class Lumen {
 
   /** A margin answer. Keep is offered only when the answer belongs to a passage or a highlight. */
   async ai(action: AIAction, text: string, target: { question?: string; passage?: BarSnapshot | null; highlight?: Highlight } = {}) {
-    this.tldrMode = false;
-    this.aiText = "";
-    this.aiModel = null;
+    this.cancelAnswer();
+    const requestId = ++this.requestCount;
+    this.answer = startAnswer(requestId, "answer");
     const canKeep = Boolean(target.passage || target.highlight);
     this.card.hidden = false;
     this.card.innerHTML = `
@@ -521,44 +526,45 @@ export class Lumen {
     this.card.onclick = async (ev) => {
       const b = (ev.target as HTMLElement).closest("button");
       if (b?.dataset.act === "close") this.hideCard();
-      if (b?.dataset.act === "copy-answer") { await navigator.clipboard.writeText(this.aiText); this.toast("Answer copied"); }
+      if (b?.dataset.act === "copy-answer") { await navigator.clipboard.writeText(this.answer?.text ?? ""); this.toast("Answer copied"); }
       if (b?.dataset.act === "more-panel") { this.hideCard(); this.openPanel(`Tell me more about: “${text.slice(0, 300)}”`); }
-      if (b?.dataset.act === "keep" && this.aiText && !kept) {
+      if (b?.dataset.act === "keep" && this.answer?.text && !kept) {
         kept = true;
         b.setAttribute("disabled", "");
         if (!(await this.keep(action, target))) { kept = false; b.removeAttribute("disabled"); }
       }
     };
-    await send({ type: "AI_REQUEST", action, text, question: target.question, title: this.surface.title(), context: this.contextFor(text) }).catch(() => null);
+    await send({ type: "AI_REQUEST", requestId, action, text, question: target.question, title: this.surface.title(), context: this.contextFor(text) }).catch(() => null);
   }
 
   /** The page's TL;DR card: paragraphs numbered for the model, [pN] shown as ¶ links, Keep saves the page. */
   async tldr() {
     this.paragraphs = this.surface.paragraphs();
-    this.tldrMode = true;
-    this.aiText = this.tldrCache?.text ?? "";
-    this.aiModel = this.tldrCache?.model ?? null;
+    this.cancelAnswer();
+    const requestId = ++this.requestCount;
+    this.answer = this.tldrCache ? cachedAnswer(requestId, "tldr", this.tldrCache) : startAnswer(requestId, "tldr");
     this.card.hidden = false;
     this.card.innerHTML = `
       <div class="head"><span class="tile iris">✦</span><b>TL;DR</b><span class="sp"></span><button class="x" data-act="close">✕</button></div>
       <div class="answer ${this.tldrCache ? "" : "streaming"}"></div>
       <div class="row"><button class="key ghost" data-act="keep">Keep</button></div>
-      <div class="foot" data-model>${this.aiModel ? esc(modelLabel(this.aiModel)) : ""}</div>`;
+      <div class="foot" data-model>${this.answer.model ? esc(modelLabel(this.answer.model)) : ""}</div>`;
     this.renderTldr();
     this.card.onclick = async (ev) => {
       const target = ev.target as HTMLElement;
       const cite = target.closest<HTMLElement>("[data-p]");
       if (cite) return this.scrollToParagraph(Number(cite.dataset.p));
       const b = target.closest("button");
-      if (b?.dataset.act === "close") { this.tldrMode = false; return this.hideCard(); }
-      if (b?.dataset.act === "keep" && this.aiText && !b.hasAttribute("disabled")) {
+      if (b?.dataset.act === "close") return this.hideCard();
+      const shown = this.answer;
+      if (b?.dataset.act === "keep" && shown?.text && !b.hasAttribute("disabled")) {
         b.setAttribute("disabled", "");
-        const citations: Citation[] = splitCitations(this.aiText).flatMap((part) => {
+        const citations: Citation[] = splitCitations(shown.text).flatMap((part) => {
           const paragraph = typeof part === "string" ? undefined : this.paragraphs[part.n - 1];
           return typeof part === "string" || !paragraph ? [] : [{ n: part.n, quote: paragraph.quote }];
         });
         type KeepResult = { ok: boolean; error?: string };
-        const r: KeepResult = await send<KeepResult>({ type: "KEEP_TLDR", url: this.surface.url(), title: this.surface.title(), html: this.surface.html(), kind: this.surface.kind, text: this.aiText, model: this.aiModel, citations })
+        const r: KeepResult = await send<KeepResult>({ type: "KEEP_TLDR", url: this.surface.url(), title: this.surface.title(), html: this.surface.html(), kind: this.surface.kind, text: shown.text, model: shown.model, citations })
           .catch((e): KeepResult => ({ ok: false, error: String(e) }));
         if (!r.ok) { b.removeAttribute("disabled"); return this.toast(r.error ?? "Could not keep the TL;DR", "err"); }
         this.toast("Kept the TL;DR with this page");
@@ -566,14 +572,14 @@ export class Lumen {
       }
     };
     if (this.tldrCache) return;
-    if (!this.paragraphs.length) return this.onMessage({ type: "AI_ERROR", error: "Lumen could not find the article text on this page." });
-    await send({ type: "AI_TLDR", title: this.surface.title(), paragraphs: this.paragraphs.map((p) => p.text) }).catch(() => null);
+    if (!this.paragraphs.length) return this.onMessage({ type: "AI_ERROR", requestId, error: "Lumen could not find the article text on this page." });
+    await send({ type: "AI_TLDR", requestId, title: this.surface.title(), paragraphs: this.paragraphs.map((p) => p.text) }).catch(() => null);
   }
 
   renderTldr() {
     const ans = this.card.querySelector<HTMLElement>(".answer");
     if (!ans) return;
-    ans.innerHTML = splitCitations(this.aiText).map((part) => (typeof part === "string" ? esc(part).replace(/^[-*] /gm, "• ") : `<button class="cite" data-p="${part.n}" title="Paragraph ${part.n}">¶${part.n}</button>`)).join("");
+    ans.innerHTML = splitCitations(this.answer?.text ?? "").map((part) => (typeof part === "string" ? esc(part).replace(/^[-*] /gm, "• ") : `<button class="cite" data-p="${part.n}" title="Paragraph ${part.n}">¶${part.n}</button>`)).join("");
   }
 
   scrollToParagraph(n: number) {
@@ -593,7 +599,7 @@ export class Lumen {
     if (!highlight) return false;
     const owner = highlight;
     type KeepResult = { ok: boolean; answer?: HighlightAnswer; error?: string };
-    const r: KeepResult = await send<KeepResult>({ type: "KEEP_ANSWER", highlightId: owner.id, url: this.surface.url(), action, question: target.question ?? null, answer: this.aiText, model: this.aiModel })
+    const r: KeepResult = await send<KeepResult>({ type: "KEEP_ANSWER", highlightId: owner.id, url: this.surface.url(), action, question: target.question ?? null, answer: this.answer?.text ?? "", model: this.answer?.model ?? null })
       .catch((e): KeepResult => ({ ok: false, error: String(e) }));
     const answer = r.answer;
     if (!r.ok || !answer) { this.toast(r.error ?? "Could not keep this answer", "err"); return false; }
@@ -603,17 +609,11 @@ export class Lumen {
     return true;
   }
 
-  onMessage(m: { type: string; chunk?: string; error?: string; cmd?: string; text?: string; tone?: string; model?: string }) {
-    const ans = this.card.querySelector<HTMLElement>(".answer");
-    if (m.type === "AI_CHUNK" && ans) { this.aiText += m.chunk; if (this.tldrMode) this.renderTldr(); else ans.textContent = this.aiText; }
-    if (m.type === "AI_DONE" && ans) {
-      ans.classList.remove("streaming");
-      this.aiModel = m.model ?? null;
-      if (this.tldrMode) this.tldrCache = { text: this.aiText, model: this.aiModel };
-      const foot = this.card.querySelector<HTMLElement>("[data-model]");
-      if (foot && m.model) foot.textContent = modelLabel(m.model);
-    }
-    if (m.type === "AI_ERROR" && ans) { ans.classList.remove("streaming"); ans.classList.add("err"); ans.textContent = m.error ?? "Something went wrong"; }
+  onMessage(m: { type: string; requestId?: number; chunk?: string; error?: string; cmd?: string; text?: string; tone?: string; model?: string }) {
+    const requestId = m.requestId ?? 0;
+    if (m.type === "AI_CHUNK") this.onAnswerEvent({ type: "chunk", requestId, chunk: m.chunk ?? "" });
+    if (m.type === "AI_DONE") this.onAnswerEvent({ type: "done", requestId, model: m.model ?? null });
+    if (m.type === "AI_ERROR") this.onAnswerEvent({ type: "error", requestId, error: m.error ?? "Something went wrong" });
     if (m.type === "TOAST") this.toast(m.text ?? "", m.tone === "err" ? "err" : "ok");
     if (m.type === "CMD") {
       if (m.cmd === "save") this.savePage((m as { collectionId?: string }).collectionId);
@@ -635,6 +635,24 @@ export class Lumen {
         }
       }
     }
+  }
+
+  onAnswerEvent(event: AnswerEvent) {
+    const next = applyAnswerEvent(this.answer, event);
+    if (!next || next === this.answer) return;
+    this.answer = next;
+    if (next.kind === "tldr" && next.status === "done") this.tldrCache = { text: next.text, model: next.model };
+    const ans = this.card.querySelector<HTMLElement>(".answer");
+    if (!ans) return;
+    if (next.status === "streaming") {
+      if (next.kind === "tldr") this.renderTldr();
+      else ans.textContent = next.text;
+      return;
+    }
+    ans.classList.remove("streaming");
+    if (next.status === "failed") { ans.classList.add("err"); ans.textContent = next.error; return; }
+    const foot = this.card.querySelector<HTMLElement>("[data-model]");
+    if (foot && next.model) foot.textContent = modelLabel(next.model);
   }
 
   async savePage(collectionId?: string) {

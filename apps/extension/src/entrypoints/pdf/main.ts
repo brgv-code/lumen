@@ -12,6 +12,7 @@ import type { Settings } from "../../lib/types";
 import { Lumen } from "../content/lumen";
 import { markLineEnds } from "@lumen/core/pdf-dom";
 import { PdfSurface } from "./surface";
+import { untilDone } from "../../lib/runs";
 
 const file = new URLSearchParams(location.search).get("file") ?? "";
 let title = fileName(file);
@@ -96,9 +97,10 @@ async function open() {
   titleEl.textContent = document.title = title;
 
   let wantsSync = false;
+  const sync = untilDone(() => syncToLumen(surface, bytes));
   const surface = new PdfSurface(viewerEl, file, () => title, () => {
     wantsSync = true;
-    syncToLumen(surface, bytes).catch((error) => console.warn("Lumen could not store this PDF's text or file", error));
+    sync().catch((error) => console.warn("Lumen could not store this PDF's text or file", error));
   });
   const lumen = new Lumen(surface);
   lumen.start();
@@ -114,26 +116,24 @@ async function open() {
   }
   surface.setText(runs);
   lumen.paint();
-  if (wantsSync) syncToLumen(surface, bytes).catch((error) => console.warn("Lumen could not store this PDF's text or file", error));
+  if (wantsSync) sync().catch((error) => console.warn("Lumen could not store this PDF's text or file", error));
 }
 
-let synced = false;
-
-/** After the first save or highlight: give the library item this PDF's text and file, as an upload in the web app would. */
-async function syncToLumen(surface: PdfSurface, bytes: ArrayBuffer) {
-  if (synced || !surface.runs.length) return;
+/** After the first save or highlight: give the library item this PDF's text and file, as an upload in the web app would. Resolves false while the text or item is not there yet. */
+async function syncToLumen(surface: PdfSurface, bytes: ArrayBuffer): Promise<boolean> {
+  if (!surface.runs.length) return false;
   const found = await cloudApi.lookup(pageKey(file));
-  if (!found.item) return;
-  synced = true;
+  if (!found.item) return false;
   const itemId = found.item.id;
   const { item } = await cloud<{ item: { pdf?: PdfInfo } }>("GET", `/items/${itemId}`);
   const pdf = item.pdf;
-  if (!pdf || pdf.locked) return;
+  if (!pdf || pdf.locked) return true;
   const pageCount = surface.runs.length;
   if ((pdf.text === "pending" || pdf.text === "failed") && pageCount <= PDF_MAX_PAGES) {
     await cloud("PUT", `/items/${itemId}/text`, { sha256: await sha256Hex(bytes), pageCount, pages: pdfParagraphs(surface.runs) });
   }
   if (!pdf.hasFile && bytes.byteLength <= PDF_MAX_BYTES) await uploadFile(itemId, bytes);
+  return true;
 }
 
 async function uploadFile(itemId: string, bytes: ArrayBuffer) {

@@ -32,6 +32,13 @@ export async function localHighlights(url: string): Promise<Highlight[]> {
   return list.map(answerOutOfNote);
 }
 
+/** Every page's offline highlights, for the upload once connected. */
+export async function allLocalHighlights(): Promise<Record<string, Highlight[]>> {
+  const r = await chrome.storage.local.get(LOCAL);
+  const all: Record<string, Highlight[]> = r[LOCAL] ?? {};
+  return Object.fromEntries(Object.entries(all).map(([url, list]) => [url, list.map(answerOutOfNote)]));
+}
+
 /** Before LUM-1 a kept answer sat in the note as "Explain: …"; it becomes a kept answer again. */
 function answerOutOfNote(highlight: Highlight): Highlight {
   const found = answerFromNote(highlight.note);
