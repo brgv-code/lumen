@@ -101,6 +101,8 @@ export type Msg =
   | { type: "FOLLOW_SITE"; url: string }
   | { type: "UNFOLLOW_SITE"; id: string }
   | { type: "GET_FOLLOW"; url: string }
-  | { type: "PDF_BYPASS"; url: string };
+  | { type: "PDF_BYPASS"; url: string }
+  | { type: "PDF_TAB"; tabId: number; url: string }
+  | { type: "PDF_VIEW_IN_LUMEN"; tabId: number; url: string };
 
 export type { Collection, Highlight, Item };

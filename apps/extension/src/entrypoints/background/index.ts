@@ -65,6 +65,8 @@ export default defineBackground(() => {
     ["responseHeaders"],
   );
 
+  chrome.tabs.onRemoved.addListener((tabId) => { forgetPdfTab(tabId).catch((error) => console.warn("Lumen could not forget a closed PDF tab", error)); });
+
   chrome.runtime.onInstalled.addListener((d) => {
     buildMenus();
     refreshPlan().catch((error) => console.warn("Lumen could not read the plan", error));
@@ -284,6 +286,21 @@ async function addToMarkedIndex(url: string) {
 const PLAN_KEY = "lumen_plan";
 // PDFs the reader sent back to the browser's viewer this session.
 const BYPASS_KEY = "lumen_pdf_bypass";
+// The PDF each tab last loaded, so the popup can offer Lumen's viewer for a tab in the browser's.
+const PDF_TABS_KEY = "lumen_pdf_tabs";
+
+async function pdfTabs(): Promise<Record<number, string>> {
+  return (await chrome.storage.session.get(PDF_TABS_KEY))[PDF_TABS_KEY] ?? {};
+}
+
+async function rememberPdfTab(tabId: number, url: string) {
+  await chrome.storage.session.set({ [PDF_TABS_KEY]: { ...(await pdfTabs()), [tabId]: url } });
+}
+
+async function forgetPdfTab(tabId: number) {
+  const { [tabId]: _, ...rest } = await pdfTabs();
+  await chrome.storage.session.set({ [PDF_TABS_KEY]: rest });
+}
 
 async function refreshPlan(): Promise<boolean> {
   if (!(await connected())) { await chrome.storage.local.remove(PLAN_KEY); return false; }
@@ -305,6 +322,7 @@ function isPdfResponse(headers: chrome.webRequest.HttpHeader[] = []): boolean {
 
 async function openInViewer(details: chrome.webRequest.WebResponseHeadersDetails) {
   if (details.tabId < 0 || details.method !== "GET" || details.statusCode >= 400 || !isPdfResponse(details.responseHeaders)) return;
+  await rememberPdfTab(details.tabId, details.url);
   const settings = await getSettings();
   if (!settings.token || !settings.pdfViewer || !(await isPro())) return;
   const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
@@ -568,6 +586,20 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case "PDF_BYPASS": {
       const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
       await chrome.storage.session.set({ [BYPASS_KEY]: [...new Set([...bypassed, msg.url])] });
+      // The browser may serve the PDF from cache, which the header listener never sees.
+      if (tabId !== undefined) await rememberPdfTab(tabId, msg.url);
+      return { ok: true };
+    }
+
+    case "PDF_TAB": {
+      const isPdf = (await pdfTabs())[msg.tabId] === msg.url;
+      return { ok: true, viewable: isPdf && (await connected()) && (await isPro()) };
+    }
+
+    case "PDF_VIEW_IN_LUMEN": {
+      const bypassed: string[] = (await chrome.storage.session.get(BYPASS_KEY))[BYPASS_KEY] ?? [];
+      await chrome.storage.session.set({ [BYPASS_KEY]: bypassed.filter((url) => url !== msg.url) });
+      await chrome.tabs.update(msg.tabId, { url: pdfViewerUrl(msg.url) });
       return { ok: true };
     }
 
