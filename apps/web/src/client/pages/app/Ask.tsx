@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUp, MessageCircle, Sparkles } from "lucide-react";
+import { citedSources } from "@lumen/core";
 import { streamChat, type ChatSource } from "../../lib/api";
 import { PageHero } from "../../components/PageHero";
 import { Md } from "../../components/Md";
@@ -24,7 +25,8 @@ export default function Ask() {
     setQ("");
     const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => l.map((m, k) => (k === l.length - 1 ? fn(m) : m)));
     try {
-      await streamChat({ question, history }, { text: (t) => patch((m) => ({ ...m, content: t })), sources: (s) => patch((m) => ({ ...m, sources: s })) });
+      // This page asks the library itself, so every follow up searches it too.
+      await streamChat({ question, history, library: true }, { text: (t) => patch((m) => ({ ...m, content: t })), sources: (s) => patch((m) => ({ ...m, sources: s })) });
       patch((m) => ({ ...m, streaming: false }));
     } catch (e) {
       patch((m) => ({ ...m, streaming: false, error: (e as Error).message }));
@@ -49,9 +51,9 @@ export default function Ask() {
               {m.error ? m.error : <Md text={m.content} onCite={(n) => { const s = m.sources?.find((x) => x.n === n); if (s) nav(`/app/read/${s.itemId}${s.kind === "highlight" ? `#${s.id}` : ""}`); }} />}
               {m.streaming && <span className="caret" />}
             </div>
-            {!m.streaming && m.sources && m.sources.length > 0 && /\[\d+\]/.test(m.content) && (
+            {!m.streaming && m.sources && citedSources(m.sources, m.content).length > 0 && (
               <div className="grid-2" style={{ gap: 8 }}>
-                {m.sources.map((s) => (
+                {citedSources(m.sources, m.content).map((s) => (
                   <Link key={s.n} to={`/app/read/${s.itemId}${s.kind === "highlight" ? `#${s.id}` : ""}`} className="card-flat row" style={{ padding: 10, alignItems: "flex-start" }}>
                     <span className="tile tile--xs tile--iris" style={{ fontSize: 11, fontWeight: 700 }}>{s.n}</span>
                     <span style={{ minWidth: 0 }}><b style={{ color: "var(--ink)", fontWeight: 500, fontSize: 13.5 }}>{s.title}</b>

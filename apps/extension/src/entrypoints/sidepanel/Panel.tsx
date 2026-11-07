@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SLASH_HINT, colorSwatch, parseSlash, type SlashCommand } from "@lumen/core";
+import { SLASH_HINT, citedSources, colorSwatch, parseSlash, type SlashCommand } from "@lumen/core";
 import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
@@ -175,10 +175,10 @@ export default function Panel() {
                   {m.streaming && <span className="caret-i">▍</span>}
                 </div>
                 {m.upgrade && <button className="key lamp" style={{ height: 32 }} onClick={() => openInLumen("/app/upgrade")}>See Pro</button>}
-                {!m.streaming && m.sources && m.sources.length > 0 && /\[\d+\]/.test(m.content) && (
+                {!m.streaming && m.sources && citedSources(m.sources, m.content).length > 0 && (
                   <div className="stack" style={{ gap: 4 }}>
                     <div className="eyebrow">From your library</div>
-                    {m.sources.map((src) => (
+                    {citedSources(m.sources, m.content).map((src) => (
                       <button key={src.n} className="src" onClick={() => openInLumen(`/app/read/${src.itemId}${src.kind === "highlight" ? `#${src.id}` : ""}`)}>
                         <span className="n">{src.n}</span>
                         <span style={{ minWidth: 0 }}><b style={{ color: "var(--ink)", fontWeight: 500 }}>{src.title}</b>{src.quote && <span style={{ display: "block", fontFamily: "Newsreader, Georgia, serif", fontSize: 13 }}>“{src.quote.slice(0, 120)}{src.quote.length > 120 ? "…" : ""}”</span>}</span>
