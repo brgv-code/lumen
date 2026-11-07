@@ -24,5 +24,14 @@
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "triggers": { "crons": ["17 */6 * * *"] },
   "vars": { "DEMO_ENABLED": "true", "OWNER_EMAILS": "hello@bhargav.dev", "AI_SOFT_CAP": "60" },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Branch previews get their own DB and bucket so branch code never touches live data.
+  "previews": {
+    "vars": { "DEMO_ENABLED": "true", "OWNER_EMAILS": "hello@bhargav.dev", "AI_SOFT_CAP": "60" },
+    "ai": { "binding": "AI", "remote": true },
+    "d1_databases": [
+      { "binding": "DB", "database_name": "lumen-db-preview", "database_id": "c1b61ae3-9d91-4a60-afba-bd94d1a528e6", "migrations_dir": "migrations" }
+    ],
+    "r2_buckets": [{ "binding": "FILES", "bucket_name": "lumen-files-preview" }]
+  }
 }
