@@ -137,3 +137,34 @@ mark.lumen-mark.lumen-dark:hover { background: rgb(var(--lc) / calc(var(--lumen-
 /* underline style (any page) */
 mark.lumen-mark.lumen-ul { background: transparent !important; border-radius: 0; padding: 0; box-shadow: inset 0 -2px 0 rgb(var(--lc) / .9) !important; }
 `;
+
+// The link preview card, in its own shadow root.
+export const PREVIEW_CSS = `
+:host { all: initial; }
+* { box-sizing: border-box; font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+[hidden] { display: none !important; }
+.preview { position: fixed; display: block; width: min(340px, calc(100vw - 16px)); padding: 12px 14px; border-radius: 16px;
+  background: #f6f6f5; color: #3a3a3f; text-decoration: none; font-size: 13px; line-height: 1.45;
+  box-shadow: 0 0 0 1px rgba(14,14,16,.06), 0 20px 50px -18px rgba(0,0,0,.35); animation: rise 160ms ease-out both; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+.site { display: block; margin-bottom: 4px; font-size: 11.5px; font-weight: 600; color: #8c8c92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.body { display: flex; gap: 12px; align-items: flex-start; }
+.text { display: block; flex: 1; min-width: 0; }
+.title, .summary { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.title { -webkit-line-clamp: 2; color: #0e0e10; font-size: 14px; font-weight: 600; }
+.summary { -webkit-line-clamp: 3; margin-top: 4px; }
+.thumb { flex: none; width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: #e3e3e1; }
+.link { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 7px 10px; border-radius: 10px;
+  background: #fff; font-size: 12px; box-shadow: inset 0 0 0 1px rgba(14,14,16,.08); }
+.arrow { color: #ff8a1f; font-weight: 700; }
+.address { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview:hover .link { color: #0e0e10; box-shadow: inset 0 0 0 1px rgba(255,138,31,.6); }
+.bar { display: block; height: 10px; margin-top: 8px; border-radius: 5px; background: #e3e3e1; animation: blink 1.2s ease-in-out infinite; }
+.bar.short { width: 60%; }
+@keyframes blink { 50% { opacity: .45; } }
+:host(.dark) .preview { background: #18181b; color: #c9c9ce; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 20px 50px -18px rgba(0,0,0,.8); }
+:host(.dark) .title, :host(.dark) .preview:hover .link { color: #f4f4f5; }
+:host(.dark) .link { background: #222226; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+:host(.dark) .bar, :host(.dark) .thumb { background: #2a2a2e; }
+@media (prefers-reduced-motion: reduce) { .preview, .bar { animation: none; } }
+`;

@@ -1,6 +1,7 @@
 // Lumen in a web page: the whole page is the surface.
 import { anchorToRange, readableParagraphs } from "@lumen/core/dom";
 import { Lumen, type Surface } from "./lumen";
+import { LinkPreviews } from "./link-preview";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -8,9 +9,11 @@ export default defineContentScript({
   main() {
     const v = chrome.runtime.getManifest().version;
     if ((window as any).__lumen === v) return;
-    document.querySelectorAll("lumen-ui, lumen-bar").forEach((n) => n.remove());
+    document.querySelectorAll("lumen-ui, lumen-bar, lumen-preview").forEach((n) => n.remove());
     (window as any).__lumen = v;
-    new Lumen(webPage()).start();
+    const lumen = new Lumen(webPage());
+    lumen.start();
+    new LinkPreviews(() => lumen.settings).start();
   },
 });
 
