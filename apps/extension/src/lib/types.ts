@@ -22,6 +22,7 @@ export interface Settings {
   markStyle: "auto" | "fill" | "underline"; // auto adapts to dark pages
   markStrength: "soft" | "medium" | "strong";
   pdfViewer: boolean;       // open PDF tabs in Lumen's viewer (Pro), where the toolbar works
+  linkPreviews: boolean;    // a short card about a link's page when hovering it
 }
 
 export const TOOLBAR_ACTIONS = BAR_ACTIONS;
@@ -63,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
   markStyle: "auto",
   markStrength: "soft",
   pdfViewer: true,
+  linkPreviews: true,
 };
 
 export interface PageState {
@@ -105,6 +107,7 @@ export type Msg =
   | { type: "PDF_BYPASS"; url: string }
   | { type: "PDF_TAB"; tabId: number; url: string }
   | { type: "PDF_VIEW_IN_LUMEN"; tabId: number; url: string }
-  | { type: "READ_IN_LUMEN"; url: string };
+  | { type: "READ_IN_LUMEN"; url: string }
+  | { type: "LINK_PREVIEW"; url: string };
 
 export type { Collection, Highlight, Item };

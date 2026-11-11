@@ -217,6 +217,7 @@ export default function Options() {
             <div className="surface stack">
               <div className="row"><span style={{ flex: 1 }}>Remind me about articles I started and left (at most once a day per article)</span><button className="switch" role="switch" aria-checked={s.reminders} onClick={() => { const n = { ...s, reminders: !s.reminders }; setS(n); save(n); }}><span /></button></div>
               <div className="row"><span style={{ flex: 1 }}>Open PDFs in Lumen's viewer, so the toolbar and highlights work on them (Lumen Pro)</span><button className="switch" role="switch" aria-checked={s.pdfViewer} onClick={() => { const n = { ...s, pdfViewer: !s.pdfViewer }; setS(n); save(n); }}><span /></button></div>
+              <div className="row"><span style={{ flex: 1 }}>Show a short preview of a link's page when I hover it</span><button className="switch" role="switch" aria-checked={s.linkPreviews} onClick={() => { const n = { ...s, linkPreviews: !s.linkPreviews }; setS(n); save(n); }}><span /></button></div>
               <div className="small muted">Shortcuts: Alt+Shift+H highlight · Alt+Shift+S save page · Alt+Shift+L open the panel. Change them at chrome://extensions/shortcuts.</div>
             </div>
           </>

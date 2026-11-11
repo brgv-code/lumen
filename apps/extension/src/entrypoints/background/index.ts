@@ -4,6 +4,7 @@ import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { allLocalHighlights, getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
 import { uploadLocalHighlights } from "../../lib/offline";
 import { pdfViewerUrl, viewedPdf } from "../../lib/page";
+import { fetchPageHead } from "../../lib/preview";
 import { rerunIfAsked } from "../../lib/runs";
 import { OpenStreams } from "../../lib/streams";
 import type { Msg, PageState } from "../../lib/types";
@@ -659,6 +660,12 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const s = await getSettings();
       await chrome.tabs.create({ url: `${s.apiBase}${msg.path ?? "/app"}` });
       return { ok: true };
+    }
+
+    case "LINK_PREVIEW": {
+      // The page cannot read other sites; the extension can, under its host permissions.
+      if (!/^https?:\/\//.test(msg.url)) return { ok: false, error: "Only web pages have previews" };
+      return { ok: true, head: await fetchPageHead(msg.url) };
     }
   }
 }
