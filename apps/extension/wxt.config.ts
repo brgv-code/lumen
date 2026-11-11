@@ -31,7 +31,7 @@ export default defineConfig({
     // A store title that stands out among the other extensions called Lumen.
     name: "Lumen: Highlight, Ask and Sync to your notes",
     description: "Highlight, ask and send what you read to Obsidian, Notion or markdown.",
-    version: "2.7.1",
+    version: "2.8.0",
     // Unpacked builds keep the id ffjconacpmnbadoeegamifkellcddfja so the dashboard can connect in one click.
     ...(STORE ? {} : { key: DEV_KEY }),
     // The floating panel is the side panel page, framed inside the page by the content script.
