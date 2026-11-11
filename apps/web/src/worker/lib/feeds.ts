@@ -3,7 +3,7 @@
 import { id, now } from "./util";
 
 const UA = { "user-agent": "LumenFollow/1.0 (+https://readwithlumen.app)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8" };
-const COMMON = ["/feed", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/rss", "/feed/", "/blog/rss.xml", "/blog/feed", "/blog/atom.xml"];
+const COMMON = ["/feed", "/feed.xml", "/rss.xml", "/atom.xml", "/feed.atom", "/index.xml", "/rss", "/feed/", "/blog/rss.xml", "/blog/feed", "/blog/atom.xml"];
 
 const decode = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").trim();
 const strip = (s: string) => decode(s).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -40,7 +40,20 @@ async function get(url: string) {
   return { ok: r.ok, url: r.url || url, type: r.headers.get("content-type") ?? "", body: r.ok ? (await r.text()).slice(0, 2_000_000) : "" };
 }
 
-/** Accepts a blog URL or a feed URL. */
+/** The feeds a page declares in its head. */
+function feedLinks(html: string, base: URL) {
+  const links: string[] = [];
+  for (const match of html.matchAll(/<link\b[^>]*>/gi)) {
+    const link = match[0];
+    if (/rel=["'][^"']*alternate/i.test(link) && /type=["']application\/(rss|atom)\+xml/i.test(link)) {
+      const href = link.match(/href=["']([^"']+)["']/i)?.[1];
+      if (href) links.push(new URL(decode(href), base).toString());
+    }
+  }
+  return links;
+}
+
+/** Accepts a blog URL, an article URL or a feed URL. */
 export async function discover(input: string): Promise<Feed> {
   const first = await get(input);
   if (first.ok && (isFeed(first.body) || /xml|rss|atom/.test(first.type) && isFeed(first.body))) {
@@ -48,24 +61,22 @@ export async function discover(input: string): Promise<Feed> {
     return { feedUrl: first.url, title: p.title, siteUrl: new URL(first.url).origin, posts: p.posts };
   }
   const site = new URL(first.url || input);
-  const candidates: string[] = [];
-  if (first.ok) {
-    for (const m of first.body.matchAll(/<link\b[^>]*>/gi)) {
-      const t = m[0];
-      if (/rel=["'][^"']*alternate/i.test(t) && /type=["']application\/(rss|atom)\+xml/i.test(t)) {
-        const href = t.match(/href=["']([^"']+)["']/i)?.[1];
-        if (href) candidates.push(new URL(decode(href), site).toString());
-      }
-    }
-  }
-  const pathBase = site.pathname.replace(/\/[^/]*$/, "");
-  for (const c of COMMON) { candidates.push(new URL(c, site.origin).toString()); if (pathBase && pathBase !== "/") candidates.push(new URL(pathBase + c, site.origin).toString()); }
+  const declared = first.ok ? feedLinks(first.body, site) : [];
+  const sections = site.pathname.split("/").filter(Boolean).slice(0, -1).slice(0, 3).map((_, depth, all) => "/" + all.slice(0, depth + 1).join("/"));
+  const at = (base: string) => COMMON.map((path) => new URL(base + path, site.origin).toString());
+  // article templates often leave out the feed link the home page carries
+  const home = !declared.length && site.pathname !== "/" ? await get(site.origin + "/").catch(() => null) : null;
+  // the first section goes before the home page so /dhh on a shared host finds DHH's feed, not the host's
+  const candidates = [...declared, ...sections.slice(0, 1).flatMap(at), ...(home?.ok ? feedLinks(home.body, site) : []), ...at(""), ...sections.slice(1).flatMap(at)];
   const title = first.ok ? strip(tag(first.body, "title")).split(/[|·—-]\s/)[0].slice(0, 120) : site.hostname;
-  for (const c of [...new Set(candidates)].slice(0, 14)) {
-    const r = await get(c).catch(() => null);
-    if (r?.ok && isFeed(r.body)) {
-      const p = parseFeed(r.body, r.url);
-      return { feedUrl: r.url, title: p.title || title || site.hostname, siteUrl: site.origin, posts: p.posts };
+  const queue = [...new Set(candidates)].slice(0, 30);
+  // in small parallel rounds so a site with no feed answers in seconds, keeping the first match by priority
+  for (let start = 0; start < queue.length; start += 6) {
+    const round = await Promise.all(queue.slice(start, start + 6).map((url) => get(url).catch(() => null)));
+    const hit = round.find((reply) => reply?.ok && isFeed(reply.body));
+    if (hit) {
+      const parsed = parseFeed(hit.body, hit.url);
+      return { feedUrl: hit.url, title: parsed.title || title || site.hostname, siteUrl: site.origin, posts: parsed.posts };
     }
   }
   throw new Error("No RSS or Atom feed found on that site.");
