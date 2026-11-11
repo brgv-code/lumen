@@ -45,6 +45,7 @@ export default function Layout() {
   const [paywall, setPaywall] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [follows, setFollows] = useState(0);
+  const [feedCount, setFeedCount] = useState(0);
   const [labs, setLabsState] = useState(getLabs);
   const [recallDue, setRecallDue] = useState(0);
   const [agents, setAgents] = useState<Token[]>([]);
@@ -55,7 +56,7 @@ export default function Layout() {
 
   const refresh = () => {
     api.stats().then(setStats).catch(() => {});
-    api.following().then((r) => setFollows(r.unseenTotal)).catch(() => {});
+    api.following().then((r) => { setFollows(r.unseenTotal); setFeedCount(r.feeds.length); }).catch(() => {});
     api.tokens().then((r) => setAgents(r.data.filter((t) => t.kind === "agent"))).catch(() => {});
     api.collections().then((r) => setCollections(r.data)).catch(() => {});
     api.recall().then((r) => setRecallDue(r.due)).catch(() => {});
@@ -78,6 +79,7 @@ export default function Layout() {
   if (!user) return <div style={{ minHeight: "100vh" }} />;
 
   const logout = async () => { await api.logout().catch(() => {}); resetAnalytics(); nav("/"); };
+  const followingLink = <NavLink to="/app/following" className="side__link" data-tour="nav-following"><span className="ico"><Heart /></span> Following {follows > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{follows}</span>}</NavLink>;
   const goal = stats ? Math.min(1, stats.glowToday / Math.max(1, stats.dailyGoal)) : 0;
 
   return (
@@ -93,9 +95,11 @@ export default function Layout() {
             <NavLink to="/app/highlights" className="side__link" data-tour="nav-highlights"><span className="ico"><Highlighter /></span> Highlights {stats && <span className="count">{stats.counts.highlights}</span>}</NavLink>
             <NavLink to="/app/recall" className="side__link" data-tour="nav-recall"><span className="ico"><BookCheck /></span> Recall {recallDue > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{recallDue}</span>}</NavLink>
             <NavLink to="/app/collections" className="side__link" data-tour="nav-collections"><span className="ico"><FolderHeart /></span> Collections</NavLink>
+            {/* following from the extension must stay findable without turning on Labs */}
+            {!labs && feedCount > 0 && followingLink}
             {labs && (<>
               <div className="side__section">Labs</div>
-              <NavLink to="/app/following" className="side__link" data-tour="nav-following"><span className="ico"><Heart /></span> Following {follows > 0 && <span className="count" style={{ color: "var(--lamp)", fontWeight: 600 }}>{follows}</span>}</NavLink>
+              {followingLink}
               <NavLink to="/app/ask" className="side__link" data-tour="nav-ask"><span className="ico"><MessageCircle /></span> Ask</NavLink>
               <NavLink to="/app/radar" className="side__link" data-tour="nav-radar"><span className="ico"><Radar /></span> Radar {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
               <NavLink to="/app/spark" className="side__link"><span className="ico"><Sparkles /></span> Spark {!user.pro && <span className="count"><ProChip small /></span>}</NavLink>
