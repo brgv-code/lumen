@@ -71,6 +71,8 @@ export default function Popup() {
         <b style={{ color: "var(--ink)", fontSize: 17, letterSpacing: "-0.04em" }}>lumen</b>
         <span className="sp" />
         {streak !== null && <span className="chip lamp">🔥 {streak}</span>}
+        {connected && <button className="key ghost" style={{ height: 30, padding: "0 10px", flex: "none", fontSize: 13 }} title="Open your Lumen dashboard"
+          onClick={async () => { await send({ type: "OPEN_DASHBOARD" }); window.close(); }}>Dashboard ↗</button>}
         <button className="icon-btn" title="Settings" onClick={() => chrome.runtime.openOptionsPage()}>⚙</button>
       </div>
 
