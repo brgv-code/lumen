@@ -28,7 +28,7 @@ export function SiteFooter() {
         <div><h5>Developers</h5><ul><li><a href="/docs/api">API</a></li><li><a href="/docs/mcp">MCP for agents</a></li><li><a href="/docs/architecture">Architecture</a></li><li><a href="https://github.com/brgv-code/lumen">Source</a></li></ul></div>
         <div><h5>Resources</h5><ul><li><a href="/answers">Answers</a></li><li><a href="/docs">Docs</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li></ul></div>
       </div>
-      <p className="small muted" style={{ textAlign: "center", marginTop: 40, position: "relative", zIndex: 2 }}>© 2026 Lumen · Open source under AGPL-3.0</p>
+      <p className="small muted" style={{ textAlign: "center", marginTop: 40, position: "relative", zIndex: 2 }}>© 2026 Lumen · Open source under AGPL-3.0 · <a href="https://bhargav.dev/projects/lumen">Made by Bhargav</a></p>
       <div className="foot-stage" aria-hidden="true">
         {FLOATS.map((f, k) => (
           <div key={k} className={`foot-float ${f.sm ? "hide-sm" : ""}`} style={{ ["--x" as string]: f.x, ["--y" as string]: f.y, ["--r" as string]: f.r, ["--d" as string]: f.d }}><div>{f.el}</div></div>

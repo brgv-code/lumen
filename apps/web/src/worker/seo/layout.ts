@@ -48,7 +48,7 @@ export function footerHtml() {
     <div><h5>Developers</h5><ul><li><a href="/docs/api">API</a></li><li><a href="/docs/mcp">MCP for agents</a></li><li><a href="/docs/architecture">Architecture</a></li><li><a href="${SITE.github}">Source</a></li></ul></div>
     <div><h5>Resources</h5><ul><li><a href="/answers">Answers</a></li><li><a href="/docs">Docs</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li></ul></div>
   </div>
-  <p class="small muted" style="text-align:center;margin-top:40px;position:relative;z-index:2">© 2026 Lumen · Open source under AGPL-3.0</p>
+  <p class="small muted" style="text-align:center;margin-top:40px;position:relative;z-index:2">© 2026 Lumen · Open source under AGPL-3.0 · <a href="https://bhargav.dev/projects/lumen">Made by Bhargav</a></p>
   <div class="foot-stage" aria-hidden="true">
     ${floats.map(([x, y, r, d, inner, cls]) => `<div class="foot-float ${cls}" style="--x:${x};--y:${y};--r:${r};--d:${d}"><div>${inner}</div></div>`).join("")}
     <div class="wordmark">lumen</div>
