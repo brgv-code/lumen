@@ -70,7 +70,7 @@ The original Lumen was a small extension for explaining selected text with Ollam
 kept at [docs/media/lumen-v1-demo.gif](docs/media/lumen-v1-demo.gif).
 
 ## License
-Copyright (C) 2026 Bhargav Venkatesh Babu.
+Copyright (C) 2026 [Bhargav Venkatesh Babu](https://bhargav.dev/projects/lumen).
 
 Lumen is free software under the [GNU Affero General Public License v3.0](LICENSE). You may use,
 study, modify and share it; if you run a modified version as a service for others, you must
