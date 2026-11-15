@@ -1,0 +1,394 @@
+{
+  "apps/extension/src/entrypoints/background/index.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 7
+    }
+  },
+  "apps/extension/src/entrypoints/content/icons.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/extension/src/entrypoints/content/index.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 4
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "apps/extension/src/entrypoints/content/link-preview.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/extension/src/entrypoints/content/lumen.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 19
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "@typescript-eslint/switch-exhaustiveness-check": {
+      "count": 1
+    }
+  },
+  "apps/extension/src/entrypoints/options/Options.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/extension/src/entrypoints/popup/Picker.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/extension/src/entrypoints/popup/Popup.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/extension/src/entrypoints/sidepanel/Panel.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/extension/src/lib/ai.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/extension/src/lib/cloud.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/extension/src/lib/md.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/extension/src/lib/msg.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/extension/src/lib/page.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 4
+    }
+  },
+  "apps/web/src/client/components/CollectionEditor.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/components/ColorPicker.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 5
+    }
+  },
+  "apps/web/src/client/components/ConnectAgent.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/components/ShareModal.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/web/src/client/components/SiteFooter.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 4
+    }
+  },
+  "apps/web/src/client/components/Tour.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/web/src/client/components/cards.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/lib/analytics.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/lib/api.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/lib/extension.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "apps/web/src/client/lib/hl.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/client/lib/hooks.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/lib/landing-demo.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/lib/pdf-pages.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/Landing.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 17
+    }
+  },
+  "apps/web/src/client/pages/Login.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/app/Ask.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/app/Collections.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/client/pages/app/Following.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/client/pages/app/Highlights.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/app/Integrations.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 9
+    }
+  },
+  "apps/web/src/client/pages/app/Layout.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 5
+    }
+  },
+  "apps/web/src/client/pages/app/Library.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/app/Owner.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/client/pages/app/Radar.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/client/pages/app/Reader.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 13
+    }
+  },
+  "apps/web/src/client/pages/app/Recall.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/app/Spark.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/client/pages/app/Upgrade.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/lib/extract.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/web/src/worker/lib/feeds.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/lib/map.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/web/src/worker/lib/plan.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/worker/lib/radar.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/lib/session.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "apps/web/src/worker/lib/util.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/web/src/worker/routes/ai.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 21
+    }
+  },
+  "apps/web/src/worker/routes/auth.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/routes/billing.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "apps/web/src/worker/routes/destinations.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/routes/discover.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/web/src/worker/routes/following.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "apps/web/src/worker/routes/highlights.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/routes/items.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 4
+    }
+  },
+  "apps/web/src/worker/routes/mcp.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 22
+    }
+  },
+  "apps/web/src/worker/routes/me.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 4
+    }
+  },
+  "apps/web/src/worker/routes/owner.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "apps/web/src/worker/routes/recall.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/web/src/worker/seo/routes.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    }
+  },
+  "apps/web/src/worker/seo/share-page.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/core/src/bar.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "packages/core/src/colors.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "packages/core/src/dom.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 7
+    }
+  },
+  "packages/core/src/recall.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "packages/core/src/slash.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "packages/core/src/toolbar.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  }
+}

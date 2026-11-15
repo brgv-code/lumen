@@ -10,10 +10,16 @@
     "dev:ext": "npm run dev -w @lumen/extension",
     "build": "npm run build -w @lumen/web && npm run build -w @lumen/extension",
     "test": "npm test -w @lumen/core && npm test -w @lumen/web && npm test -w @lumen/extension",
-    "typecheck": "npm run typecheck -w @lumen/core && npm run typecheck -w @lumen/web && npm run typecheck -w @lumen/extension"
+    "typecheck": "npm run typecheck -w @lumen/core && npm run typecheck -w @lumen/web && npm run typecheck -w @lumen/extension",
+    "lint": "eslint"
   },
   "engines": {
     "node": ">=22"
   },
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript-eslint": "^8.72.2"
+  }
 }
