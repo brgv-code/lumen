@@ -1,4 +1,4 @@
-import { googleDocExportUrl, googleDocTitle, googleDocUrl, type AIAction, type Highlight } from "@lumen/core";
+import { askQuestion, googleDocExportUrl, googleDocTitle, googleDocUrl, type AIAction, type AskPrefs, type Highlight, type StyleListing } from "@lumen/core";
 import { streamAnswer, streamTldr, testProvider } from "../../lib/ai";
 import { cloud, cloudApi, syncTarget } from "../../lib/cloud";
 import { allLocalHighlights, getSettings, localHighlights, pageKey, saveSettings, setLocalHighlights } from "../../lib/storage";
@@ -7,6 +7,7 @@ import { pdfViewerUrl, viewedPdf } from "../../lib/page";
 import { fetchPageHead } from "../../lib/preview";
 import { rerunIfAsked } from "../../lib/runs";
 import { OpenStreams } from "../../lib/streams";
+import { NO_STYLES, freshStyles, storageCache } from "../../lib/styles";
 import type { Msg, PageState } from "../../lib/types";
 
 export default defineBackground(() => {
@@ -60,7 +61,7 @@ export default defineBackground(() => {
       });
     }
     if (port.name === "lumen-chat") {
-      port.onMessage.addListener((req: { question: string; page?: { title: string; url: string; text: string }; selection?: string; history?: { role: string; content: string }[] }) => chat(port, req));
+      port.onMessage.addListener((req: Parameters<typeof chat>[1]) => chat(port, req));
     }
   });
 
@@ -190,7 +191,7 @@ async function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.T
   // In Lumen's PDF viewer the page is the PDF, not the viewer.
   const pageUrl = viewedPdf(tab.url) ?? tab.url;
   if (id === "panel" || id === "ask") {
-    const prompt = id === "ask" && info.selectionText ? `What does this mean: “${info.selectionText}”` : undefined;
+    const prompt = id === "ask" && info.selectionText ? askQuestion(info.selectionText) : undefined;
     return openPanelFor(tab, prompt);
   }
   if (id === "save-page") return tabMsg({ type: "CMD", cmd: "save" });
@@ -234,7 +235,7 @@ async function setHelperSite(host: string, on: boolean) {
 
 /* ---------------- library chat (side panel) ---------------- */
 
-async function chat(port: chrome.runtime.Port, req: { question: string; page?: unknown; selection?: string; history?: unknown[] }) {
+async function chat(port: chrome.runtime.Port, req: { question: string; page?: unknown; selection?: string; history?: unknown[]; library?: boolean; style?: string; template?: string; entry?: string }) {
   const s = await getSettings();
   if (!s.token) return safePost(port, { error: "Connect Lumen in settings to ask your library." });
   try {
@@ -567,6 +568,18 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
 
     case "GET_SETTINGS":
       return { ok: true, settings: await getSettings() };
+
+    case "GET_STYLES": {
+      if (!msg.fresh || !(await connected())) return { ok: true, listing: (await storageCache.read()) ?? NO_STYLES };
+      return { ok: true, listing: await freshStyles(storageCache, () => cloud<StyleListing>("GET", "/templates")) };
+    }
+
+    case "SAVE_STYLE_PREFS": {
+      const { prefs } = await cloud<{ prefs: AskPrefs }>("PUT", "/templates/prefs", msg.prefs);
+      const cached = (await storageCache.read()) ?? NO_STYLES;
+      await storageCache.write({ ...cached, prefs });
+      return { ok: true, prefs };
+    }
 
     case "SAVE_SETTINGS": {
       const settings = await saveSettings(msg.settings);

@@ -1,4 +1,4 @@
-import { BAR_ACTIONS, BAR_SETTINGS_VERSION, DEFAULT_BAR_ACTIONS, type AIAction, type BarAction, type Citation, type Collection, type Highlight, type Item, type TextQuote } from "@lumen/core";
+import { BAR_ACTIONS, BAR_SETTINGS_VERSION, DEFAULT_BAR_ACTIONS, type AIAction, type AskPrefs, type BarAction, type Citation, type Collection, type Highlight, type Item, type TextQuote } from "@lumen/core";
 
 export type Provider = "lumen" | "ollama" | "openai" | "claude";
 
@@ -108,6 +108,8 @@ export type Msg =
   | { type: "PDF_TAB"; tabId: number; url: string }
   | { type: "PDF_VIEW_IN_LUMEN"; tabId: number; url: string }
   | { type: "READ_IN_LUMEN"; url: string }
-  | { type: "LINK_PREVIEW"; url: string };
+  | { type: "LINK_PREVIEW"; url: string }
+  | { type: "GET_STYLES"; fresh: boolean }
+  | { type: "SAVE_STYLE_PREFS"; prefs: AskPrefs };
 
 export type { Collection, Highlight, Item };

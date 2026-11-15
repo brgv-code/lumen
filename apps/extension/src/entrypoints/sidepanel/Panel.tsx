@@ -1,15 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { SLASH_HINT, citedSources, colorSwatch, parseSlash, patchReply, type SlashCommand } from "@lumen/core";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { ASK_STYLE_START, REDO_TASK, SLASH_HINT, activeStyleKey, askStyle, citedSources, colorSwatch, orderedStyles, parseSlash, patchReply, slashStyle, type AskPrefs, type SlashCommand, type Style, type StyleListing } from "@lumen/core";
 import type { Collection, Highlight } from "@lumen/core";
 import { send } from "../../lib/msg";
 import type { PageState, Settings } from "../../lib/types";
 import { Picker } from "../popup/Picker";
 import { asPage, readPage, type PageContext } from "../../lib/page";
 import { Md } from "../../lib/md";
+import { NO_STYLES, dismissOffer, dismissedOffers } from "../../lib/styles";
+import { StylePills } from "./StylePills";
 
 type Tab = "ask" | "page" | "you";
 interface Source { n: number; kind: string; id: string; itemId: string; title: string; url: string; quote?: string; note?: string | null }
-interface Msg { id?: string; role: "user" | "assistant"; content: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean; kind?: "tldr" }
+interface Msg { id?: string; role: "user" | "assistant"; content: string; display?: string; sources?: Source[]; error?: string; upgrade?: boolean; streaming?: boolean; kind?: "tldr" | "pro" }
+type Entry = "ask" | "pill" | "slash" | "typed";
+interface AskHow { entry?: Entry; style?: Style | null; history?: { role: Msg["role"]; content: string }[]; display?: string }
+
+/** The chat's first question and its answer: what every pill explains again (ADR-005). */
+function firstPair(msgs: Msg[]): { role: Msg["role"]; content: string }[] | null {
+  const at = msgs.findIndex((msg) => msg.role === "user" && msg.kind !== "pro");
+  const answer = msgs[at + 1];
+  const question = msgs[at];
+  if (at === -1 || !question || answer?.role !== "assistant" || answer.error || !answer.content) return null;
+  return [{ role: "user", content: question.content }, { role: "assistant", content: answer.content }];
+}
+
+/** Answer text as it should sound: no markdown marks, no [n] citations. */
+const speakable = (text: string) => text.replace(/\[\d+\]/g, "").replace(/[*_`#>]/g, "");
 
 async function activeTab() {
   const [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -41,7 +57,16 @@ export default function Panel() {
   const [input, setInput] = useState("");
   const [usePage, setUsePage] = useState(true);
   const [ctxInfo, setCtxInfo] = useState<PageContext | null | "none">(null);
+  const [listing, setListing] = useState<StyleListing>(NO_STYLES);
+  const [styleState, dispatchStyle] = useReducer(askStyle, ASK_STYLE_START);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [speaking, setSpeaking] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const styles = orderedStyles(listing.styles.filter((style) => !style.locked), listing.prefs);
+  const defaultStyle = listing.pro ? listing.prefs.defaultStyle : null;
+  const activeKey = activeStyleKey(styleState, defaultStyle);
+  const activeStyle = styles.find((style) => style.key === activeKey) ?? null;
+  const streaming = msgs.some((msg) => msg.streaming);
 
   const refreshTab = useCallback(async () => {
     const t = await activeTab();
@@ -61,9 +86,15 @@ export default function Panel() {
     const onUpd = (_id: number, info: chrome.tabs.TabChangeInfo) => { if (info.status === "complete") refreshTab(); };
     chrome.tabs.onActivated.addListener(onAct);
     chrome.tabs.onUpdated.addListener(onUpd);
-    const onMsg = (m: { type?: string; prompt?: string }) => { if (m?.type === "PANEL_PROMPT" && m.prompt) { setTab("ask"); askRef.current(m.prompt); } };
+    const onMsg = (m: { type?: string; prompt?: string }) => { if (m?.type === "PANEL_PROMPT" && m.prompt) { setTab("ask"); askRef.current(m.prompt, { entry: "ask" }); } };
     chrome.runtime.onMessage.addListener(onMsg);
-    if (START_PROMPT) setTimeout(() => ask(START_PROMPT), 300);
+    dismissedOffers().then(setDismissed).catch((error) => console.warn("offer dismissals unreadable", error));
+    // The cached styles first, so a highlight's Ask already carries the reader's default style.
+    send<{ listing: StyleListing }>({ type: "GET_STYLES", fresh: false })
+      .then((cached) => { setListing(cached.listing); return send<{ listing: StyleListing }>({ type: "GET_STYLES", fresh: true }); })
+      .then((fresh) => setListing(fresh.listing))
+      .catch((error) => console.warn("styles unavailable", error))
+      .finally(() => { if (START_PROMPT) setTimeout(() => askRef.current(START_PROMPT, { entry: "ask" }), 300); });
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && FLOAT) closeFloat(); };
     window.addEventListener("keydown", esc);
     return () => { chrome.tabs.onActivated.removeListener(onAct); chrome.tabs.onUpdated.removeListener(onUpd); chrome.runtime.onMessage.removeListener(onMsg); };
@@ -103,27 +134,65 @@ export default function Panel() {
     return true;
   };
 
-  const ask = async (input: string) => {
+  const ask = async (input: string, how: AskHow = {}): Promise<void> => {
     if (!input.trim()) return;
     const command = parseSlash(input);
     if (command && (await slash(input, command.command, command.rest))) return;
+    const typedStyle = command ? null : slashStyle(input, styles);
+    if (typedStyle) return pickStyle(typedStyle.style, "slash", typedStyle.rest);
+    const style = how.style === undefined ? activeStyle : how.style;
     const question = command?.command === "related" ? `What in my library relates to this passage: “${(command.rest || input).slice(0, 400)}”` : input;
     const t = await activeTab();
     const ctx = usePage ? await readPage(t) : null;
     if (usePage) setCtxInfo(ctx ?? "none");
-    const history = msgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content }));
+    const history = how.history ?? msgs.filter((m) => !m.error && m.kind !== "pro").map((m) => ({ role: m.role, content: m.content }));
     const replyId = crypto.randomUUID();
-    setMsgs((l) => [...l, { role: "user", content: input }, { id: replyId, role: "assistant", content: "", streaming: true }]);
+    setMsgs((l) => [...l, { role: "user", content: input, display: how.display }, { id: replyId, role: "assistant", content: "", streaming: true }]);
     setInput("");
     const port = chrome.runtime.connect({ name: "lumen-chat" });
     const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => patchReply(l, replyId, fn));
     port.onMessage.addListener((m: { chunk?: string; sources?: Source[]; done?: boolean; error?: string; upgrade?: boolean }) => {
       if (m.sources) patch((x) => ({ ...x, sources: m.sources }));
       if (m.chunk) patch((x) => ({ ...x, content: x.content + m.chunk }));
-      if (m.done) { patch((x) => ({ ...x, streaming: false })); port.disconnect(); }
+      if (m.done) { patch((x) => ({ ...x, streaming: false })); port.disconnect(); dispatchStyle({ type: "DONE", defaultStyle, dismissed }); }
       if (m.error) { patch((x) => ({ ...x, streaming: false, error: m.error, upgrade: m.upgrade })); port.disconnect(); }
     });
-    port.postMessage({ question, history, selection: ctx?.selection || undefined, page: ctx ? { title: ctx.title, url: t?.url ?? "", text: ctx.text } : undefined });
+    port.postMessage({
+      question, history, selection: ctx?.selection || undefined, page: ctx ? { title: ctx.title, url: t?.url ?? "", text: ctx.text } : undefined,
+      style: style?.body, template: style?.key, entry: how.entry ?? "typed", library: style?.library || undefined,
+    });
+  };
+
+  /** A pill or /slug: free readers learn the feature exists; Pro switches the chat's style and explains the passage again. */
+  const pickStyle = (style: Style, entry: Entry, rest = ""): Promise<void> | undefined => {
+    if (!listing.pro) {
+      setMsgs((l) => [...l, { role: "assistant", content: "Ask styles are part of Lumen Pro: set how Lumen explains things to you, and switch styles under any answer.", kind: "pro" }]);
+      return;
+    }
+    dispatchStyle({ type: "PICK", key: style.key });
+    if (rest) return ask(rest, { entry, style });
+    const first = firstPair(msgs);
+    if (first) return ask(REDO_TASK, { entry, style, history: first, display: `✦ ${style.name}` });
+  };
+
+  const makeDefault = async (key: string) => {
+    const prefs: AskPrefs = { ...listing.prefs, defaultStyle: key };
+    try {
+      const saved = await send<{ prefs: AskPrefs }>({ type: "SAVE_STYLE_PREFS", prefs });
+      setListing((current) => ({ ...current, prefs: saved.prefs }));
+      dispatchStyle({ type: "MADE_DEFAULT" });
+    } catch (error) {
+      console.warn("default style not saved", error);
+    }
+  };
+
+  const readAloud = (index: number, text: string) => {
+    speechSynthesis.cancel();
+    if (speaking === index) return setSpeaking(null);
+    const utterance = new SpeechSynthesisUtterance(speakable(text));
+    utterance.onend = () => setSpeaking(null);
+    setSpeaking(index);
+    speechSynthesis.speak(utterance);
   };
 
   // The message listener is added once on mount; through this it asks with the chat as it is now.
@@ -172,7 +241,12 @@ export default function Panel() {
               </div>
             )}
             {msgs.map((m, k) => m.role === "user" ? (
-              <div key={k} className="bubble me"><Md text={m.content} /></div>
+              <div key={k} className="bubble me"><Md text={m.display ?? m.content} /></div>
+            ) : m.kind === "pro" ? (
+              <div key={k} className="stack" style={{ gap: 6 }}>
+                <div className="bubble ai">{m.content}</div>
+                <button className="key lamp" style={{ height: 32 }} onClick={() => openInLumen("/app/upgrade?from=ask-templates")}>See Pro</button>
+              </div>
             ) : (
               <div key={k} className="stack" style={{ gap: 6 }}>
                 <div className="bubble ai" style={m.error ? { color: "var(--peach)" } : undefined}>
@@ -181,6 +255,9 @@ export default function Panel() {
                   {m.streaming && <span className="caret-i">▍</span>}
                 </div>
                 {m.upgrade && <button className="key lamp" style={{ height: 32 }} onClick={() => openInLumen("/app/upgrade")}>See Pro</button>}
+                {!m.streaming && !m.error && m.content && (
+                  <div className="row"><button type="button" className="key ghost" style={{ height: 26, fontSize: 12 }} aria-pressed={speaking === k} onClick={() => readAloud(k, m.content)}>{speaking === k ? "■ Stop" : "🔊 Read aloud"}</button></div>
+                )}
                 {!m.streaming && m.sources && citedSources(m.sources, m.content).length > 0 && (
                   <div className="stack" style={{ gap: 4 }}>
                     <div className="eyebrow">From your library</div>
@@ -194,6 +271,13 @@ export default function Panel() {
                 )}
               </div>
             ))}
+            {styleState.offering && (
+              <div className="row small" style={{ gap: 6, flexWrap: "wrap" }}>
+                <span>Use <b style={{ color: "var(--ink)" }}>{styles.find((style) => style.key === styleState.offering)?.name}</b> for every chat?</span>
+                <button type="button" className="key" style={{ height: 26 }} onClick={() => styleState.offering && makeDefault(styleState.offering)}>Make default</button>
+                <button type="button" className="key ghost" style={{ height: 26 }} onClick={() => { const key = styleState.offering; dispatchStyle({ type: "NOT_NOW" }); if (key) dismissOffer(key).then(setDismissed).catch((error) => console.warn("offer dismissal not saved", error)); }}>Not now</button>
+              </div>
+            )}
             <div ref={endRef} />
           </div>
         )}
@@ -250,6 +334,10 @@ export default function Panel() {
 
       {tab === "ask" && (
         <form style={{ padding: 12, borderTop: "1px solid var(--hair)", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }} onSubmit={(e) => { e.preventDefault(); ask(input); }}>
+          {msgs.length > 0 && (
+            <StylePills styles={styles} active={activeStyle} isDefault={styleState.active.source === "default" && activeKey !== null} disabled={streaming}
+              onPick={(style) => pickStyle(style, "pill")} onClear={() => dispatchStyle({ type: "CLEAR" })} onNew={() => openInLumen("/app/settings")} />
+          )}
           {usePage && ctxInfo && (
             <div className={`ctx ${ctxInfo === "none" ? "off" : ""}`}>
               <span className="dot" />
@@ -258,13 +346,13 @@ export default function Panel() {
                 : <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Reading: <b style={{ color: "var(--ink)", fontWeight: 500 }}>{ctxInfo.title}</b>{ctxInfo.selection ? " · your selection" : ""}</span>}
             </div>
           )}
-          {input.startsWith("/") && <div className="small muted">{SLASH_HINT}</div>}
+          {input.startsWith("/") && <div className="small muted">{SLASH_HINT}<br />Styles: {styles.map((style) => `/${style.slug}`).join(" · ")}</div>}
           <textarea rows={2} placeholder="Ask about this page or anything you have saved…" value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }} />
           <div className="row small muted">
             <label className="row" style={{ display: "flex", gap: 6, fontWeight: 400 }}><input type="checkbox" checked={usePage} onChange={(e) => setUsePage(e.target.checked)} style={{ width: 14, height: 14 }} /> Include this page</label>
             <span className="sp" />
-            {msgs.length > 0 && <button type="button" className="key ghost" style={{ height: 30 }} onClick={() => setMsgs([])}>New chat</button>}
+            {msgs.length > 0 && <button type="button" className="key ghost" style={{ height: 30 }} onClick={() => { setMsgs([]); dispatchStyle({ type: "NEW_CHAT" }); speechSynthesis.cancel(); setSpeaking(null); }}>New chat</button>}
             <button className="key" style={{ height: 30 }}>Ask</button>
           </div>
         </form>

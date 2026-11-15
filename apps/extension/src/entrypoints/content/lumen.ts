@@ -1,6 +1,6 @@
 // Lumen on a reading surface: a selection toolbar that never takes over copy and paste,
 // highlights that come back when you return, and margin answers in a side card.
-import { HIGHLIGHT_COLORS, answerLabel, applyAnswerEvent, cachedAnswer, googleDocId, requestToCancel, startAnswer, type AnswerEvent, type AnswerStream, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
+import { HIGHLIGHT_COLORS, answerLabel, askQuestion, applyAnswerEvent, cachedAnswer, googleDocId, requestToCancel, startAnswer, type AnswerEvent, type AnswerStream, citeForClipboard, colorName, colorSwatch, colorVar, modelLabel, normalizeColor, splitCitations, type AIAction, type Citation, type Highlight, type HighlightAnswer, type TextQuote } from "@lumen/core";
 import { WHEEL_CSS, bindWheel, wheelHTML } from "./wheel";
 import { coveringQuote, describeRange, unwrapMarks, wrapRange } from "@lumen/core/dom";
 import { createSelectionBar, type BarChoice, type BarConfig, type BarSnapshot, type SelectionBar } from "@lumen/core/bar";
@@ -296,7 +296,7 @@ export class Lumen {
       case "save": return this.highlight("mint");
       case "copy": return this.copyText(quote);
       case "cite": return this.copy();
-      case "ask": return this.openPanel(`What does this mean: “${quote.slice(0, 400)}”`);
+      case "ask": return this.openPanel(askQuestion(quote));
       case "related": return this.openPanel(`What in my library relates to this passage: “${quote.slice(0, 400)}”`);
       default: return this.ai(choice.action, quote, { passage: snapshot });
     }
