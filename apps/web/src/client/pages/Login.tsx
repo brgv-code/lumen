@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Github, Sparkles } from "lucide-react";
 import { AppIcon, useToast } from "../components/ui";
 import { api } from "../lib/api";
+import { signupsPausedOnLoad } from "../lib/signups";
 
 const ERRORS: Record<string, string> = {
   google_not_configured: "Google sign in is not configured on this deployment yet.",
@@ -84,7 +85,7 @@ export default function Login() {
           <Github size={17} /> Continue with GitHub
         </a>
 
-        {p?.signups === false && !joined && (
+        {(p ? !p.signups : signupsPausedOnLoad()) && !joined && (
           <>
             <div className="row small muted" style={{ position: "relative", margin: "6px 0" }}>
               <span style={{ flex: 1, height: 1, background: "var(--hairline-strong)" }} />or join the waitlist with your email<span style={{ flex: 1, height: 1, background: "var(--hairline-strong)" }} />

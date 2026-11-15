@@ -25,6 +25,7 @@ import { refreshActiveRadars } from "./lib/radar";
 import { eventFor, trackUser } from "./lib/analytics";
 import { owner } from "./routes/owner";
 import { recall } from "./routes/recall";
+import { signupsOpen } from "./lib/waitlist";
 
 const app = new Hono<AppEnv>();
 let ctxRef: ExecutionContext | undefined;
@@ -115,8 +116,12 @@ app.all("*", async (c) => {
   if (!isApp) return notFound();
   const res = await c.env.ASSETS.fetch(c.req.raw);
   const token = c.env.GOOGLE_SITE_VERIFICATION;
-  if (p === "/" && token && (res.headers.get("content-type") ?? "").includes("text/html")) {
-    return new HTMLRewriter().on("head", { element(el) { el.append(`<meta name="google-site-verification" content="${token.replace(/"/g, "")}">`, { html: true }); } }).transform(res);
+  const head: string[] = [];
+  if (p === "/" && token) head.push(`<meta name="google-site-verification" content="${token.replace(/"/g, "")}">`);
+  // Landing and login paint the waitlist on first render instead of swapping copy after a fetch.
+  if ((p === "/" || p === "/login") && !signupsOpen(c.env)) head.push(`<meta name="lumen-signups" content="paused">`);
+  if (head.length && (res.headers.get("content-type") ?? "").includes("text/html")) {
+    return new HTMLRewriter().on("head", { element(el) { el.append(head.join(""), { html: true }); } }).transform(res);
   }
   return res;
 });
