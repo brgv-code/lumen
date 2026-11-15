@@ -51,7 +51,7 @@ export default function Login() {
   const join = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    try { await api.joinWaitlist(email, website); setJoined(true); } catch (error) { toast((error as Error).message, "err"); }
+    try { await api.joinWaitlist(email, website); setJoined(true); } catch (error) { toast(error instanceof Error ? error.message : String(error), "err"); }
     setBusy(false);
   };
 

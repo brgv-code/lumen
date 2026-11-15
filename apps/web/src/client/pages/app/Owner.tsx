@@ -17,14 +17,20 @@ const NOTE: Record<string, string> = {
   "before guards": "Before the guards",
 };
 
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 export default function Owner() {
   const { user } = useApp();
   const [s, setS] = useState<OwnerStats | null>(null);
   const [err, setErr] = useState("");
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
-  const loadWaitlist = () => api.ownerWaitlist().then((listing) => setWaitlist(listing.entries)).catch((e) => setErr((e as Error).message));
-  useEffect(() => { if (user.owner) { api.ownerStats().then(setS).catch((e) => setErr((e as Error).message)); loadWaitlist(); } }, [user.owner]);
-  const approve = (email: string) => api.approveWaitlist(email).then(loadWaitlist).catch((e) => setErr((e as Error).message));
+  const loadWaitlist = () => api.ownerWaitlist().then((listing) => setWaitlist(listing.entries));
+  useEffect(() => {
+    if (!user.owner) return;
+    api.ownerStats().then(setS).catch((e) => setErr((e as Error).message));
+    api.ownerWaitlist().then((listing) => setWaitlist(listing.entries)).catch((error) => setErr(messageOf(error)));
+  }, [user.owner]);
+  const approve = (email: string) => api.approveWaitlist(email).then(loadWaitlist).catch((error) => setErr(messageOf(error)));
   if (!user.owner) return <Navigate to="/app" replace />;
 
   const f = s?.funnel;
