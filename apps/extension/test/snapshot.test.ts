@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
-import { pageSnapshot } from "../src/lib/snapshot.ts";
+import { firstShown, isShown, pageSnapshot } from "../src/lib/snapshot.ts";
 
 const docFrom = (html: string) => parseHTML(html).document as unknown as Document;
 
@@ -34,4 +34,26 @@ test("the snapshot drops scripts and styles and leaves the live page untouched",
   assert.doesNotMatch(snapshot, /track\(\)|\.x\{\}/);
   assert.ok(snapshot.startsWith("<!doctype html>"));
   assert.equal(doc.documentElement.outerHTML, before);
+});
+
+// The previous route sits before the visible one, as it can when Next.js reveals a cached page.
+const twoArticles = `<html><body>
+  <div class="hidden"><article id="previous"><p>Task budgets paragraph.</p></article></div>
+  <article id="current"><p>Structured outputs paragraph.</p></article>
+</body></html>`;
+
+test("the article root is the first one on screen, not a hidden earlier page", () => {
+  const doc = docFrom(twoArticles);
+  assert.equal(firstShown(doc, "article, main", hiddenByClass)?.id, "current");
+});
+
+test("without a shown match there is no article root", () => {
+  assert.equal(firstShown(docFrom(twoArticles), "main", hiddenByClass), null);
+});
+
+test("an element inside a hidden ancestor is not shown, even if its own style is visible", () => {
+  const doc = docFrom(twoArticles);
+  const [previous, current] = [...doc.querySelectorAll("p")];
+  assert.equal(isShown(previous!, hiddenByClass), false);
+  assert.equal(isShown(current!, hiddenByClass), true);
 });

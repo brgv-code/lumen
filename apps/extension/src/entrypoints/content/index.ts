@@ -2,7 +2,7 @@
 import { anchorToRange, readableParagraphs } from "@lumen/core/dom";
 import { Lumen, type Surface } from "./lumen";
 import { LinkPreviews } from "./link-preview";
-import { hiddenByStyle, pageSnapshot } from "../../lib/snapshot";
+import { firstShown, hiddenByStyle, isShown, pageSnapshot } from "../../lib/snapshot";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -26,8 +26,11 @@ function webPage(): Surface {
     title: () => document.title,
     site: () => location.hostname,
     html: pageHtml,
-    mainText: () => ((document.querySelector("article, main, [role=main]") as HTMLElement | null) ?? document.body).innerText.replace(/\n{3,}/g, "\n\n"),
-    paragraphs: () => readableParagraphs(articleRoot()),
+    mainText: () => {
+      const article = articleRoot();
+      return (article instanceof HTMLElement ? article.innerText : article.textContent ?? "").replace(/\n{3,}/g, "\n\n");
+    },
+    paragraphs: () => readableParagraphs(articleRoot()).filter((paragraph) => isShown(paragraph.element, hiddenByStyle)),
     quotesFor: (snapshot) => [snapshot.quote],
     rangeFor: (quote) => anchorToRange(root, quote),
   };
@@ -39,5 +42,5 @@ function pageHtml(): string {
 
 /** Where the article is: the page's main content, or the whole body. */
 function articleRoot(): Element {
-  return document.querySelector("article, main, [role=main]") ?? document.body;
+  return firstShown(document, "article, main, [role=main]", hiddenByStyle) ?? document.body;
 }

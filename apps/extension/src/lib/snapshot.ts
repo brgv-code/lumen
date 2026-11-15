@@ -6,6 +6,19 @@ const SNAPSHOT_LIMIT = 2_500_000;
 /** Elements hidden with display none, the way Next.js keeps the previous route in the DOM. */
 export const hiddenByStyle = (element: Element) => getComputedStyle(element).display === "none";
 
+/** False when the element or any ancestor is hidden, since a hidden parent hides everything inside. */
+export function isShown(element: Element, isHidden: (element: Element) => boolean): boolean {
+  for (let node: Element | null = element; node; node = node.parentElement) {
+    if (isHidden(node)) return false;
+  }
+  return true;
+}
+
+/** The first element matching `selector` that is on screen, or null. */
+export function firstShown(doc: Document, selector: string, isHidden: (element: Element) => boolean): Element | null {
+  return [...doc.querySelectorAll(selector)].find((element) => isShown(element, isHidden)) ?? null;
+}
+
 /** Serializes the page without the body elements `isHidden` rejects; the live page is not touched. */
 export function pageSnapshot(doc: Document, isHidden: (element: Element) => boolean): string {
   const clone = doc.importNode(doc.documentElement, true);
