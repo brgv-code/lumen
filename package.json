@@ -10,7 +10,7 @@
     "dev:ext": "npm run dev -w @lumen/extension",
     "build": "npm run build -w @lumen/web && npm run build -w @lumen/extension",
     "test": "npm test -w @lumen/core && npm test -w @lumen/web && npm test -w @lumen/extension",
-    "typecheck": "npm run typecheck -w @lumen/core && npm run typecheck -w @lumen/web"
+    "typecheck": "npm run typecheck -w @lumen/core && npm run typecheck -w @lumen/web && npm run typecheck -w @lumen/extension"
   },
   "engines": {
     "node": ">=22"
