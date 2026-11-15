@@ -23,7 +23,7 @@
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "lumen-files" }],
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "triggers": { "crons": ["17 */6 * * *"] },
-  "vars": { "DEMO_ENABLED": "true", "OWNER_EMAILS": "hello@bhargav.dev", "AI_SOFT_CAP": "60" },
+  "vars": { "DEMO_ENABLED": "true", "SIGNUPS_OPEN": "false", "OWNER_EMAILS": "hello@bhargav.dev", "AI_SOFT_CAP": "60" },
   "observability": { "enabled": true },
   // Branch previews get their own DB and bucket so branch code never touches live data.
   "previews": {

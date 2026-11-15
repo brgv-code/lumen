@@ -3,6 +3,7 @@ import type { AIAction, AskPrefs, Citation, Collection, Destination, Highlight, 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
 export interface OwnerSignup { id: string; name: string; email: string | null; plan: string; status: "trial" | "pro" | "free"; createdAt: number; trialNote: string | null; providers: string | null; items: number; highlights: number; ai: number; extension: number; agents: number; lastActive: number }
+export interface WaitlistEntry { email: string; name: string | null; source: string; createdAt: number; approvedAt: number | null; status: "waiting" | "approved" | "joined" }
 export interface OwnerStats {
   totals: { users: number; today: number; week: number; month: number; paying: number; trialing: number; demos_week: number };
   active: { day: number; week: number };
@@ -71,8 +72,11 @@ const qs = (o: Record<string, string | number | undefined | null | boolean>) => 
 };
 
 export const api = {
-  providers: () => req<{ google: boolean; github: boolean; demo: boolean; analytics: { key: string; host: string } | null }>("GET", "/auth/providers"),
+  providers: () => req<{ google: boolean; github: boolean; demo: boolean; signups: boolean; analytics: { key: string; host: string } | null }>("GET", "/auth/providers"),
   ownerStats: () => req<OwnerStats>("GET", "/api/v1/owner/stats"),
+  ownerWaitlist: () => req<{ entries: WaitlistEntry[] }>("GET", "/api/v1/owner/waitlist"),
+  approveWaitlist: (email: string) => req<{ ok: true }>("POST", "/api/v1/owner/waitlist/approve", { email }),
+  joinWaitlist: (email: string, website: string) => req<{ ok: true }>("POST", "/auth/waitlist", { email, website }),
   demo: () => req<{ ok: true; next: string }>("POST", "/auth/demo", {}),
   logout: () => req<{ ok: true }>("POST", "/auth/logout", {}),
 

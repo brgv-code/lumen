@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight, BookOpen, Check, FileText, Flame, Github, Highlighter, Library, Link2, Lock,
@@ -94,9 +94,12 @@ const FEATURE: Record<Tab, { pill: string; lead: string; pay: string; body: stri
 export default function Landing() {
   const ref = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("ask");
+  // Copy switches to the waitlist while signups are paused.
+  const [waitlist, setWaitlist] = useState(false);
   const nav = useNavigate();
   const toast = useToast();
   useReveal(ref);
+  useEffect(() => { api.providers().then((providers) => setWaitlist(!providers.signups)).catch(() => {}); }, []);
 
   const tryDemo = async () => {
     try {
@@ -124,7 +127,7 @@ export default function Landing() {
           <div className="row">
             <a href={STORE_URL} className="key key--quiet key--sm lp-nav__chrome" target="_blank" rel="noreferrer">Add to Chrome</a>
             <Link to="/login" className="key key--quiet key--sm">Log in</Link>
-            <Link to="/login" className="key key--lamp key--sm">Start free</Link>
+            <Link to="/login" className="key key--lamp key--sm">{waitlist ? "Join the waitlist" : "Start free"}</Link>
           </div>
         </div>
       </nav>
@@ -144,10 +147,10 @@ export default function Landing() {
               Highlight, ask, and keep notes on anything you read, then send it to Obsidian, Notion or plain markdown. One calm place for everything you bookmark and read.
             </p>
             <div className="ctas">
-              <Link to="/login" className="key key--lamp key--lg">Light your first lamp, free <ArrowRight size={16} /></Link>
+              <Link to="/login" className="key key--lamp key--lg">{waitlist ? "Join the waitlist" : "Light your first lamp, free"} <ArrowRight size={16} /></Link>
               <button className="key key--ghost key--lg" onClick={tryDemo}>Explore the demo</button>
             </div>
-            <p className="small muted" style={{ marginTop: 16 }}>Free plan forever · every Pro feature for your first 7 days · no card</p>
+            <p className="small muted" style={{ marginTop: 16 }}>{waitlist ? "Opening soon · free plan forever · 7 days of Pro when you're in" : "Free plan forever · every Pro feature for your first 7 days · no card"}</p>
           </div>
 
           <div className="reveal" style={{ ["--i" as string]: 2 }}>
@@ -174,7 +177,7 @@ export default function Landing() {
                 <span className="lead-in">One reading tool.</span> <span className="payoff">Every place you think.</span>
               </h2>
             </div>
-            <Link to="/login" className="key key--lg">Start free, 7 days of Pro <ArrowRight size={16} /></Link>
+            <Link to="/login" className="key key--lg">{waitlist ? "Join the waitlist" : "Start free, 7 days of Pro"} <ArrowRight size={16} /></Link>
           </div>
 
           <div className="lp-tabs reveal">
@@ -359,10 +362,10 @@ export default function Landing() {
         <section className="lp-sec">
           <div className="surface gridlines reveal" style={{ padding: "64px 24px", textAlign: "center", display: "grid", justifyItems: "center", gap: 18 }}>
             <span className="bob" style={{ position: "relative" }}><AppIcon size={72} /></span>
-            <h2 className="h2" style={{ position: "relative" }}><span className="lead-in">Turn the lamp on.</span> <span className="payoff">It is free.</span></h2>
-            <p className="muted" style={{ position: "relative", maxWidth: 460 }}>Sign in with Google or GitHub and your library is ready in seconds. Every Pro feature is yours for the first 7 days.</p>
+            <h2 className="h2" style={{ position: "relative" }}><span className="lead-in">{waitlist ? "The lamp is almost on." : "Turn the lamp on."}</span> <span className="payoff">{waitlist ? "Get on the list." : "It is free."}</span></h2>
+            <p className="muted" style={{ position: "relative", maxWidth: 460 }}>{waitlist ? "Lumen opens to everyone soon. Join the waitlist and you'll be among the first readers in, with 7 days of Pro." : "Sign in with Google or GitHub and your library is ready in seconds. Every Pro feature is yours for the first 7 days."}</p>
             <div className="row" style={{ position: "relative", flexWrap: "wrap", justifyContent: "center" }}>
-              <Link to="/login" className="key key--lamp key--lg">Light your first lamp <ArrowRight size={16} /></Link>
+              <Link to="/login" className="key key--lamp key--lg">{waitlist ? "Join the waitlist" : "Light your first lamp"} <ArrowRight size={16} /></Link>
               <a className="key key--ghost key--lg" href="https://github.com/brgv-code/lumen" target="_blank" rel="noreferrer"><Puzzle size={16} /> Get the extension</a>
             </div>
           </div>

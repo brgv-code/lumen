@@ -1,8 +1,9 @@
-// Owner only: signups, activation and AI spend at a glance. Reads only; product analytics
+// Owner only: signups, activation and AI spend at a glance, plus waitlist approval. Product analytics
 // (funnels, retention, replays) live in PostHog.
 import { Hono } from "hono";
 import type { AppEnv, Env, SessionUser } from "../env";
-import { fail, now } from "../lib/util";
+import { body, fail, now, str } from "../lib/util";
+import { canonicalEmail } from "../lib/abuse";
 import { entitlement } from "../lib/plan";
 import { analyticsKey } from "../lib/analytics";
 
@@ -68,4 +69,20 @@ owner.get("/stats", async (c) => {
     posthog: Boolean(analyticsKey(c.env)),
     signups: list.map((u) => ({ ...u, status: entitlement({ ...(u as any), plan: u.plan, trial_ends_at: u.trialEndsAt, created_at: u.createdAt }).status })),
   });
+});
+
+owner.get("/waitlist", async (c) => {
+  const rows = await c.env.DB.prepare(`SELECT w.email, w.name, w.source, w.created_at AS createdAt, w.approved_at AS approvedAt,
+    EXISTS (SELECT 1 FROM users u WHERE u.email_canonical = w.email_canonical AND u.is_demo = 0) AS hasAccount
+    FROM waitlist w ORDER BY w.created_at DESC LIMIT 500`).all<{ email: string; name: string | null; source: string; createdAt: number; approvedAt: number | null; hasAccount: number }>();
+  const entries = rows.results.map(({ hasAccount, ...entry }) => ({ ...entry, status: hasAccount ? "joined" : entry.approvedAt ? "approved" : "waiting" }));
+  return c.json({ entries });
+});
+
+owner.post("/waitlist/approve", async (c) => {
+  const email = str((await body<{ email?: unknown }>(c)).email, 254);
+  if (!email) fail(422, "bad_email", "Which email?");
+  const result = await c.env.DB.prepare("UPDATE waitlist SET approved_at = COALESCE(approved_at, ?) WHERE email_canonical = ?").bind(now(), canonicalEmail(email)).run();
+  if (!result.meta.changes) fail(404, "not_found", "That email is not on the waitlist.");
+  return c.json({ ok: true });
 });
