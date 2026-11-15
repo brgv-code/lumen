@@ -3,17 +3,19 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { AppEnv } from "../env";
 import { authorizeUrl, configured, exchange, type Provider } from "../lib/oauth";
 import { createSession, destroySession } from "../lib/session";
-import { id, now, sha256 } from "../lib/util";
+import { body, fail, id, now, sha256, str } from "../lib/util";
 import { seedDemo } from "../lib/seed";
-import { SIGNUPS_PER_IP_PER_DAY, canonicalEmail, claimTrial, ensureDevice, ipHash, signupsFromIp, trialDecision } from "../lib/abuse";
+import { SIGNUPS_PER_IP_PER_DAY, canonicalEmail, claimTrial, ensureDevice, ipHash, isDisposable, signupsFromIp, trialDecision } from "../lib/abuse";
+import { WAITLIST_PER_IP_PER_DAY, isApproved, joinWaitlist, signupsOpen, waitlistFromIp } from "../lib/waitlist";
 import { analyticsHost, analyticsKey, track } from "../lib/analytics";
 
 export const auth = new Hono<AppEnv>();
 
 const safeNext = (n?: string | null) => (n && n.startsWith("/") && !n.startsWith("//") ? n : "/app");
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 auth.get("/providers", (c) =>
-  c.json({ ...configured(c.env), demo: c.env.DEMO_ENABLED !== "false", analytics: analyticsKey(c.env) ? { key: analyticsKey(c.env), host: analyticsHost(c.env) } : null }),
+  c.json({ ...configured(c.env), demo: c.env.DEMO_ENABLED !== "false", signups: signupsOpen(c.env), analytics: analyticsKey(c.env) ? { key: analyticsKey(c.env), host: analyticsHost(c.env) } : null }),
 );
 
 auth.get("/:provider/start", async (c) => {
@@ -58,7 +60,14 @@ auth.get("/:provider/callback", async (c) => {
   }
   const isNew = !userId;
   if (!userId) {
-    if (c.env.SIGNUPS_OPEN === "false") return c.redirect("/login?error=signups_paused");
+    if (!signupsOpen(c.env)) {
+      const verified = profile.emailVerified ? profile.email : null;
+      if (!verified) return c.redirect("/login?error=waitlist_no_email");
+      if (!(await isApproved(db, verified))) {
+        await joinWaitlist(db, { email: verified, name: profile.name, source: provider, ip: await ipHash(c) });
+        return c.redirect("/login?waitlist=joined");
+      }
+    }
     // abuse guards: a cap on new accounts per network, and one trial per person
     const ip = await ipHash(c);
     if ((await signupsFromIp(db, ip)) >= SIGNUPS_PER_IP_PER_DAY) return c.redirect("/login?error=signup_limit");
@@ -81,6 +90,21 @@ auth.get("/:provider/callback", async (c) => {
   await createSession(c, userId);
   if (!isNew) track(c.env, c.executionCtx, userId, "user_logged_in", { provider });
   return c.redirect(saved.next);
+});
+
+auth.post("/waitlist", async (c) => {
+  const origin = c.req.header("origin");
+  if (origin && origin !== new URL(c.req.url).origin) fail(403, "bad_origin", "No.");
+  const input = await body<{ email?: unknown; website?: unknown }>(c);
+  // Bots fill every field; people never see this one.
+  if (str(input.website)) return c.json({ ok: true });
+  const email = str(input.email, 254);
+  if (!email || !EMAIL.test(email)) fail(422, "bad_email", "That does not look like an email address.");
+  if (isDisposable(email)) fail(422, "disposable_email", "Use an inbox you keep, so we can reach you when you are in.");
+  const ip = await ipHash(c);
+  if ((await waitlistFromIp(c.env.DB, ip)) >= WAITLIST_PER_IP_PER_DAY) fail(429, "waitlist_limit", "Too many sign ups from this network today. Try again tomorrow.");
+  await joinWaitlist(c.env.DB, { email, name: null, source: "form", ip });
+  return c.json({ ok: true });
 });
 
 auth.post("/demo", async (c) => {

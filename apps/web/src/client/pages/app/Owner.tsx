@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Gauge, ExternalLink } from "lucide-react";
-import { api, type OwnerStats } from "../../lib/api";
+import { api, type OwnerStats, type WaitlistEntry } from "../../lib/api";
 import { timeAgo } from "../../lib/hooks";
 import { PageHero } from "../../components/PageHero";
 import { useApp } from "./Layout";
@@ -21,7 +21,10 @@ export default function Owner() {
   const { user } = useApp();
   const [s, setS] = useState<OwnerStats | null>(null);
   const [err, setErr] = useState("");
-  useEffect(() => { if (user.owner) api.ownerStats().then(setS).catch((e) => setErr((e as Error).message)); }, [user.owner]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const loadWaitlist = () => api.ownerWaitlist().then((listing) => setWaitlist(listing.entries)).catch((e) => setErr((e as Error).message));
+  useEffect(() => { if (user.owner) { api.ownerStats().then(setS).catch((e) => setErr((e as Error).message)); loadWaitlist(); } }, [user.owner]);
+  const approve = (email: string) => api.approveWaitlist(email).then(loadWaitlist).catch((e) => setErr((e as Error).message));
   if (!user.owner) return <Navigate to="/app" replace />;
 
   const f = s?.funnel;
@@ -71,6 +74,28 @@ export default function Owner() {
             <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
               {s.trialNotes.map((t) => <span key={t.note} className={`chip ${t.note === "ok" ? "chip--mint" : ""}`}>{NOTE[t.note] ?? t.note} · {t.n}</span>)}
             </div>
+          </section>
+
+          <section className="panel stack">
+            <h2>Waitlist</h2>
+            <p className="small muted">{waitlist.filter((entry) => entry.status === "waiting").length} waiting. Approving lets that email create an account on its next Google or GitHub sign in; tell them yourself, Lumen sends no email yet.</p>
+            {waitlist.length > 0 && (
+              <div className="owner-table">
+                <table>
+                  <thead><tr><th>Person</th><th>Joined the list</th><th>Via</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {waitlist.map((entry) => (
+                      <tr key={entry.email}>
+                        <td><b>{entry.name ?? entry.email}</b>{entry.name && <><br /><span className="small muted">{entry.email}</span></>}</td>
+                        <td className="small">{timeAgo(entry.createdAt)}</td>
+                        <td className="small">{entry.source}</td>
+                        <td>{entry.status === "waiting" ? <button className="key key--lamp key--sm" onClick={() => approve(entry.email)}>Approve</button> : <span className={`chip ${entry.status === "joined" ? "chip--mint" : "chip--lamp"}`}>{entry.status === "joined" ? "Has an account" : "Approved"}</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           <section className="panel stack">

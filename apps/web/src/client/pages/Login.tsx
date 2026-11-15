@@ -11,7 +11,7 @@ const ERRORS: Record<string, string> = {
   exchange_failed: "The provider did not confirm your sign in. Try again.",
   dev_login: "That test login link is not valid.",
   signup_limit: "Too many new accounts from this network today. Try again tomorrow, or sign in to an account you already have.",
-  signups_paused: "New accounts are paused while Lumen gets polished. Readers who already have an account can sign in as usual.",
+  waitlist_no_email: "We need a verified email to add you to the waitlist. Use the email form below instead.",
 };
 
 function GoogleMark() {
@@ -26,9 +26,12 @@ function GoogleMark() {
 }
 
 export default function Login() {
-  const [p, setP] = useState<{ google: boolean; github: boolean; demo: boolean } | null>(null);
+  const [p, setP] = useState<{ google: boolean; github: boolean; demo: boolean; signups: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [params] = useSearchParams();
+  const [joined, setJoined] = useState(params.get("waitlist") === "joined");
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
   const nav = useNavigate();
   const toast = useToast();
   const err = params.get("error");
@@ -36,13 +39,20 @@ export default function Login() {
   const next = rawNext.startsWith("/app") ? rawNext : "/app";
 
   useEffect(() => {
-    api.providers().then(setP).catch(() => setP({ google: false, github: false, demo: true }));
+    api.providers().then(setP).catch(() => setP({ google: false, github: false, demo: true, signups: true }));
     api.me().then(() => nav(next, { replace: true })).catch(() => {});
   }, [nav]);
 
   const demo = async () => {
     setBusy(true);
     try { await api.demo(); nav(next); } catch (e) { toast((e as Error).message, "err"); setBusy(false); }
+  };
+
+  const join = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try { await api.joinWaitlist(email, website); setJoined(true); } catch (error) { toast((error as Error).message, "err"); }
+    setBusy(false);
   };
 
   return (
@@ -53,6 +63,7 @@ export default function Login() {
         <h1 className="h3" style={{ position: "relative", marginTop: 8 }}><span className="lead-in">Welcome to</span> <span className="payoff">Lumen.</span></h1>
         <p className="muted" style={{ position: "relative", marginBottom: 10 }}>One account for the dashboard and the extension. Free plan forever, every Pro feature for your first 7 days.</p>
         {err && <div className="chip chip--peach" style={{ justifySelf: "center", height: "auto", padding: "6px 12px", whiteSpace: "normal", position: "relative" }}>{ERRORS[err] ?? "Sign in failed."}</div>}
+        {joined && <div className="chip chip--mint" style={{ justifySelf: "center", height: "auto", padding: "6px 12px", whiteSpace: "normal", position: "relative" }}>You're on the list. Lumen is being polished; you'll get in soon. Meanwhile, explore the demo.</div>}
 
         <a
           className="key key--ghost key--lg"
@@ -72,6 +83,20 @@ export default function Login() {
         >
           <Github size={17} /> Continue with GitHub
         </a>
+
+        {p?.signups === false && !joined && (
+          <>
+            <div className="row small muted" style={{ position: "relative", margin: "6px 0" }}>
+              <span style={{ flex: 1, height: 1, background: "var(--hairline-strong)" }} />or join the waitlist with your email<span style={{ flex: 1, height: 1, background: "var(--hairline-strong)" }} />
+            </div>
+            <form className="row" style={{ position: "relative" }} onSubmit={join}>
+              <input className="input" type="email" required aria-label="Email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
+              {/* honeypot: hidden from people, filled by bots */}
+              <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" value={website} onChange={(e) => setWebsite(e.target.value)} style={{ position: "absolute", left: -9999, width: 1, height: 1, opacity: 0 }} />
+              <button className="key key--lg" disabled={busy}>Join the waitlist</button>
+            </form>
+          </>
+        )}
 
         {p?.demo !== false && (
           <>
