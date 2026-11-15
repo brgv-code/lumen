@@ -2,6 +2,7 @@
 import { anchorToRange, readableParagraphs } from "@lumen/core/dom";
 import { Lumen, type Surface } from "./lumen";
 import { LinkPreviews } from "./link-preview";
+import { hiddenByStyle, pageSnapshot } from "../../lib/snapshot";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -33,9 +34,7 @@ function webPage(): Surface {
 }
 
 function pageHtml(): string {
-  const clone = document.documentElement.cloneNode(true) as HTMLElement;
-  clone.querySelectorAll("script,style,noscript,iframe,svg,[data-lumen-ui]").forEach((n) => n.remove());
-  return "<!doctype html>" + clone.outerHTML.slice(0, 2_500_000);
+  return pageSnapshot(document, hiddenByStyle);
 }
 
 /** Where the article is: the page's main content, or the whole body. */

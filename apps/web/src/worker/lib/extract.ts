@@ -55,6 +55,10 @@ export function extractFromHtml(html: string, url: string): Extracted {
   const ogTitle = meta('meta[property="og:title"]');
   const cover = meta('meta[property="og:image"]');
   const site = meta('meta[property="og:site_name"]') || host;
+  // linkedom reads "display: none !important" as display "none !important", which Readability takes as visible.
+  document.querySelectorAll("[style]").forEach((node: Element) => {
+    if (/display\s*:\s*none/i.test(node.getAttribute("style") ?? "")) node.remove();
+  });
   let article: ReturnType<Readability["parse"]> = null;
   try {
     article = new Readability(document as any, { charThreshold: 300 }).parse();

@@ -11,7 +11,7 @@
   },
   "apps/extension/src/entrypoints/content/index.ts": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 4
+      "count": 3
     },
     "@typescript-eslint/no-explicit-any": {
       "count": 2
