@@ -6,6 +6,8 @@ import type { AppEnv, SessionUser } from "../src/worker/env.ts";
 import { me } from "../src/worker/routes/me.ts";
 import { items } from "../src/worker/routes/items.ts";
 import { destinations } from "../src/worker/routes/destinations.ts";
+import { templates } from "../src/worker/routes/templates.ts";
+import { ai } from "../src/worker/routes/ai.ts";
 
 const MIGRATIONS = new URL("../migrations/", import.meta.url);
 
@@ -63,22 +65,31 @@ export const READER: SessionUser = {
   timezone: "UTC", ai_provider: "lumen", share_signals: 0, reminders: 0, created_at: 0,
 };
 
-/** The API as a signed in reader sees it, plus the database to seed. */
-export function signedInApi() {
+type AiCall = { messages: { role: string; content: string }[] };
+
+/** The API as a signed in reader sees it, plus the database to seed and what Workers AI was asked. */
+export function signedInApi(user: SessionUser = READER) {
   const sqlite = migratedDatabase();
-  sqlite.prepare("INSERT INTO users (id, email, name, plan, created_at) VALUES (?, ?, ?, ?, 0)").run(READER.id, READER.email, READER.name, READER.plan);
+  sqlite.prepare("INSERT INTO users (id, email, name, plan, created_at) VALUES (?, ?, ?, ?, ?)").run(user.id, user.email, user.name, user.plan, user.created_at);
   const app = new Hono<AppEnv>();
-  app.use("*", async (context, next) => { context.set("user", READER); await next(); });
+  // The session loads users with SELECT u.*, so the reader's stored columns come along.
+  app.use("*", async (context, next) => { context.set("user", { ...user, ...(sqlite.prepare("SELECT ask_prefs FROM users WHERE id = ?").get(user.id) ?? {}) }); await next(); });
   app.route("/api/v1", me);
   app.route("/api/v1/items", items);
   app.route("/api/v1/destinations", destinations);
-  const env = { DB: sqliteD1(sqlite) };
+  app.route("/api/v1/templates", templates);
+  app.route("/api/v1/ai", ai);
+  const aiCalls: AiCall[] = [];
+  const AI = { run: async (_model: string, input: AiCall) => { aiCalls.push(input); return new ReadableStream({ start: (controller) => controller.close() }); } };
+  const env = { DB: sqliteD1(sqlite), AI };
   // No analytics key in env, so tracking returns before it would schedule anything here.
   const executionContext = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} };
-  const call = async <T = Row>(method: string, path: string, payload?: unknown): Promise<T> => {
-    const response = await app.request(path, { method, headers: { "content-type": "application/json" }, body: payload === undefined ? undefined : JSON.stringify(payload) }, env, executionContext);
+  const send = (method: string, path: string, payload?: unknown) =>
+    app.request(path, { method, headers: { "content-type": "application/json" }, body: payload === undefined ? undefined : JSON.stringify(payload) }, env, executionContext);
+  const call = async <T = Row>(method: string, path: string, payload?: unknown, as: "json" | "text" = "json"): Promise<T> => {
+    const response = await send(method, path, payload);
     if (!response.ok) throw new Error(`${method} ${path} answered ${response.status}: ${await response.text()}`);
-    return response.json() as Promise<T>;
+    return (as === "json" ? response.json() : response.text()) as Promise<T>;
   };
-  return { sqlite, call };
+  return { sqlite, call, send, aiCalls };
 }

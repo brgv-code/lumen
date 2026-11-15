@@ -7,6 +7,7 @@ import { getTheme, setTheme, timeAgo } from "../../lib/hooks";
 import { Segmented, useToast } from "../../components/ui";
 import { useApp } from "./Layout";
 import { analyticsConfigured, consent, setConsent } from "../../lib/analytics";
+import { AskStyles } from "../../components/AskStyles";
 
 export default function Settings() {
   const { user, refresh, startTour, labs, setLabs } = useApp();
@@ -53,6 +54,8 @@ export default function Settings() {
         <p className="small muted">{user.planStatus === "trial" ? `Every Pro feature is on until ${new Date(user.trialEndsAt).toLocaleDateString(undefined, { month: "long", day: "numeric" })}. Your library, highlights and Obsidian sync stay free after that.` : user.planStatus === "free" ? "Your library, highlights, notes and Obsidian sync are free forever." : "Thank you for supporting Lumen."}</p>
         <div className="row" style={{ flexWrap: "wrap" }}><Link to="/app/upgrade" className="key key--lamp key--sm"><Crown size={14} /> {user.planStatus === "pro" ? "Manage plan" : "See Pro"}</Link><button className="key key--ghost key--sm" onClick={startTour}>Replay the tour</button></div>
       </section>
+
+      <AskStyles />
 
       <section className="panel stack">
         <h2>Reading and privacy</h2>
