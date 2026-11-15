@@ -372,7 +372,7 @@ export default function Reader() {
       const { collection } = await api.createCollection({ name: newCollection ?? "" });
       setNewCollection(null);
       await moveTo(collection.id);
-    } catch (err) { toast((err as Error).message, "err"); }
+    } catch (err) { toast(err instanceof Error ? err.message : String(err), "err"); }
   };
 
   // A PDF opens its stored copy; a local upload without one has nothing to open.
