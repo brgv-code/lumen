@@ -11,6 +11,7 @@ import { STORE_URL } from "../lib/extension";
 import { AppIcon, Logo, Segmented, Sparkle, useToast } from "../components/ui";
 import { useReveal } from "../lib/hooks";
 import { api } from "../lib/api";
+import { signupsPausedOnLoad } from "../lib/signups";
 import "../styles/landing.css";
 
 type Tab = "ask" | "send" | "library" | "spark" | "agents";
@@ -95,7 +96,7 @@ export default function Landing() {
   const ref = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("ask");
   // Copy switches to the waitlist while signups are paused.
-  const [waitlist, setWaitlist] = useState(false);
+  const [waitlist, setWaitlist] = useState(signupsPausedOnLoad);
   const nav = useNavigate();
   const toast = useToast();
   useReveal(ref);
