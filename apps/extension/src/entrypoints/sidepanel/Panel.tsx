@@ -147,7 +147,9 @@ export default function Panel() {
     if (usePage) setCtxInfo(ctx ?? "none");
     const history = how.history ?? msgs.filter((m) => !m.error && m.kind !== "pro").map((m) => ({ role: m.role, content: m.content }));
     const replyId = crypto.randomUUID();
-    setMsgs((l) => [...l, { role: "user", content: input, display: how.display }, { id: replyId, role: "assistant", content: "", streaming: true }]);
+    // A highlight's Ask shows its first line, the quote, not the whole Explain instruction.
+    const display = how.display ?? (how.entry === "ask" ? input.split("\n1. ")[0] : undefined);
+    setMsgs((l) => [...l, { role: "user", content: input, display }, { id: replyId, role: "assistant", content: "", streaming: true }]);
     setInput("");
     const port = chrome.runtime.connect({ name: "lumen-chat" });
     const patch = (fn: (m: Msg) => Msg) => setMsgs((l) => patchReply(l, replyId, fn));
