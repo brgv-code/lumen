@@ -6,7 +6,7 @@ import type { PageState, Settings } from "../../lib/types";
 import { Picker } from "../popup/Picker";
 import { asPage, readPage, type PageContext } from "../../lib/page";
 import { Md } from "../../lib/md";
-import { NO_STYLES, dismissOffer, dismissedOffers } from "../../lib/styles";
+import { dismissOffer, dismissedOffers } from "../../lib/styles";
 import { StylePills } from "./StylePills";
 
 type Tab = "ask" | "page" | "you";
@@ -57,13 +57,13 @@ export default function Panel() {
   const [input, setInput] = useState("");
   const [usePage, setUsePage] = useState(true);
   const [ctxInfo, setCtxInfo] = useState<PageContext | null | "none">(null);
-  const [listing, setListing] = useState<StyleListing>(NO_STYLES);
+  const [listing, setListing] = useState<StyleListing | null>(null); // null until known: no pills, no default
   const [styleState, dispatchStyle] = useReducer(askStyle, ASK_STYLE_START);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [speaking, setSpeaking] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const styles = orderedStyles(listing.styles.filter((style) => !style.locked), listing.prefs);
-  const defaultStyle = listing.pro ? listing.prefs.defaultStyle : null;
+  const styles = listing ? orderedStyles(listing.styles.filter((style) => !style.locked), listing.prefs) : [];
+  const defaultStyle = listing?.pro ? listing.prefs.defaultStyle : null;
   const activeKey = activeStyleKey(styleState, defaultStyle);
   const activeStyle = styles.find((style) => style.key === activeKey) ?? null;
   const streaming = msgs.some((msg) => msg.streaming);
@@ -90,8 +90,8 @@ export default function Panel() {
     chrome.runtime.onMessage.addListener(onMsg);
     dismissedOffers().then(setDismissed).catch((error) => console.warn("offer dismissals unreadable", error));
     // The cached styles first, so a highlight's Ask already carries the reader's default style.
-    send<{ listing: StyleListing }>({ type: "GET_STYLES", fresh: false })
-      .then((cached) => { setListing(cached.listing); return send<{ listing: StyleListing }>({ type: "GET_STYLES", fresh: true }); })
+    send<{ listing: StyleListing | null }>({ type: "GET_STYLES", fresh: false })
+      .then((cached) => { setListing(cached.listing); return send<{ listing: StyleListing | null }>({ type: "GET_STYLES", fresh: true }); })
       .then((fresh) => setListing(fresh.listing))
       .catch((error) => console.warn("styles unavailable", error))
       .finally(() => { if (START_PROMPT) setTimeout(() => askRef.current(START_PROMPT, { entry: "ask" }), 300); });
@@ -167,6 +167,7 @@ export default function Panel() {
 
   /** A pill or /slug: free readers learn the feature exists; Pro switches the chat's style and explains the passage again. */
   const pickStyle = (style: Style, entry: Entry, rest = ""): Promise<void> | undefined => {
+    if (!listing) return;
     if (!listing.pro) {
       setMsgs((l) => [...l, { role: "assistant", content: "Ask styles are part of Lumen Pro: set how Lumen explains things to you, and switch styles under any answer.", kind: "pro" }]);
       return;
@@ -178,10 +179,11 @@ export default function Panel() {
   };
 
   const makeDefault = async (key: string) => {
+    if (!listing) return;
     const prefs: AskPrefs = { ...listing.prefs, defaultStyle: key };
     try {
       const saved = await send<{ prefs: AskPrefs }>({ type: "SAVE_STYLE_PREFS", prefs });
-      setListing((current) => ({ ...current, prefs: saved.prefs }));
+      setListing((current) => current && { ...current, prefs: saved.prefs });
       dispatchStyle({ type: "MADE_DEFAULT" });
     } catch (error) {
       console.warn("default style not saved", error);
@@ -336,7 +338,7 @@ export default function Panel() {
 
       {tab === "ask" && (
         <form style={{ padding: 12, borderTop: "1px solid var(--hair)", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }} onSubmit={(e) => { e.preventDefault(); ask(input); }}>
-          {msgs.length > 0 && (
+          {msgs.length > 0 && listing && (
             <StylePills styles={styles} active={activeStyle} isDefault={styleState.active.source === "default" && activeKey !== null} disabled={streaming}
               onPick={(style) => pickStyle(style, "pill")} onClear={() => dispatchStyle({ type: "CLEAR" })} onNew={() => openInLumen("/app/settings")} />
           )}
@@ -348,7 +350,7 @@ export default function Panel() {
                 : <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Reading: <b style={{ color: "var(--ink)", fontWeight: 500 }}>{ctxInfo.title}</b>{ctxInfo.selection ? " · your selection" : ""}</span>}
             </div>
           )}
-          {input.startsWith("/") && <div className="small muted">{SLASH_HINT}<br />Styles: {styles.map((style) => `/${style.slug}`).join(" · ")}</div>}
+          {input.startsWith("/") && <div className="small muted">{SLASH_HINT}{styles.length > 0 && <><br />Styles: {styles.map((style) => `/${style.slug}`).join(" · ")}</>}</div>}
           <textarea rows={2} placeholder="Ask about this page or anything you have saved…" value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }} />
           <div className="row small muted">

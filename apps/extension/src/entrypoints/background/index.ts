@@ -7,7 +7,7 @@ import { pdfViewerUrl, viewedPdf } from "../../lib/page";
 import { fetchPageHead } from "../../lib/preview";
 import { rerunIfAsked } from "../../lib/runs";
 import { OpenStreams } from "../../lib/streams";
-import { NO_STYLES, freshStyles, storageCache } from "../../lib/styles";
+import { freshStyles, storageCache } from "../../lib/styles";
 import type { Msg, PageState } from "../../lib/types";
 
 export default defineBackground(() => {
@@ -570,14 +570,14 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       return { ok: true, settings: await getSettings() };
 
     case "GET_STYLES": {
-      if (!msg.fresh || !(await connected())) return { ok: true, listing: (await storageCache.read()) ?? NO_STYLES };
+      if (!msg.fresh || !(await connected())) return { ok: true, listing: await storageCache.read() };
       return { ok: true, listing: await freshStyles(storageCache, () => cloud<StyleListing>("GET", "/templates")) };
     }
 
     case "SAVE_STYLE_PREFS": {
       const { prefs } = await cloud<{ prefs: AskPrefs }>("PUT", "/templates/prefs", msg.prefs);
-      const cached = (await storageCache.read()) ?? NO_STYLES;
-      await storageCache.write({ ...cached, prefs });
+      const cached = await storageCache.read();
+      if (cached) await storageCache.write({ ...cached, prefs });
       return { ok: true, prefs };
     }
 
