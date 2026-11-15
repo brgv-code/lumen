@@ -81,6 +81,14 @@
       "count": 4
     }
   },
+  "apps/web/src/client/components/AskStyles.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
   "apps/web/src/client/components/CollectionEditor.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -384,6 +392,11 @@
   "packages/core/src/slash.ts": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
+    }
+  },
+  "packages/core/src/styles.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
     }
   },
   "packages/core/src/toolbar.ts": {
