@@ -44,7 +44,8 @@ npx wrangler secret put GITHUB_CLIENT_ID
 npx wrangler secret put GITHUB_CLIENT_SECRET
 ```
 The login page enables each button as soon as its secrets exist. Set `DEMO_ENABLED` to `"false"`
-in `wrangler.jsonc` to turn the sandbox off.
+in `wrangler.jsonc` to turn the sandbox off. Set `SIGNUPS_OPEN` to `"false"` to pause new accounts; existing
+readers still sign in and new people land on `/login?error=signups_paused`.
 
 ## Extension
 ```bash

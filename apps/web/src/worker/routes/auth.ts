@@ -58,6 +58,7 @@ auth.get("/:provider/callback", async (c) => {
   }
   const isNew = !userId;
   if (!userId) {
+    if (c.env.SIGNUPS_OPEN === "false") return c.redirect("/login?error=signups_paused");
     // abuse guards: a cap on new accounts per network, and one trial per person
     const ip = await ipHash(c);
     if ((await signupsFromIp(db, ip)) >= SIGNUPS_PER_IP_PER_DAY) return c.redirect("/login?error=signup_limit");

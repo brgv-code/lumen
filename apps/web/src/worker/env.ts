@@ -10,6 +10,8 @@ export interface Env {
   GITHUB_CLIENT_SECRET?: string;
   /** Turn the "Try the demo" sandbox on (default on). */
   DEMO_ENABLED?: string;
+  /** Let new readers create an account (default on). Existing readers can always sign in. */
+  SIGNUPS_OPEN?: string;
   AI_MODEL?: string;
   /** Google Search Console HTML tag verification token. */
   GOOGLE_SITE_VERIFICATION?: string;

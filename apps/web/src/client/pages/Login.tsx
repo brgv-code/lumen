@@ -11,6 +11,7 @@ const ERRORS: Record<string, string> = {
   exchange_failed: "The provider did not confirm your sign in. Try again.",
   dev_login: "That test login link is not valid.",
   signup_limit: "Too many new accounts from this network today. Try again tomorrow, or sign in to an account you already have.",
+  signups_paused: "New accounts are paused while Lumen gets polished. Readers who already have an account can sign in as usual.",
 };
 
 function GoogleMark() {
