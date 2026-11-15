@@ -6,7 +6,8 @@ import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
 import { CHAT_MODEL, DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
 import { asksForLibrary, retrieve, sourcesBlock, terms } from "../lib/retrieve";
-import { LIBRARY_SYSTEM, TLDR_SYSTEM, chunkParagraphs, paragraphsWithin, tldrCombinePrompt, tldrPrompt } from "@lumen/core";
+import { BUILTIN_STYLES, LIBRARY_SYSTEM, TLDR_SYSTEM, chunkParagraphs, paragraphsWithin, styleBlock, tldrCombinePrompt, tldrPrompt } from "@lumen/core";
+import { templateLabel } from "./templates";
 import { safeJson, toIdea } from "../lib/map";
 import { glowStmt } from "../lib/glow";
 
@@ -15,7 +16,7 @@ export const ai = new Hono<AppEnv>();
 /** Count a hosted answer against the reader's daily cap and the site wide budget, and pick the
  *  model: past AI_SOFT_CAP answers a day across everyone, answers move to the small model so the
  *  free Workers AI allowance lasts the whole day. */
-export async function spend(c: Context<AppEnv>, feature: string, preferred: string): Promise<string> {
+export async function spend(c: Context<AppEnv>, feature: string, preferred: string, extra: Record<string, string | null> = {}): Promise<string> {
   const user = c.get("user");
   const db = c.env.DB;
   const day = dayIn(user.timezone);
@@ -34,8 +35,20 @@ export async function spend(c: Context<AppEnv>, feature: string, preferred: stri
   }
   const soft = Number(c.env.AI_SOFT_CAP || 60);
   const model = (global.results[0]?.count ?? 0) > soft ? DEFAULT_MODEL : preferred;
-  track(c.env, c.executionCtx, user.id, "ai_answer", { feature, model, small_model: model !== preferred, used_today: used, source, ...personProps(user) });
+  track(c.env, c.executionCtx, user.id, "ai_answer", { feature, model, small_model: model !== preferred, used_today: used, source, ...personProps(user), ...extra });
   return model;
+}
+
+const CHAT_ENTRIES = ["ask", "pill", "slash", "typed"] as const;
+const BUILTIN_KEYS = BUILTIN_STYLES.map((style) => style.key);
+
+/** One more use of a built in or of the reader's own style; keys that are neither are ignored. */
+async function countStyleUse(c: Context<AppEnv>, key: string) {
+  const user = c.get("user");
+  await c.env.DB.prepare(`INSERT INTO template_usage (user_id, template_key, count, last_used_at)
+    SELECT ?1, ?2, 1, ?3 WHERE ?4 = 1 OR EXISTS (SELECT 1 FROM ask_templates WHERE id = ?2 AND user_id = ?1)
+    ON CONFLICT(user_id, template_key) DO UPDATE SET count = count + 1, last_used_at = excluded.last_used_at`)
+    .bind(user.id, key, now(), BUILTIN_KEYS.includes(key) ? 1 : 0).run();
 }
 
 /** Streams Server Sent Events: data: {"response":"..."} ... data: [DONE] */
@@ -95,10 +108,13 @@ ai.post("/tldr", async (c) => {
  *  SSE: first event {"sources":[...]}, then {"response":"..."} chunks, then [DONE]. */
 ai.post("/chat", async (c) => {
   const u = c.get("user");
-  const b = await body<{ question?: string; page?: { title?: string; url?: string; text?: string }; selection?: string; history?: { role: string; content: string }[]; library?: boolean }>(c);
+  const b = await body<{ question?: string; page?: { title?: string; url?: string; text?: string }; selection?: string; history?: { role: string; content: string }[]; library?: boolean; style?: string; template?: string; entry?: string }>(c);
   const question = str(b.question, 1500);
   if (!question) fail(422, "bad_request", "Ask a question.");
-  const chatModel = await spend(c, b.page?.text ? "ask_page" : "ask_library", CHAT_MODEL);
+  const style = str(b.style, 1000);
+  const template = str(b.template, 64);
+  const chatModel = await spend(c, b.page?.text ? "ask_page" : "ask_library", CHAT_MODEL, { template: templateLabel(template), entry: oneOf(b.entry, CHAT_ENTRIES) ?? "typed" });
+  if (template) await countStyleUse(c, template);
   const history = (b.history ?? []).slice(-6).filter((m) => m && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
   // A follow up continues the chat; the library joins a fresh question, the Ask page, or a reader who asks for it (BUG-12).
   const searchLibrary = b.library === true || !history.length || asksForLibrary(question);
@@ -118,7 +134,7 @@ ai.post("/chat", async (c) => {
       messages: [
         { role: "system", content: LIBRARY_SYSTEM },
         ...history,
-        { role: "user", content: [page, sel, library, asked].filter(Boolean).join("\n\n") },
+        { role: "user", content: [page, sel, library, style ? styleBlock(style) : "", asked].filter(Boolean).join("\n\n") },
       ],
       stream: true,
       max_tokens: 700,
