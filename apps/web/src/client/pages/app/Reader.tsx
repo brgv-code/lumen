@@ -11,7 +11,7 @@ import { api, streamAI, streamChat, streamTldr, type ChatSource } from "../../li
 import { alignMargin } from "../../lib/margin";
 import { capture } from "../../lib/analytics";
 import { useDebounced, hostOf } from "../../lib/hooks";
-import { burst, useToast } from "../../components/ui";
+import { burst, Modal, useToast } from "../../components/ui";
 import { HighlightCard } from "../../components/cards";
 import { PdfBody } from "../../components/PdfBody";
 import { PdfPages } from "../../components/PdfPages";
@@ -35,6 +35,9 @@ interface AIState {
   keptOn?: string;
   lastKeptId?: string;
 }
+// Never a real collection id, so the picker can tell "make one" from "move".
+const NEW_COLLECTION = "__new";
+
 type KeptAnswer = Pick<HighlightAnswer, "action" | "question" | "answer" | "model"> & { parentId?: string };
 
 export default function Reader() {
@@ -63,6 +66,7 @@ export default function Reader() {
   /** A PDF's whole text once its pages are shown; anchoring and quotes go through it. */
   const [pdfText, setPdfText] = useState<PdfText | null>(null);
   const [pagesFailed, setPagesFailed] = useState(false);
+  const [newCollection, setNewCollection] = useState<string | null>(null);
 
   useEffect(() => {
     setItem(null); setHls([]); setMissing(false); setAi(null);
@@ -356,6 +360,21 @@ export default function Reader() {
     } else if (status === "archived") toast("Archived");
   };
 
+  const moveTo = async (collectionId: string | null) => {
+    if (!item) return;
+    const r = await api.updateItem(item.id, { collectionId });
+    setItem({ ...item, ...r.item }); refresh(); toast("Moved");
+  };
+
+  const createAndMove = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { collection } = await api.createCollection({ name: newCollection ?? "" });
+      setNewCollection(null);
+      await moveTo(collection.id);
+    } catch (err) { toast((err as Error).message, "err"); }
+  };
+
   // A PDF opens its stored copy; a local upload without one has nothing to open.
   const originalHref = !item?.pdf ? item?.url : item.pdf.locked || (!item.pdf.hasFile && item.url.startsWith(`${location.origin}/app/read/`)) ? null : `/api/v1/items/${item.id}/file`;
 
@@ -369,9 +388,10 @@ export default function Reader() {
         <Link to="/app/library" className="key key--quiet key--sm"><ArrowLeft size={15} /> Library</Link>
         <span className="spacer" />
         <select className="select" style={{ width: 220, height: 34 }} value={item.collectionId ?? ""} aria-label="Collection"
-          onChange={async (e) => { const r = await api.updateItem(item.id, { collectionId: e.target.value || null }); setItem({ ...item, ...r.item }); refresh(); toast("Moved"); }}>
+          onChange={(e) => (e.target.value === NEW_COLLECTION ? setNewCollection("") : moveTo(e.target.value || null))}>
           <option value="">No collection</option>
           {collections.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+          <option value={NEW_COLLECTION}>+ New collection…</option>
         </select>
         <button className={`icon-btn ${item.favorite ? "on" : ""}`} aria-label="Favourite" aria-pressed={item.favorite}
           onClick={async () => { const r = await api.updateItem(item.id, { favorite: !item.favorite }); setItem({ ...item, ...r.item }); }}>
@@ -493,6 +513,13 @@ export default function Reader() {
           </div>
         </aside>
       </div>
+
+      <Modal open={newCollection !== null} onClose={() => setNewCollection(null)} title="New collection">
+        <form className="stack" onSubmit={createAndMove}>
+          <label className="field"><span>Name</span><input className="input" required autoFocus placeholder="Essay: reading should feel joyful" value={newCollection ?? ""} onChange={(e) => setNewCollection(e.target.value)} /></label>
+          <div className="row" style={{ justifyContent: "flex-end" }}><button type="button" className="key key--quiet" onClick={() => setNewCollection(null)}>Cancel</button><button className="key key--lamp">Create and move</button></div>
+        </form>
+      </Modal>
 
       {wheelAt && (
         <div className="cp-pop cp-pop--center" style={{ position: "fixed", left: wheelAt.x, top: wheelAt.y - 10, transform: "translate(-50%, -100%)" }}>
