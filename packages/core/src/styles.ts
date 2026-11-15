@@ -146,6 +146,9 @@ export function upgradeAskPrefs(saved: unknown): AskPrefs {
   };
 }
 
+/** What GET /api/v1/templates returns: the reader's own styles, their choices and how often each was used. */
+export interface StyleListing { styles: Style[]; prefs: AskPrefs; usage: Record<string, { count: number; lastUsedAt: number | null }>; pro: boolean }
+
 /** Built ins then the reader's own, in the reader's order, hidden ones left out. */
 export function orderedStyles(custom: readonly Style[], prefs: AskPrefs): Style[] {
   const all = [...BUILTIN_STYLES, ...custom].filter((style) => !prefs.hidden.includes(style.key));

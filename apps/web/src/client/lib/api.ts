@@ -1,4 +1,4 @@
-import type { AIAction, AskPrefs, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, PdfInfo, RecallCard, Stats, Style, User } from "@lumen/core";
+import type { AIAction, AskPrefs, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, PdfInfo, RecallCard, Stats, Style, StyleListing, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
@@ -13,7 +13,6 @@ export interface OwnerStats {
   posthog: boolean;
   signups: OwnerSignup[];
 }
-export interface StyleListing { styles: Style[]; prefs: AskPrefs; usage: Record<string, { count: number; lastUsedAt: number | null }>; pro: boolean }
 export interface Token { id: string; name: string; prefix: string; kind: string; client: string | null; calls?: number; lastTool?: string | null; lastUsedAt: number | null; createdAt: number }
 export interface Trend { id: string; topic: string; url: string; title: string; source: string; score: number; comments?: number; publishedAt?: number | null; saved?: boolean }
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }

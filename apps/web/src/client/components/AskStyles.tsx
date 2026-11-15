@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Copy, Crown, EyeOff, Pencil, Sparkles, Trash2 } from "lucide-react";
-import { BUILTIN_STYLES, STYLE_BODY_MAX, orderedStyles, unknownVariables, type AskPrefs, type Style } from "@lumen/core";
-import { api, type StyleListing } from "../lib/api";
+import { BUILTIN_STYLES, STYLE_BODY_MAX, orderedStyles, unknownVariables, type AskPrefs, type Style, type StyleListing } from "@lumen/core";
+import { api } from "../lib/api";
 import { timeAgo } from "../lib/hooks";
 import { Segmented, useToast } from "./ui";
 
