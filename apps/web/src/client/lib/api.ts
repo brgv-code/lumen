@@ -1,4 +1,4 @@
-import type { AIAction, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, PdfInfo, RecallCard, Stats, User } from "@lumen/core";
+import type { AIAction, AskPrefs, Citation, Collection, Destination, Highlight, HighlightAnswer, Idea, Item, ItemTldr, ItemWithContent, Page, PdfInfo, RecallCard, Stats, Style, User } from "@lumen/core";
 
 export interface FollowedFeed { id: string; title: string; siteUrl: string; feedUrl: string; notify: boolean; unseen: number; latestAt: number | null; lastCheckedAt: number | null; lastError: string | null; createdAt: number }
 export interface FeedPost { id: string; feedId: string; feedTitle: string; siteUrl: string; url: string; title: string; summary: string | null; publishedAt: number; seen: boolean; saved: boolean }
@@ -13,6 +13,7 @@ export interface OwnerStats {
   posthog: boolean;
   signups: OwnerSignup[];
 }
+export interface StyleListing { styles: Style[]; prefs: AskPrefs; usage: Record<string, { count: number; lastUsedAt: number | null }>; pro: boolean }
 export interface Token { id: string; name: string; prefix: string; kind: string; client: string | null; calls?: number; lastTool?: string | null; lastUsedAt: number | null; createdAt: number }
 export interface Trend { id: string; topic: string; url: string; title: string; source: string; score: number; comments?: number; publishedAt?: number | null; saved?: boolean }
 export interface Reads { period: string; budgetMinutes: number; minutes: number; picks: Item[]; resurface: Highlight[]; trending: Trend[]; date: string }
@@ -79,6 +80,11 @@ export const api = {
   me: () => req<{ user: User }>("GET", "/api/v1/me"),
   updateMe: (d: Partial<{ name: string; dailyGoal: number; timezone: string; aiProvider: string; shareSignals: boolean; reminders: boolean }>) => req<{ user: User }>("PATCH", "/api/v1/me", d),
   deleteMe: () => req<{ ok: true }>("DELETE", "/api/v1/me"),
+  styles: () => req<StyleListing>("GET", "/api/v1/templates"),
+  createStyle: (d: { name: string; body: string }) => req<Style>("POST", "/api/v1/templates", d),
+  updateStyle: (id: string, d: { name: string; body: string }) => req<Style>("PATCH", `/api/v1/templates/${id}`, d),
+  deleteStyle: (id: string) => req<{ ok: true }>("DELETE", `/api/v1/templates/${id}`),
+  saveStylePrefs: (prefs: AskPrefs) => req<{ prefs: AskPrefs }>("PUT", "/api/v1/templates/prefs", prefs),
   stats: () => req<Stats>("GET", "/api/v1/stats"),
   tags: () => req<{ data: { name: string; count: number }[] }>("GET", "/api/v1/tags"),
 
