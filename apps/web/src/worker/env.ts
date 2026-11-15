@@ -44,6 +44,7 @@ export interface SessionUser {
   reminders: number;
   created_at: number;
   trial_note?: string | null;
+  ask_prefs?: string | null;  // JSON, read through upgradeAskPrefs
 }
 
 export type SelfFetch = (path: string, init?: RequestInit) => Promise<Response>;
