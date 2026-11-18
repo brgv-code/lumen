@@ -4,7 +4,7 @@ import { AI_ACTIONS } from "@lumen/core";
 import type { AppEnv, SessionUser } from "../env";
 import { aiDailyCap, entitlement, requirePro } from "../lib/plan";
 import { body, dayIn, fail, id, now, oneOf, str } from "../lib/util";
-import { CHAT_MODEL, DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, promptFor } from "../lib/ai";
+import { CHAT_MODEL, DEFAULT_MODEL, SPARK_MODEL, SPARK_SYSTEM, asResponseEvents, promptFor, replyOf } from "../lib/ai";
 import { asksForLibrary, retrieve, sourcesBlock, terms } from "../lib/retrieve";
 import { BUILTIN_STYLES, LIBRARY_SYSTEM, TLDR_SYSTEM, chunkParagraphs, paragraphsWithin, styleBlock, tldrCombinePrompt, tldrPrompt } from "@lumen/core";
 import { templateLabel } from "./templates";
@@ -70,7 +70,7 @@ ai.post("/run", async (c) => {
     console.error("ai run failed", e);
     fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment, or switch to a local model in the extension.");
   }
-  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
+  return new Response(asResponseEvents(stream), { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
 });
 
 /** TL;DR of a whole article: numbered paragraphs in, a streamed list with [pN] citations out. One call
@@ -94,14 +94,14 @@ ai.post("/tldr", async (c) => {
       stream = (await run(tldrPrompt(title, paragraphs), true)) as unknown as ReadableStream;
     } else {
       const partials: string[] = [];
-      for (const chunk of chunks) partials.push(((await run(tldrPrompt(title, chunk.paragraphs, chunk.first), false)) as { response?: string }).response ?? "");
+      for (const chunk of chunks) partials.push(String(replyOf(await run(tldrPrompt(title, chunk.paragraphs, chunk.first), false))));
       stream = (await run(tldrCombinePrompt(title, partials), true)) as unknown as ReadableStream;
     }
   } catch (e) {
     console.error("tldr failed", e);
     fail(502, "ai_unavailable", "The assistant is resting. Try again in a moment, or switch to a local model in the extension.");
   }
-  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
+  return new Response(asResponseEvents(stream), { headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-lumen-model": model } });
 });
 
 /** Ask Lumen: chat grounded in the page (optional) and the reader's own library.
@@ -147,7 +147,7 @@ ai.post("/chat", async (c) => {
   const out = new ReadableStream({
     async start(ctrl) {
       ctrl.enqueue(head);
-      const r = stream.getReader();
+      const r = asResponseEvents(stream).getReader();
       while (true) { const { done, value } = await r.read(); if (done) break; ctrl.enqueue(value); }
       ctrl.close();
     },
@@ -165,17 +165,18 @@ ai.post("/spark", async (c) => {
   if (results.length < 3) fail(422, "not_enough", "Highlight at least 3 passages first: Spark needs something to notice.");
   const sparkModel = await spend(c, "spark", SPARK_MODEL);
   const list = results.map((r, k) => `${k + 1}. "${r.quote.slice(0, 300)}"${r.note ? ` (my note: ${r.note.slice(0, 200)})` : ""} [from: ${r.title}]`).join("\n");
-  let out: { response?: unknown };
+  let out: unknown;
   try {
     out = (await c.env.AI.run(sparkModel as Parameters<Ai["run"]>[0], {
       messages: [{ role: "system", content: SPARK_SYSTEM }, { role: "user", content: list }],
       max_tokens: 900,
-    } as never)) as { response?: unknown };
+    } as never));
   } catch (e) {
     console.error("spark failed", e);
     fail(502, "ai_unavailable", "Spark could not reach the model. Try again in a moment.");
   }
-  const parsed = typeof out.response === "object" && out.response ? ideasFrom(out.response) : parseIdeas(String(out.response ?? ""));
+  const reply = replyOf(out);
+  const parsed = typeof reply === "object" && reply ? ideasFrom(reply) : parseIdeas(String(reply ?? ""));
   if (!parsed.length) fail(502, "spark_unparsed", "The model did not return ideas this time. Try again.");
   const t = now();
   const rows = parsed.slice(0, 3).map((p) => ({
