@@ -47,6 +47,16 @@ function fileName(address: string): string {
   }
 }
 
+/** Saves the bytes already fetched, so a PDF behind a sign in downloads without a second request. */
+function download(bytes: ArrayBuffer) {
+  const name = fileName(file);
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  link.download = /\.pdf$/i.test(name) ? name : `${name}.pdf`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 function showProblem() {
   stateEl.hidden = false;
   stateEl.querySelector("[data-state-title]")!.textContent = "This PDF could not be opened here.";
@@ -78,6 +88,9 @@ async function open() {
   viewer.setDocument(doc);
   linkService.setDocument(doc);
   stateEl.hidden = true;
+  const downloadButton = document.querySelector<HTMLButtonElement>("[data-download]")!;
+  downloadButton.disabled = false;
+  downloadButton.onclick = () => download(bytes);
   pagesEl.textContent = `1 / ${doc.numPages}`;
   // "auto" fills the width but caps the zoom, so a portrait page on a wide screen is not blown up.
   eventBus.on("pagesinit", () => { viewer.currentScaleValue = "auto"; });
@@ -104,6 +117,10 @@ async function open() {
   });
   const lumen = new Lumen(surface);
   lumen.start();
+  // The helper's menu also saves, but it is hidden unless the helper is on for this site.
+  const saveButton = document.querySelector<HTMLButtonElement>("[data-save]")!;
+  saveButton.disabled = false;
+  saveButton.onclick = () => lumen.savePage();
   eventBus.on("textlayerrendered", ({ source }: { source: { textLayer: { div: HTMLElement } | null } }) => {
     if (source.textLayer) markLineEnds(source.textLayer.div);
     lumen.paint();
