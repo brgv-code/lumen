@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PDF_MAX_BYTES, isPdfBytes, pdfArticle, pdfParagraphs, pdfRuns, type PdfRun } from "../src/pdf.ts";
+import { PDF_MAX_BYTES, isPdfBytes, pdfArticle, pdfParagraphs, pdfRuns, pdfTitle, type PdfRun, type PdfTextItem } from "../src/pdf.ts";
 
 const build = (pages: PdfRun[][]) => pdfArticle(pdfParagraphs(pages));
 
@@ -105,4 +105,36 @@ test("PdfText.covering picks the highlight that overlaps a passage", async () =>
   const second = { id: "b", quote: "Another idea", prefix: "", suffix: "", position: 15 };
   assert.equal(text.covering({ quote: "idea there", prefix: "", suffix: "", position: 0 }, [first, second])?.id, "b");
   assert.equal(text.covering({ quote: "here.", prefix: "", suffix: "", position: 0 }, [second]), undefined);
+});
+
+/** A pdf.js text item at (x, y) and font size `size`; `rotated` turns it 90 degrees like arXiv's side stamp. */
+const run = (str: string, x: number, y: number, size: number, rotated = false): PdfTextItem => ({ str, transform: rotated ? [0, size, -size, 0, x, y] : [size, 0, 0, size, x, y], height: size, hasEOL: false });
+const body = [run("Ashish Vaswani", 133, 549, 10), run("The dominant sequence transduction models are based on", 125, 380, 10)];
+
+test("the PDF's own Title wins over the page", () => {
+  assert.equal(pdfTitle({ Title: "Attention Is All You Need" }, [run("Something else", 200, 630, 17)]), "Attention Is All You Need");
+});
+
+test("with no Title, the biggest upright text on page one is the title", () => {
+  const page = [run("arXiv:1706.03762v7 [cs.CL] 2 Aug 2023", 32, 237, 20, true), run("Attention Is All You Need", 211, 630, 17.2), ...body];
+  assert.equal(pdfTitle({ Title: "" }, page), "Attention Is All You Need");
+});
+
+test("a title set over two lines is joined", () => {
+  const page = [run("Chain-of-Thought Prompting Elicits Reasoning", 132, 679, 17.2), run("in Large Language Models", 207, 659, 17.2), ...body];
+  assert.equal(pdfTitle({}, page), "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models");
+});
+
+test("small capitals come back as lower case", () => {
+  const page = [run("T", 108, 699, 17.2), run("REE OF", 120, 699, 13.8), run(" ", 160, 699, 0), run("T", 170, 699, 17.2), run("HOUGHTS", 180, 699, 13.8), ...body];
+  assert.equal(pdfTitle({}, page), "Tree of Thoughts");
+});
+
+test("a file name in Title is ignored for the page heading", () => {
+  assert.equal(pdfTitle({ Title: "paper-final.pdf" }, [run("Tree of Thoughts", 136, 679, 17.2), ...body]), "Tree of Thoughts");
+});
+
+test("a page whose text is all one size has no title", () => {
+  assert.equal(pdfTitle({}, body), null);
+  assert.equal(pdfTitle(null), null);
 });

@@ -1,5 +1,5 @@
 // Browser side of PDFs: every check and all parsing happen here, the worker only stores.
-import { PDF_MAX_BYTES, PDF_MAX_PAGES, isPdfBytes, pdfParagraphs, pdfRuns, pdfTitle, type Item, type PdfInfo, type PdfRun } from "@lumen/core";
+import { PDF_MAX_BYTES, PDF_MAX_PAGES, isPdfBytes, pdfParagraphs, pdfRuns, pdfTitle, type Item, type PdfInfo, type PdfRun, type PdfTextItem } from "@lumen/core";
 import { api } from "./api";
 
 export interface ParsedPdf {
@@ -34,14 +34,16 @@ export async function parsePdf(file: ArrayBuffer): Promise<ParseResult> {
     const doc = await task.promise;
     if (doc.numPages > PDF_MAX_PAGES) return { ok: false, problem: "too_many_pages" };
     const runs: PdfRun[][] = [];
+    let firstPage: PdfTextItem[] = [];
     for (let number = 1; number <= doc.numPages; number++) {
       const page = await doc.getPage(number);
       const content = await page.getTextContent();
+      if (number === 1) firstPage = content.items;
       runs.push(pdfRuns(content.items));
       page.cleanup();
     }
     const { info } = await doc.getMetadata();
-    return { ok: true, pdf: { sha256, bytes: file.byteLength, pageCount: doc.numPages, pages: pdfParagraphs(runs), title: pdfTitle(info) } };
+    return { ok: true, pdf: { sha256, bytes: file.byteLength, pageCount: doc.numPages, pages: pdfParagraphs(runs), title: pdfTitle(info, firstPage) } };
   } catch (error) {
     console.warn("pdf.js could not read the file", error);
     return { ok: false, problem: "unreadable" };

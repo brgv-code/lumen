@@ -41,11 +41,58 @@ const PARAGRAPH_GAP = 1.6;
 // Titles, author lines and licence notes are shorter than this; an abstract is not.
 const EXCERPT_MIN_WORDS = 40;
 
-/** The PDF's own Title, when the producer filled it with something better than a file name. */
-export function pdfTitle(info: unknown): string | null {
+// A heading must be this much bigger than the page's usual text to count as the title.
+const TITLE_MIN_RATIO = 1.2;
+const TITLE_MAX_LINES = 3;
+// Runs this close to the biggest size are full capitals; smaller ones on a title line are small caps.
+const TITLE_SIZE_SLACK = 0.95;
+
+type TextRun = Extract<PdfTextItem, { str: string }>;
+
+/** The PDF's own Title when the producer filled it in, else the title as printed on page one. */
+export function pdfTitle(info: unknown, firstPage: readonly PdfTextItem[] = []): string | null {
+  return metadataTitle(info) ?? headingTitle(firstPage);
+}
+
+function metadataTitle(info: unknown): string | null {
   if (!info || typeof info !== "object" || !("Title" in info) || typeof info.Title !== "string") return null;
   const title = info.Title.trim();
   return title && !/\.(pdf|docx?|tex)$/i.test(title) ? title : null;
+}
+
+/** The topmost lines holding page one's biggest upright text, joined. LaTeX papers on arXiv leave Title empty. */
+function headingTitle(items: readonly PdfTextItem[]): string | null {
+  // arXiv stamps its id up the left margin, bigger than any title, so turned text is left out.
+  const upright = items.filter((entry): entry is TextRun => "str" in entry && entry.transform[1] === 0 && entry.transform[2] === 0);
+  const sized = upright.filter((entry) => entry.height > 0);
+  if (!sized.length) return null;
+  const biggest = Math.max(...sized.map((entry) => entry.height));
+  // The usual size is the one most characters are set in; on a tie the smaller, since body text is the small one.
+  const characters = new Map<number, number>();
+  for (const entry of sized) characters.set(entry.height, (characters.get(entry.height) ?? 0) + entry.str.length);
+  const [usual] = [...characters.entries()].sort(([leftSize, leftCount], [rightSize, rightCount]) => rightCount - leftCount || leftSize - rightSize)[0];
+  if (biggest < usual * TITLE_MIN_RATIO) return null;
+
+  const rows = new Map<number, TextRun[]>();
+  for (const entry of upright) {
+    const y = Math.round(entry.transform[5]);
+    rows.set(y, [...(rows.get(y) ?? []), entry]);
+  }
+  const lines = [...rows.entries()].sort(([upper], [lower]) => lower - upper).map(([, runs]) => runs);
+  const isTitleLine = (runs: TextRun[]) => runs.some((entry) => entry.height >= biggest * TITLE_SIZE_SLACK);
+  const first = lines.findIndex(isTitleLine);
+  const titleLines: TextRun[][] = [];
+  for (const runs of lines.slice(first)) {
+    if (!isTitleLine(runs) || titleLines.length === TITLE_MAX_LINES) break;
+    titleLines.push(runs);
+  }
+  const lineText = (runs: TextRun[]) => [...runs]
+    .sort((left, right) => left.transform[4] - right.transform[4])
+    .map((entry) => (entry.height > 0 && entry.height < biggest * TITLE_SIZE_SLACK ? entry.str.toLowerCase() : entry.str))
+    .join("");
+  // Separate runs leave a space before punctuation ("ReAct :"); close it.
+  const title = titleLines.map(lineText).join(" ").replace(/\s+/g, " ").replace(/ ([:,;.])/g, "$1").trim();
+  return title.length >= 3 ? title : null;
 }
 
 export function isPdfBytes(bytes: Uint8Array): boolean {

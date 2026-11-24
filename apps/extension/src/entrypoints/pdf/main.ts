@@ -106,7 +106,8 @@ async function open() {
   });
 
   const { info } = await doc.getMetadata();
-  title = pdfTitle(info) ?? title;
+  const firstPage = await (await doc.getPage(1)).getTextContent();
+  title = pdfTitle(info, firstPage.items) ?? title;
   titleEl.textContent = document.title = title;
 
   let wantsSync = false;
