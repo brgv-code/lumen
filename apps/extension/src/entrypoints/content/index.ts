@@ -4,6 +4,8 @@ import { Lumen, type Surface } from "./lumen";
 import { LinkPreviews } from "./link-preview";
 import { firstShown, hiddenByStyle, isShown, pageSnapshot } from "../../lib/snapshot";
 
+const LINK_PREVIEWS_ENABLED = false;
+
 export default defineContentScript({
   matches: ["<all_urls>"],
   runAt: "document_idle",
@@ -14,7 +16,8 @@ export default defineContentScript({
     (window as any).__lumen = v;
     const lumen = new Lumen(webPage());
     lumen.start();
-    new LinkPreviews(() => lumen.settings).start();
+    // Paused: hover cards fire on every site; bring back once they're limited to article pages.
+    if (LINK_PREVIEWS_ENABLED) new LinkPreviews(() => lumen.settings).start();
   },
 });
 
